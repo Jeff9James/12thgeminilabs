@@ -3,12 +3,16 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { config, validateEnv } from './utils/env';
 import { initDatabase } from './db/connection';
+import { videoService } from './services/videoService';
+import { queueService } from './services/queue';
+import { createStorageProvider } from './services/storage';
 import logger from './utils/logger';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 
 // Routes
 import healthRouter from './routes/health';
 import authRouter from './routes/auth';
+import videosRouter from './routes/videos';
 
 function createApp(): Application {
   const app = express();
@@ -34,6 +38,9 @@ function createApp(): Application {
   // Auth routes
   app.use('/api/auth', authRouter);
 
+  // Video routes
+  app.use('/api/videos', videosRouter);
+
   // 404 handler
   app.use(notFoundHandler);
 
@@ -53,6 +60,15 @@ async function startServer(): Promise<void> {
     await db.connect();
     await db.initialize();
 
+    // Initialize services
+    logger.info('Initializing services...');
+    
+    await videoService.initialize();
+    await queueService.initialize();
+    await createStorageProvider();
+    
+    logger.info('All services initialized');
+
     // Create Express app
     const app = createApp();
 
@@ -61,6 +77,7 @@ async function startServer(): Promise<void> {
       logger.info(`Server running on port ${config.port}`);
       logger.info(`Environment: ${config.nodeEnv}`);
       logger.info(`Frontend URL: ${config.frontendUrl}`);
+      logger.info(`Video Storage: ${config.videoStorageType}`);
     });
   } catch (error) {
     logger.error('Failed to start server:', error);

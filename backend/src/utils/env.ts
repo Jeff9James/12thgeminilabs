@@ -1,5 +1,4 @@
 import dotenv from 'dotenv';
-import { ENV_VARS } from '../../../shared/constants';
 
 dotenv.config();
 
@@ -51,13 +50,18 @@ export const config = {
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET!,
   databasePath: process.env.DATABASE_PATH || './database.db',
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
-  videoStorageType: process.env.VIDEO_STORAGE_TYPE || 'local',
-  videoStoragePath: process.env.VIDEO_STORAGE_PATH || './videos',
+  videoStorageType: (process.env.VIDEO_STORAGE_TYPE as 'local' | 'firebase') || 'local',
+  videoStoragePath: process.env.VIDEO_STORAGE_PATH || './data/videos',
+  tempUploadPath: process.env.TEMP_UPLOAD_PATH || './data/uploads',
+  queuePath: process.env.QUEUE_PATH || './data/queue',
   jwtSecret: process.env.JWT_SECRET!,
   jwtRefreshSecret: process.env.JWT_REFRESH_SECRET!,
   port: parseInt(process.env.PORT || '3001', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
-  firebaseProjectId: process.env.FIREBASE_PROJECT_ID,
+  firebaseProjectId: process.env.FIREBASE_PROJECT_ID || '',
   firebasePrivateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-  firebaseClientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+  firebaseClientEmail: process.env.FIREBASE_CLIENT_EMAIL || '',
+  firebaseBucket: process.env.FIREBASE_BUCKET || '',
+  maxChunkSize: 5 * 1024 * 1024, // 5MB
+  maxFileSize: 2 * 1024 * 1024 * 1024, // 2GB
 };

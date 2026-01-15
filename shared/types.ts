@@ -22,13 +22,27 @@ export interface Video {
   userId: string;
   title: string;
   filename: string;
+  originalFilename: string;
   path: string;
-  size: number;
+  fileSize: number;
+  mimeType: string;
   duration?: number;
-  status: 'uploading' | 'processing' | 'ready' | 'error';
+  width?: number;
+  height?: number;
+  frameCount?: number;
+  status: VideoStatus;
+  uploadError?: string;
   createdAt: Date;
   updatedAt: Date;
 }
+
+export type VideoStatus = 
+  | 'uploading'
+  | 'pending'
+  | 'uploaded'
+  | 'processing'
+  | 'ready'
+  | 'error';
 
 // Video Analysis Types
 export interface VideoAnalysis {
@@ -83,4 +97,40 @@ export interface UploadProgress {
 export interface UploadResponse {
   videoId: string;
   status: string;
+}
+
+export interface ChunkUploadResponse {
+  success: boolean;
+  chunkNumber: number;
+  totalChunks: number;
+  videoId: string;
+  message?: string;
+}
+
+export interface FinalizeUploadResponse {
+  success: boolean;
+  video: Video;
+  message?: string;
+}
+
+export interface VideoMetadata {
+  duration: number;
+  width: number;
+  height: number;
+  frameRate: number;
+  frameCount: number;
+  format: string;
+  codec: string;
+  bitrate?: number;
+}
+
+// Queue Types
+export interface VideoProcessingQueueItem {
+  id: string;
+  videoId: string;
+  userId: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  error?: string;
+  createdAt: string;
+  updatedAt: string;
 }
