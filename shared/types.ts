@@ -135,3 +135,67 @@ export interface UploadResponse {
   videoId: string;
   status: string;
 }
+
+// Gemini Analysis Types
+export interface Analysis {
+  id: string;
+  videoId: string;
+  userId: string;
+  analysisType: 'summary' | 'scenes' | 'search' | 'custom';
+  query?: string;
+  status: 'pending' | 'processing' | 'complete' | 'error';
+  result?: string; // JSON stringified result
+  errorMessage?: string;
+  createdAt: Date;
+  startedAt?: Date;
+  completedAt?: Date;
+}
+
+export interface Scene {
+  timestamp: number;
+  duration?: number;
+  title: string;
+  description: string;
+}
+
+export interface SearchMatch {
+  timestamp: number;
+  duration: number;
+  description: string;
+  confidence: number;
+}
+
+export interface SummaryResult {
+  summary: string;
+  keyPoints?: string[];
+  duration: number;
+}
+
+export interface Conversation {
+  id: string;
+  videoId: string;
+  userId: string;
+  messages: ConversationMessage[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ConversationMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: Date;
+}
+
+export interface AnalysisJobResponse {
+  jobId: string;
+  status: 'pending' | 'processing';
+  message: string;
+}
+
+export interface AnalysisStatusResponse {
+  jobId: string;
+  status: 'pending' | 'processing' | 'complete' | 'error';
+  result?: any;
+  error?: string;
+  progress?: number;
+}

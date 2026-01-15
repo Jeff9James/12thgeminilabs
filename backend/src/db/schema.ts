@@ -61,11 +61,47 @@ export const CREATE_VIDEO_TIMESTAMPS_TABLE = `
   );
 `;
 
+export const CREATE_ANALYSES_TABLE = `
+  CREATE TABLE IF NOT EXISTS analyses (
+    id TEXT PRIMARY KEY,
+    video_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    analysis_type TEXT NOT NULL CHECK(analysis_type IN ('summary', 'scenes', 'search', 'custom')),
+    query TEXT,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'processing', 'complete', 'error')),
+    result TEXT,
+    error_message TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    started_at DATETIME,
+    completed_at DATETIME,
+    FOREIGN KEY (video_id) REFERENCES videos(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+`;
+
+export const CREATE_CONVERSATIONS_TABLE = `
+  CREATE TABLE IF NOT EXISTS conversations (
+    id TEXT PRIMARY KEY,
+    video_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    messages TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (video_id) REFERENCES videos(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+`;
+
 export const CREATE_INDEXES = `
   CREATE INDEX IF NOT EXISTS idx_videos_user_id ON videos(user_id);
   CREATE INDEX IF NOT EXISTS idx_videos_status ON videos(status);
   CREATE INDEX IF NOT EXISTS idx_video_analyses_video_id ON video_analyses(video_id);
   CREATE INDEX IF NOT EXISTS idx_video_timestamps_analysis_id ON video_timestamps(analysis_id);
+  CREATE INDEX IF NOT EXISTS idx_analyses_video_id ON analyses(video_id);
+  CREATE INDEX IF NOT EXISTS idx_analyses_user_id ON analyses(user_id);
+  CREATE INDEX IF NOT EXISTS idx_analyses_status ON analyses(status);
+  CREATE INDEX IF NOT EXISTS idx_conversations_video_id ON conversations(video_id);
+  CREATE INDEX IF NOT EXISTS idx_conversations_user_id ON conversations(user_id);
 `;
 
 export const ALL_TABLES = [
@@ -73,5 +109,7 @@ export const ALL_TABLES = [
   CREATE_VIDEOS_TABLE,
   CREATE_VIDEO_ANALYSES_TABLE,
   CREATE_VIDEO_TIMESTAMPS_TABLE,
+  CREATE_ANALYSES_TABLE,
+  CREATE_CONVERSATIONS_TABLE,
   CREATE_INDEXES,
 ];

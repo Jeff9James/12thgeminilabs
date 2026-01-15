@@ -10,6 +10,7 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import healthRouter from './routes/health';
 import authRouter from './routes/auth';
 import videosRouter from './routes/videos';
+import analysisRouter from './routes/analysis';
 
 function createApp(): Application {
   const app = express();
@@ -37,6 +38,9 @@ function createApp(): Application {
 
   // Video routes
   app.use('/api/videos', videosRouter);
+  
+  // Analysis routes
+  app.use('/api/videos', analysisRouter);
 
   // 404 handler
   app.use(notFoundHandler);
