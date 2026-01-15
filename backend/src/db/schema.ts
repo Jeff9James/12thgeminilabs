@@ -28,6 +28,8 @@ export const CREATE_VIDEOS_TABLE = `
     frame_count INTEGER,
     status TEXT NOT NULL DEFAULT 'pending',
     upload_error TEXT,
+    google_drive_id TEXT,
+    google_drive_url TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -130,6 +132,7 @@ export const CREATE_INDEXING_QUEUE_TABLE = `
 export const CREATE_INDEXES = `
   CREATE INDEX IF NOT EXISTS idx_videos_user_id ON videos(user_id);
   CREATE INDEX IF NOT EXISTS idx_videos_status ON videos(status);
+  CREATE INDEX IF NOT EXISTS idx_videos_google_drive_id ON videos(google_drive_id);
   CREATE INDEX IF NOT EXISTS idx_video_analyses_video_id ON video_analyses(video_id);
   CREATE INDEX IF NOT EXISTS idx_video_timestamps_analysis_id ON video_timestamps(analysis_id);
   CREATE INDEX IF NOT EXISTS idx_analyses_video_id ON analyses(video_id);

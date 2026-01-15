@@ -10,7 +10,12 @@
     "db:migrate": "ts-node src/db/migrate.ts",
     "db:seed": "ts-node src/db/seed.ts"
   },
-  "keywords": ["video", "ai", "gemini", "express"],
+  "keywords": [
+    "video",
+    "ai",
+    "gemini",
+    "express"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
@@ -22,6 +27,7 @@
     "express": "^4.19.2",
     "express-validator": "^7.0.1",
     "google-auth-library": "^9.7.0",
+    "googleapis": "^170.0.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^1.4.5-lts.1",
     "sqlite3": "^5.1.7",

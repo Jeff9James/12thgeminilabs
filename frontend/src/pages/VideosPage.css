@@ -9,6 +9,35 @@
   margin-bottom: 2rem;
 }
 
+.header-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.drive-import-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  background-color: #059669;
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.drive-import-button:hover {
+  background-color: #047857;
+}
+
+.drive-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
 .page-title {
   font-size: 1.5rem;
   font-weight: 600;

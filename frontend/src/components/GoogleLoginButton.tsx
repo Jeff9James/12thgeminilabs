@@ -4,9 +4,13 @@ import { useAuth } from '../hooks/useAuth';
 import './GoogleLoginButton.css';
 
 interface GoogleLoginButtonProps {
-  onSuccess?: (user: any) => void;
-  onError?: (error: any) => void;
+  onSuccess?: (response: GoogleLoginResponse | GoogleLoginResponseOffline) => void;
+  onError?: (error: unknown) => void;
 }
+
+type GoogleLoginResponseWithAccessToken = GoogleLoginResponse & {
+  access_token?: string;
+};
 
 export function GoogleLoginButton({ onSuccess, onError }: GoogleLoginButtonProps) {
   const { login } = useAuth();
@@ -14,25 +18,23 @@ export function GoogleLoginButton({ onSuccess, onError }: GoogleLoginButtonProps
   const handleSuccess = async (response: GoogleLoginResponse | GoogleLoginResponseOffline) => {
     try {
       if ('credential' in response) {
-        // Successful login
         const idToken = response.credential;
-        // Get access token if available (for Google Drive integration)
-        const accessToken = (response as any).access_token;
-        
+        const accessToken = (response as GoogleLoginResponseWithAccessToken).access_token;
+
         await login(idToken, accessToken);
         onSuccess?.(response);
-      } else {
-        // This handles the case where Google returns an offline response
-        console.log('Google login response:', response);
-        onError?.(new Error('Google login returned offline response'));
+        return;
       }
+
+      console.log('Google login response:', response);
+      onError?.(new Error('Google login returned offline response'));
     } catch (error) {
       console.error('Login failed:', error);
       onError?.(error);
     }
   };
 
-  const handleError = (error: any) => {
+  const handleError = (error: unknown) => {
     console.error('Google login error:', error);
     onError?.(error);
   };

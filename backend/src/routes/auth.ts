@@ -76,7 +76,7 @@ async function getOrCreateUser(payload: any): Promise<User> {
 // Returns JWT in response
 router.post('/google-callback', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { idToken, accessToken } = req.body;
+    const { idToken, accessToken, refreshToken: googleRefreshToken } = req.body;
 
     if (!idToken) {
       res.status(400).json({
@@ -106,7 +106,7 @@ router.post('/google-callback', async (req: Request, res: Response): Promise<voi
     // Generate refresh token
     const refreshToken = generateRefreshToken(user.id, user.email);
 
-    // Set HTTP-only cookie for OAuth access token (for Google Drive integration later)
+    // Set HTTP-only cookie for OAuth access token (for Google Drive integration)
     if (accessToken) {
       res.cookie('oauth_access_token', accessToken, {
         httpOnly: true,
@@ -116,7 +116,17 @@ router.post('/google-callback', async (req: Request, res: Response): Promise<voi
       });
     }
 
-    // Set HTTP-only cookie for refresh token
+    // Set HTTP-only cookie for Google refresh token (for token renewal)
+    if (googleRefreshToken) {
+      res.cookie('google_refresh_token', googleRefreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      });
+    }
+
+    // Set HTTP-only cookie for app refresh token
     res.cookie('refresh_token', refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
