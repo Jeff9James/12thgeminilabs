@@ -97,9 +97,23 @@ export const ANALYSIS_CONSTANTS = {
   CACHE_DURATION: 24 * 60 * 60 * 1000, // 24 hours
 } as const;
 
+// Search Constants
+export const SEARCH_CONSTANTS = {
+  DEFAULT_SEGMENT_DURATION: 30, // 30 seconds
+  DEFAULT_THRESHOLD: 0.5,
+  MIN_THRESHOLD: 0.0,
+  MAX_THRESHOLD: 1.0,
+  POLLING_INTERVAL: 3000, // 3 seconds
+  MAX_SUGGESTIONS: 10,
+  MAX_POPULAR_TERMS: 10,
+  MIN_QUERY_LENGTH: 2,
+} as const;
+
 // Success Messages
 export const SUCCESS_MESSAGES = {
   UPLOAD_COMPLETE: 'Video uploaded successfully',
   ANALYSIS_COMPLETE: 'Video analysis complete',
   DELETE_COMPLETE: 'Video deleted successfully',
+  INDEXING_STARTED: 'Video indexing started successfully',
+  SEARCH_COMPLETE: 'Search completed successfully',
 } as const;

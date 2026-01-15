@@ -36,3 +36,8 @@ export function isFirebaseConfigured(): boolean {
     config.firebasePrivateKey
   );
 }
+
+// Export the new services
+export { geminiService } from './gemini';
+export { temporalIndexService } from './temporalIndex';
+export { semanticSearchService } from './semanticSearch';

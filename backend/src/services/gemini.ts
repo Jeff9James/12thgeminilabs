@@ -270,6 +270,11 @@ export class GeminiVideoService {
   }
 
   async analyzeWithCustomPrompt(filePath: string, prompt: string): Promise<string> {
+    // If no file path provided, return an error
+    if (!filePath) {
+      throw new Error('Video file path is required for analysis');
+    }
+    
     const file = await this.uploadVideoFile(filePath);
     
     try {
@@ -281,6 +286,57 @@ export class GeminiVideoService {
           },
         },
         { text: prompt },
+      ]);
+
+      const response = result.response;
+      return response.text();
+    } finally {
+      await this.deleteFile(file.name);
+    }
+  }
+
+  async analyzeQueryContext(query: string, context?: string): Promise<string> {
+    // For query analysis without video file
+    const prompt = context 
+      ? `Query: "${query}"\nContext: "${context}"\nProvide analysis based on the query and context.`
+      : `Analyze this search query: "${query}"`;
+    
+    try {
+      const result = await this.model.generateContent(prompt);
+      const response = result.response;
+      return response.text();
+    } catch (error) {
+      logger.error('Error analyzing query context:', error);
+      throw error;
+    }
+  }
+
+  async analyzeVideoSegment(
+    videoFile: string, 
+    startTime: number, 
+    endTime: number, 
+    prompt: string
+  ): Promise<string> {
+    const file = await this.uploadVideoFile(videoFile);
+    
+    // Extend the prompt to include temporal context
+    const extendedPrompt = `
+      Please analyze the specific segment of this video from ${startTime} to ${endTime} seconds.
+      
+      ${prompt}
+      
+      Focus specifically on what's happening in the time range ${startTime}s to ${endTime}s.
+    `;
+    
+    try {
+      const result = await this.model.generateContent([
+        {
+          fileData: {
+            mimeType: file.mimeType,
+            fileUri: file.uri,
+          },
+        },
+        { text: extendedPrompt },
       ]);
 
       const response = result.response;

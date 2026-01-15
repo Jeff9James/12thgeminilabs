@@ -199,3 +199,61 @@ export interface AnalysisStatusResponse {
   error?: string;
   progress?: number;
 }
+
+// Temporal Index Types
+export interface TemporalSegment {
+  id: string;
+  videoId: string;
+  userId: string;
+  segmentNumber: number;
+  startTime: number;
+  endTime: number;
+  description: string;
+  entities?: string; // JSON string
+  sceneType?: string;
+  confidence: number;
+  createdAt: Date;
+}
+
+export interface IndexingJob {
+  id: string;
+  videoId: string;
+  userId: string;
+  status: 'pending' | 'processing' | 'complete' | 'error';
+  progress: number;
+  totalSegments: number;
+  processedSegments: number;
+  errorMessage?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface SearchRequest {
+  query: string;
+  threshold?: number;
+  timeRange?: {
+    start: number;
+    end: number;
+  };
+  entityFilters?: string[];
+  sceneTypeFilters?: string[];
+  searchType?: 'text' | 'semantic' | 'entity' | 'action' | 'scene_type';
+}
+
+export interface SearchMatchResult {
+  segmentId: string;
+  startTime: number;
+  endTime: number;
+  relevanceScore: number;
+  description: string;
+  entities?: string[];
+  sceneType?: string;
+  confidence: number;
+}
+
+export interface SearchResponse {
+  matches: SearchMatchResult[];
+  totalResults: number;
+  searchTime: number;
+  query: string;
+}

@@ -92,6 +92,41 @@ export const CREATE_CONVERSATIONS_TABLE = `
   );
 `;
 
+export const CREATE_TEMPORAL_INDEX_TABLE = `
+  CREATE TABLE IF NOT EXISTS temporal_index (
+    id TEXT PRIMARY KEY,
+    video_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    segment_number INTEGER NOT NULL,
+    start_time FLOAT NOT NULL,
+    end_time FLOAT NOT NULL,
+    description TEXT NOT NULL,
+    entities TEXT,
+    scene_type TEXT,
+    confidence REAL DEFAULT 0.8,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (video_id) REFERENCES videos(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+`;
+
+export const CREATE_INDEXING_QUEUE_TABLE = `
+  CREATE TABLE IF NOT EXISTS indexing_queue (
+    id TEXT PRIMARY KEY,
+    video_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'processing', 'complete', 'error')),
+    progress INTEGER DEFAULT 0,
+    total_segments INTEGER DEFAULT 0,
+    processed_segments INTEGER DEFAULT 0,
+    error_message TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (video_id) REFERENCES videos(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+`;
+
 export const CREATE_INDEXES = `
   CREATE INDEX IF NOT EXISTS idx_videos_user_id ON videos(user_id);
   CREATE INDEX IF NOT EXISTS idx_videos_status ON videos(status);
@@ -102,6 +137,11 @@ export const CREATE_INDEXES = `
   CREATE INDEX IF NOT EXISTS idx_analyses_status ON analyses(status);
   CREATE INDEX IF NOT EXISTS idx_conversations_video_id ON conversations(video_id);
   CREATE INDEX IF NOT EXISTS idx_conversations_user_id ON conversations(user_id);
+  CREATE INDEX IF NOT EXISTS idx_temporal_index_video_id ON temporal_index(video_id);
+  CREATE INDEX IF NOT EXISTS idx_temporal_index_user_id ON temporal_index(user_id);
+  CREATE INDEX IF NOT EXISTS idx_temporal_index_start_time ON temporal_index(start_time);
+  CREATE INDEX IF NOT EXISTS idx_indexing_queue_video_id ON indexing_queue(video_id);
+  CREATE INDEX IF NOT EXISTS idx_indexing_queue_status ON indexing_queue(status);
 `;
 
 export const ALL_TABLES = [
@@ -111,5 +151,7 @@ export const ALL_TABLES = [
   CREATE_VIDEO_TIMESTAMPS_TABLE,
   CREATE_ANALYSES_TABLE,
   CREATE_CONVERSATIONS_TABLE,
+  CREATE_TEMPORAL_INDEX_TABLE,
+  CREATE_INDEXING_QUEUE_TABLE,
   CREATE_INDEXES,
 ];
