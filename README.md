@@ -161,16 +161,19 @@ npm run preview
 
 ### Videos
 - `GET /api/videos` - List user's videos
-- `POST /api/videos/upload` - Upload a video
+- `POST /api/videos/upload` - Upload video chunk
+- `POST /api/videos/finalize` - Finalize chunked upload
 - `GET /api/videos/:id` - Get video details
+- `GET /api/videos/:id/stream` - Stream video with range support
 - `DELETE /api/videos/:id` - Delete a video
 
-### Analysis
-- `POST /api/videos/:id/analyze` - Analyze a video
-- `GET /api/analysis/:id` - Get analysis results
-
-### Search
-- `POST /api/search/semantic` - Semantic search within videos
+### Video Analysis (Gemini 3)
+- `POST /api/videos/:id/analyze` - Generic analysis endpoint (returns job ID for async processing)
+- `GET /api/videos/:id/analysis/:jobId` - Get analysis status and results
+- `POST /api/videos/:id/summarize` - Generate video summary with key points
+- `POST /api/videos/:id/scenes` - Detect scenes/chapters with timestamps
+- `POST /api/videos/:id/search` - Search for specific moments (body: `{query: "text"}`)
+- `POST /api/videos/:id/chat` - Chat about video content (body: `{message: "question", conversationId?: "id"}`)
 
 ## Deployment
 
@@ -205,9 +208,52 @@ npm run build
 The SQLite database is automatically initialized with the following tables:
 
 - `users` - User accounts
-- `videos` - Uploaded videos
-- `video_analyses` - Video analysis results
-- `video_timestamps` - Timestamped video insights
+- `videos` - Uploaded videos with metadata
+- `video_analyses` - Legacy video analysis results
+- `video_timestamps` - Legacy timestamped video insights
+- `analyses` - Gemini analysis jobs and cached results
+- `conversations` - Multi-turn video chat conversations
+
+### Gemini 3 Video Understanding
+
+The platform uses Google's Gemini 1.5 Pro model for advanced video understanding:
+
+**Features:**
+- **Summarization**: Generates comprehensive summaries with key points and themes
+- **Scene Detection**: Automatically breaks videos into timestamped chapters
+- **Semantic Search**: Finds specific moments matching natural language queries
+- **Video Chat**: Multi-turn conversations about video content with context awareness
+
+**Processing Strategy:**
+- Videos < 50MB: Processed synchronously, immediate results
+- Videos > 50MB: Queued for async processing, poll for results via job ID
+- Results cached for 24 hours to avoid duplicate API calls
+- Automatic retry (up to 3 times) on transient failures
+- 10-minute timeout for processing jobs
+
+**Example Usage:**
+
+```bash
+# Summarize a video
+curl -X POST http://localhost:3001/api/videos/:videoId/summarize \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Detect scenes
+curl -X POST http://localhost:3001/api/videos/:videoId/scenes \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Search for specific moments
+curl -X POST http://localhost:3001/api/videos/:videoId/search \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "person wearing red shirt"}'
+
+# Chat about video
+curl -X POST http://localhost:3001/api/videos/:videoId/chat \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "What happens at the beginning?"}'
+```
 
 ## License
 

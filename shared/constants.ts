@@ -18,6 +18,11 @@ export const API_ENDPOINTS = {
   ANALYSIS: {
     CREATE: '/api/videos/:id/analyze',
     GET: '/api/analysis/:id',
+    STATUS: '/api/videos/:id/analysis/:jobId',
+    SUMMARIZE: '/api/videos/:id/summarize',
+    SCENES: '/api/videos/:id/scenes',
+    SEARCH: '/api/videos/:id/search',
+    CHAT: '/api/videos/:id/chat',
   },
   SEARCH: {
     SEMANTIC: '/api/search/semantic',
@@ -82,6 +87,14 @@ export const ERROR_MESSAGES = {
   MISSING_CHUNK: 'Missing chunk data',
   ANALYSIS_FAILED: 'Failed to analyze video',
   INTERNAL_ERROR: 'Internal server error',
+} as const;
+
+// Analysis Constants
+export const ANALYSIS_CONSTANTS = {
+  SYNC_SIZE_THRESHOLD: 50 * 1024 * 1024, // 50MB - process synchronously if smaller
+  MAX_PROCESSING_TIME: 10 * 60 * 1000, // 10 minutes
+  MAX_RETRIES: 3,
+  CACHE_DURATION: 24 * 60 * 60 * 1000, // 24 hours
 } as const;
 
 // Success Messages
