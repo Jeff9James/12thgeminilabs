@@ -1,5 +1,6 @@
 import express, { Application } from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import { config, validateEnv } from './utils/env';
 import { initDatabase } from './db/connection';
 import logger from './utils/logger';
@@ -19,6 +20,7 @@ function createApp(): Application {
   }));
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
+  app.use(cookieParser());
 
   // Request logging
   app.use((req, res, next) => {

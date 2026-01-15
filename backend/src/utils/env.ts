@@ -12,6 +12,7 @@ export function validateEnv(): void {
     ENV_VARS.FRONTEND_URL,
     ENV_VARS.VIDEO_STORAGE_TYPE,
     ENV_VARS.JWT_SECRET,
+    ENV_VARS.JWT_REFRESH_SECRET,
   ];
 
   const missingVars: string[] = [];
@@ -53,6 +54,7 @@ export const config = {
   videoStorageType: process.env.VIDEO_STORAGE_TYPE || 'local',
   videoStoragePath: process.env.VIDEO_STORAGE_PATH || './videos',
   jwtSecret: process.env.JWT_SECRET!,
+  jwtRefreshSecret: process.env.JWT_REFRESH_SECRET!,
   port: parseInt(process.env.PORT || '3001', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
   firebaseProjectId: process.env.FIREBASE_PROJECT_ID,

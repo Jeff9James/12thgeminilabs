@@ -10,6 +10,7 @@ class ApiClient {
       headers: {
         'Content-Type': 'application/json',
       },
+      withCredentials: true, // Include cookies for OAuth tokens
     });
 
     // Request interceptor to add auth token
@@ -26,18 +27,48 @@ class ApiClient {
       }
     );
 
-    // Response interceptor to handle errors
+    // Response interceptor to handle auth errors
     this.client.interceptors.response.use(
       (response) => response,
-      (error: AxiosError<ApiResponse>) => {
+      async (error: AxiosError<ApiResponse>) => {
         if (error.response?.status === 401) {
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          window.location.href = '/login';
+          // Try to refresh token
+          const refreshToken = localStorage.getItem('refreshToken');
+          if (refreshToken) {
+            try {
+              const response = await this.post<{ token: string }>('/auth/refresh', { 
+                refreshToken 
+              });
+              
+              if (response.success && response.data) {
+                localStorage.setItem('token', response.data.token);
+                // Retry original request
+                const originalRequest = error.config;
+                if (originalRequest) {
+                  originalRequest.headers.Authorization = `Bearer ${response.data.token}`;
+                  return this.client(originalRequest);
+                }
+              }
+            } catch (refreshError) {
+              // Refresh failed, redirect to login
+              this.clearAuth();
+              window.location.href = '/login';
+            }
+          } else {
+            // No refresh token, redirect to login
+            this.clearAuth();
+            window.location.href = '/login';
+          }
         }
         return Promise.reject(error);
       }
     );
+  }
+
+  private clearAuth() {
+    localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('user');
   }
 
   async get<T>(url: string, params?: any): Promise<ApiResponse<T>> {

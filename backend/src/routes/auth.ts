@@ -1,7 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { OAuth2Client } from 'google-auth-library';
+import jwt from 'jsonwebtoken';
 import { getDatabase } from '../db/connection';
-import { authenticate, generateToken } from '../middleware/auth';
+import { authenticate, generateToken, generateRefreshToken } from '../middleware/auth';
 import { ApiResponse, AuthResponse, User } from '../../../shared/types';
 import { config } from '../utils/env';
 import logger from '../utils/logger';
@@ -10,10 +11,72 @@ import { v4 as uuidv4 } from 'uuid';
 const router = Router();
 const oauth2Client = new OAuth2Client();
 
-// Google OAuth callback
-router.post('/google', async (req: Request, res: Response): Promise<void> => {
+// Helper function to verify Google ID token
+async function verifyGoogleIdToken(idToken: string): Promise<any> {
   try {
-    const { idToken } = req.body;
+    const ticket = await oauth2Client.verifyIdToken({
+      idToken,
+      audience: config.googleClientId,
+    });
+    return ticket.getPayload();
+  } catch (error) {
+    logger.error('Google ID token verification failed:', error);
+    throw new Error('Invalid Google ID token');
+  }
+}
+
+// Helper function to get or create user
+async function getOrCreateUser(payload: any): Promise<User> {
+  const db = getDatabase();
+  const googleId = payload.sub;
+  const email = payload.email;
+  const name = payload.name || email.split('@')[0];
+  const picture = payload.picture;
+
+  // Check if user exists in our minimal users table
+  const existingUser = await db.get<User>(
+    'SELECT * FROM users WHERE google_id = ?',
+    [googleId]
+  );
+
+  let user: User;
+
+  if (existingUser) {
+    user = existingUser;
+    logger.info(`Existing user logged in: ${email}`);
+  } else {
+    // Create new user for quota/auditing only
+    const userId = uuidv4();
+    await db.run(
+      'INSERT INTO users (id, email, name, google_id, picture_url, quota_used) VALUES (?, ?, ?, ?, ?, ?)',
+      [userId, email, name, googleId, picture, 0]
+    );
+
+    user = {
+      id: userId,
+      email,
+      name,
+      googleId,
+      picture,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      quotaUsed: 0,
+    };
+
+    logger.info(`New user created: ${email}`);
+  }
+
+  return user;
+}
+
+// POST /api/auth/google-callback
+// Receives Google ID token from frontend, validates token signature with Google's public keys (cached)
+// Extracts user info (email, name, picture, sub as user_id)
+// Generates JWT token valid for 1 hour
+// Returns JWT in response
+router.post('/google-callback', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { idToken, accessToken } = req.body;
 
     if (!idToken) {
       res.status(400).json({
@@ -23,13 +86,8 @@ router.post('/google', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Verify the ID token
-    const ticket = await oauth2Client.verifyIdToken({
-      idToken,
-      audience: config.googleClientId,
-    });
-
-    const payload = ticket.getPayload();
+    // Verify the ID token with Google's public keys (cached)
+    const payload = await verifyGoogleIdToken(idToken);
 
     if (!payload || !payload.sub || !payload.email) {
       res.status(400).json({
@@ -39,51 +97,39 @@ router.post('/google', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const googleId = payload.sub;
-    const email = payload.email;
-    const name = payload.name || email.split('@')[0];
+    // Get or create user (for quota/auditing only)
+    const user = await getOrCreateUser(payload);
 
-    const db = getDatabase();
+    // Generate JWT token valid for 1 hour
+    const token = generateToken(user.id, user.email);
 
-    // Check if user exists
-    const existingUser = await db.get<User>(
-      'SELECT * FROM users WHERE google_id = ?',
-      [googleId]
-    );
+    // Generate refresh token
+    const refreshToken = generateRefreshToken(user.id, user.email);
 
-    let user: User;
-
-    if (existingUser) {
-      user = existingUser;
-      logger.info(`Existing user logged in: ${email}`);
-    } else {
-      // Create new user
-      const userId = uuidv4();
-      await db.run(
-        'INSERT INTO users (id, email, name, google_id) VALUES (?, ?, ?, ?)',
-        [userId, email, name, googleId]
-      );
-
-      user = {
-        id: userId,
-        email,
-        name,
-        googleId,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
-      logger.info(`New user created: ${email}`);
+    // Set HTTP-only cookie for OAuth access token (for Google Drive integration later)
+    if (accessToken) {
+      res.cookie('oauth_access_token', accessToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 60 * 60 * 1000, // 1 hour
+      });
     }
 
-    // Generate JWT token
-    const token = generateToken(user.id, user.email);
+    // Set HTTP-only cookie for refresh token
+    res.cookie('refresh_token', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
 
     const response: ApiResponse<AuthResponse> = {
       success: true,
       data: {
         user,
-        token,
+        token, // This will be stored in localStorage on frontend
+        refreshToken, // This will be stored in localStorage on frontend
       },
       message: 'Authentication successful',
     };
@@ -98,7 +144,55 @@ router.post('/google', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-// Get current user
+// POST /api/auth/refresh
+// Takes refresh token
+// Validates and generates new JWT
+// Returns new JWT
+router.post('/refresh', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+      res.status(400).json({
+        success: false,
+        error: 'Refresh token is required',
+      });
+      return;
+    }
+
+    // Verify refresh token
+    const decoded = jwt.verify(refreshToken, config.jwtRefreshSecret) as {
+      userId: string;
+      email: string;
+      type: 'refresh';
+    };
+
+    if (decoded.type !== 'refresh') {
+      throw new Error('Invalid token type');
+    }
+
+    // Generate new JWT token
+    const newToken = generateToken(decoded.userId, decoded.email);
+
+    const response: ApiResponse<{ token: string }> = {
+      success: true,
+      data: { token: newToken },
+      message: 'Token refreshed successfully',
+    };
+
+    res.json(response);
+  } catch (error) {
+    logger.error('Token refresh error:', error);
+    res.status(401).json({
+      success: false,
+      error: 'Invalid or expired refresh token',
+    });
+  }
+});
+
+// GET /api/auth/me
+// Validates JWT
+// Returns current user info
 router.get('/me', authenticate, async (req: Request, res: Response): Promise<void> => {
   try {
     if (!req.user) {
@@ -109,13 +203,15 @@ router.get('/me', authenticate, async (req: Request, res: Response): Promise<voi
       return;
     }
 
+    // Get user info from JWT (no database lookup needed)
+    // But we can optionally fetch quota info for display
     const db = getDatabase();
-    const user = await db.get<User>(
-      'SELECT * FROM users WHERE id = ?',
+    const userWithQuota = await db.get<User>(
+      'SELECT id, email, name, picture_url, quota_used, created_at FROM users WHERE id = ?',
       [req.user.id]
     );
 
-    if (!user) {
+    if (!userWithQuota) {
       res.status(404).json({
         success: false,
         error: 'User not found',
@@ -125,7 +221,7 @@ router.get('/me', authenticate, async (req: Request, res: Response): Promise<voi
 
     const response: ApiResponse<User> = {
       success: true,
-      data: user,
+      data: userWithQuota,
     };
 
     res.json(response);
@@ -138,10 +234,13 @@ router.get('/me', authenticate, async (req: Request, res: Response): Promise<voi
   }
 });
 
-// Logout
-router.post('/logout', authenticate, (req: Request, res: Response): void => {
-  // In a JWT-based system, logout is handled on the client side
-  // by removing the token. This endpoint exists for future extensions.
+// POST /api/auth/logout
+// Invalidates JWT (or client-side only)
+router.post('/logout', (req: Request, res: Response): void => {
+  // Clear cookies
+  res.clearCookie('oauth_access_token');
+  res.clearCookie('refresh_token');
+
   res.json({
     success: true,
     message: 'Logged out successfully',
