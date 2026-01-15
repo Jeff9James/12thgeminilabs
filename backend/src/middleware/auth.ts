@@ -4,21 +4,21 @@ import { config } from '../utils/env';
 import { ERROR_MESSAGES } from '../../../shared/constants';
 import logger from '../utils/logger';
 
-export interface AuthenticatedRequest extends Request {
-  user?: {
-    id: string;
-    email: string;
-    name?: string;
-    googleId?: string;
-    picture?: string;
-    createdAt?: Date;
-    updatedAt?: Date;
-    quotaUsed?: number;
-  };
+interface AuthenticatedUser {
+  id: string;
+  email: string;
+}
+
+declare global {
+  namespace Express {
+    interface Request {
+      user?: AuthenticatedUser;
+    }
+  }
 }
 
 export function authenticate(
-  req: AuthenticatedRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): void {

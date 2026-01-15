@@ -21,6 +21,11 @@ database.db
 # Video storage
 /videos/
 /backend/videos/
+/data/videos/
+/temp_uploads/
+
+# Queue directory
+/data/queue/
 
 # Logs
 logs/
