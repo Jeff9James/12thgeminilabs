@@ -131,13 +131,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     apiClient.post('/auth/logout').catch(console.error);
   }, []);
 
-  return (
-    <AuthContext.Provider
-      value={{ user, isAuthenticated: !!user, isLoading, login, logout, refreshToken: doRefreshToken }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
+  return React.createElement(AuthContext.Provider, {
+    value: { user, isAuthenticated: !!user, isLoading, login, logout, refreshToken: doRefreshToken }
+  }, children);
 }
 
 export function useAuth() {

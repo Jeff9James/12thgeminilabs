@@ -132,11 +132,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider
-      value={{ user, isAuthenticated: !!user, isLoading, login, logout, refreshToken: doRefreshToken }}
-    >
-      {children}
-    </AuthContext.Provider>
+    React.createElement(AuthContext.Provider, {
+      value: { user, isAuthenticated: !!user, isLoading, login, logout, refreshToken: doRefreshToken }
+    }, children)
   );
 }
 

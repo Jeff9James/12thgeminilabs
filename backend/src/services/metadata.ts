@@ -99,10 +99,10 @@ function mapFormatToMimeType(format: string): string | null {
   return formatMap[format.toLowerCase()] || null;
 }
 
+import * as path from 'path';
+
 export function isValidVideoFile(filePath: string): boolean {
   const supportedExtensions = ['.mp4', '.mov', '.avi', '.webm'];
   const ext = path.extname(filePath).toLowerCase();
   return supportedExtensions.includes(ext);
 }
-
-import * as path from 'path';
