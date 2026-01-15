@@ -1,0 +1,68 @@
+// API Endpoints
+export const API_ENDPOINTS = {
+  HEALTH: '/api/health',
+  AUTH: {
+    GOOGLE: '/api/auth/google',
+    CALLBACK: '/api/auth/google/callback',
+    LOGOUT: '/api/auth/logout',
+    ME: '/api/auth/me',
+  },
+  VIDEOS: {
+    LIST: '/api/videos',
+    UPLOAD: '/api/videos/upload',
+    GET: '/api/videos/:id',
+    DELETE: '/api/videos/:id',
+  },
+  ANALYSIS: {
+    CREATE: '/api/videos/:id/analyze',
+    GET: '/api/analysis/:id',
+  },
+  SEARCH: {
+    SEMANTIC: '/api/search/semantic',
+  },
+} as const;
+
+// Video Status
+export const VIDEO_STATUS = {
+  UPLOADING: 'uploading',
+  PROCESSING: 'processing',
+  READY: 'ready',
+  ERROR: 'error',
+} as const;
+
+// Storage Types
+export const STORAGE_TYPES = {
+  LOCAL: 'local',
+  FIREBASE: 'firebase',
+} as const;
+
+// Environment Variables
+export const ENV_VARS = {
+  GEMINI_API_KEY: 'GEMINI_API_KEY',
+  GOOGLE_CLIENT_ID: 'GOOGLE_CLIENT_ID',
+  GOOGLE_CLIENT_SECRET: 'GOOGLE_CLIENT_SECRET',
+  DATABASE_PATH: 'DATABASE_PATH',
+  FRONTEND_URL: 'FRONTEND_URL',
+  VIDEO_STORAGE_TYPE: 'VIDEO_STORAGE_TYPE',
+  VIDEO_STORAGE_PATH: 'VIDEO_STORAGE_PATH',
+  JWT_SECRET: 'JWT_SECRET',
+  PORT: 'PORT',
+  NODE_ENV: 'NODE_ENV',
+} as const;
+
+// Error Messages
+export const ERROR_MESSAGES = {
+  UNAUTHORIZED: 'Unauthorized access',
+  INVALID_TOKEN: 'Invalid or expired token',
+  VIDEO_NOT_FOUND: 'Video not found',
+  UPLOAD_FAILED: 'Failed to upload video',
+  ANALYSIS_FAILED: 'Failed to analyze video',
+  INTERNAL_ERROR: 'Internal server error',
+} as const;
+
+// Success Messages
+export const SUCCESS_MESSAGES = {
+  UPLOAD_COMPLETE: 'Video uploaded successfully',
+  ANALYSIS_COMPLETE: 'Video analysis complete',
+  DELETE_COMPLETE: 'Video deleted successfully',
+} as const;
