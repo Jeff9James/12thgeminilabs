@@ -4,6 +4,8 @@ export interface User {
   email: string;
   name: string;
   googleId: string;
+  picture?: string;
+  quotaUsed?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -11,6 +13,7 @@ export interface User {
 export interface AuthResponse {
   user: User;
   token: string;
+  refreshToken: string;
 }
 
 // Video Types

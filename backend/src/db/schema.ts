@@ -5,6 +5,8 @@ export const CREATE_USERS_TABLE = `
     email TEXT UNIQUE NOT NULL,
     name TEXT NOT NULL,
     google_id TEXT UNIQUE NOT NULL,
+    picture_url TEXT,
+    quota_used INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
