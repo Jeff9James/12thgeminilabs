@@ -10,7 +10,7 @@ class ApiClient {
       headers: {
         'Content-Type': 'application/json',
       },
-      withCredentials: true, // Include cookies for OAuth tokens
+      withCredentials: true,
     });
 
     // Request interceptor to add auth token
@@ -32,7 +32,6 @@ class ApiClient {
       (response) => response,
       async (error: AxiosError<ApiResponse>) => {
         if (error.response?.status === 401) {
-          // Try to refresh token
           const refreshToken = localStorage.getItem('refreshToken');
           if (refreshToken) {
             try {
@@ -42,7 +41,6 @@ class ApiClient {
               
               if (response.success && response.data) {
                 localStorage.setItem('token', response.data.token);
-                // Retry original request
                 const originalRequest = error.config;
                 if (originalRequest) {
                   originalRequest.headers.Authorization = `Bearer ${response.data.token}`;
@@ -50,12 +48,10 @@ class ApiClient {
                 }
               }
             } catch (refreshError) {
-              // Refresh failed, redirect to login
               this.clearAuth();
               window.location.href = '/login';
             }
           } else {
-            // No refresh token, redirect to login
             this.clearAuth();
             window.location.href = '/login';
           }
@@ -89,6 +85,86 @@ class ApiClient {
   async delete<T>(url: string): Promise<ApiResponse<T>> {
     const response = await this.client.delete<ApiResponse<T>>(url);
     return response.data;
+  }
+
+  // Upload file with progress tracking
+  async uploadFile<T>(
+    url: string,
+    file: File,
+    onProgress?: (progress: number) => void,
+    params?: Record<string, string>
+  ): Promise<ApiResponse<T>> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        formData.append(key, value);
+      });
+    }
+
+    const response = await this.client.post<ApiResponse<T>>(url, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      onUploadProgress: (progressEvent) => {
+        if (onProgress && progressEvent.total) {
+          const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          onProgress(progress);
+        }
+      },
+    });
+
+    return response.data;
+  }
+
+  // Upload chunk for chunked upload
+  async uploadChunk(
+    url: string,
+    chunk: Blob,
+    chunkNumber: number,
+    totalChunks: number,
+    videoId: string,
+    filename: string,
+    onProgress?: (progress: number) => void
+  ): Promise<ApiResponse<{ chunkNumber: number; totalChunks: number; videoId: string }>> {
+    const formData = new FormData();
+    formData.append('chunk', chunk);
+    formData.append('chunkNumber', chunkNumber.toString());
+    formData.append('totalChunks', totalChunks.toString());
+    formData.append('videoId', videoId);
+    formData.append('filename', filename);
+
+    const response = await this.client.post(url, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      onUploadProgress: (progressEvent) => {
+        if (onProgress && progressEvent.total) {
+          const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          onProgress(progress);
+        }
+      },
+    });
+
+    return response.data;
+  }
+
+  // Finalize chunked upload
+  async finalizeUpload<T>(url: string, data: {
+    videoId: string;
+    filename: string;
+    totalChunks: number;
+    mimeType: string;
+  }): Promise<ApiResponse<T>> {
+    const response = await this.client.post(url, data);
+    return response.data;
+  }
+
+  // Get video stream URL
+  getVideoStreamUrl(videoId: string): string {
+    const token = localStorage.getItem('token');
+    return `${this.client.defaults.baseURL}/videos/${videoId}/stream?token=${token}`;
   }
 }
 
