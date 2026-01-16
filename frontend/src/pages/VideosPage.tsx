@@ -1,93 +1,58 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { VideoUpload } from '../components/VideoUpload';
-import { GoogleDriveImportModal } from '../components/GoogleDriveImportModal';
 import { videoApi } from '../services/videoApi';
-import { Video } from '../../shared/types';
+import { useVideos } from '../hooks/useVideos';
+import { VideoGrid } from '../components/VideoGrid';
+import { GoogleDriveImportModal } from '../components/GoogleDriveImportModal';
+import { VideoUpload } from '../components/VideoUpload';
 import './VideosPage.css';
 
 function VideosPage() {
   const navigate = useNavigate();
-  const [videos, setVideos] = useState<Video[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showDriveImportModal, setShowDriveImportModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<'createdAt' | 'title' | 'duration' | 'status'>('createdAt');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
-  useEffect(() => {
-    loadVideos();
-  }, []);
-
-  const loadVideos = async () => {
-    try {
-      setIsLoading(true);
-      const response = await videoApi.listVideos();
-      if (response.success && response.data) {
-        setVideos(response.data);
-      }
-    } catch (error) {
-      console.error('Failed to load videos:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const { videos, isLoading, error, refetch } = useVideos({
+    search: searchQuery,
+    sortBy,
+    sortOrder,
+  });
 
   const handleUploadComplete = (videoId: string) => {
     setShowUploadModal(false);
-    loadVideos();
+    refetch();
     navigate(`/videos/${videoId}`);
   };
 
-  const formatDuration = (seconds?: number): string => {
-    if (!seconds) return '--:--';
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-    return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
-  };
-
-  const formatDate = (date: Date | string): string => {
-    const d = new Date(date);
-    return d.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
-
-  const getStatusBadgeClass = (status: string): string => {
-    switch (status) {
-      case 'ready':
-        return 'status-badge ready';
-      case 'processing':
-        return 'status-badge processing';
-      case 'uploaded':
-        return 'status-badge uploaded';
-      case 'error':
-        return 'status-badge error';
-      default:
-        return 'status-badge pending';
+  const handleDelete = async (videoId: string) => {
+    try {
+      await videoApi.deleteVideo(videoId);
+      refetch();
+    } catch (err) {
+      console.error('Failed to delete video:', err);
     }
+  };
+
+  const handleAnalyze = (videoId: string) => {
+    navigate(`/videos/${videoId}?tab=summary`);
   };
 
   return (
     <div className="videos-page">
       <div className="page-header">
-        <h1 className="page-title">My Videos</h1>
+        <div className="page-title-section">
+          <h1 className="page-title">My Videos</h1>
+          <p className="page-subtitle">{videos.length} videos</p>
+        </div>
         <div className="header-actions">
           <button
             className="drive-import-button"
             onClick={() => setShowDriveImportModal(true)}
           >
-            <svg
-              className="drive-icon"
-              fill="currentColor"
-              viewBox="0 0 24 24"
-            >
+            <svg className="drive-icon" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12.01 2L6.5 11h3.27v9h4.5v-9H17.5z"/>
               <path d="M4.51 12.51l-2 3.5L8.5 22l2-3.5H4.51zM15.5 15.5l2 3.5 6-6-2-3.5h-6z"/>
             </svg>
@@ -97,23 +62,65 @@ function VideosPage() {
             className="upload-button"
             onClick={() => setShowUploadModal(true)}
           >
-            <svg
-              className="upload-icon"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 4v16m8-8H4"
-              />
+            <svg className="upload-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
             Upload Video
           </button>
         </div>
       </div>
+
+      <div className="filters-bar">
+        <div className="search-input-wrapper">
+          <svg className="search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input
+            type="text"
+            placeholder="Search videos..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="search-input"
+          />
+        </div>
+        <div className="sort-controls">
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+            className="sort-select"
+          >
+            <option value="createdAt">Date</option>
+            <option value="title">Name</option>
+            <option value="duration">Duration</option>
+            <option value="status">Status</option>
+          </select>
+          <button
+            className="sort-order-button"
+            onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+            aria-label="Toggle sort order"
+          >
+            {sortOrder === 'asc' ? (
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
+              </svg>
+            ) : (
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h9m5-4v12m0 0l-4-4m4 4l4-4" />
+              </svg>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="error-banner">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span>Failed to load videos: {error}</span>
+          <button onClick={() => refetch()}>Retry</button>
+        </div>
+      )}
 
       {showUploadModal && (
         <div className="modal-overlay" onClick={() => setShowUploadModal(false)}>
@@ -123,6 +130,7 @@ function VideosPage() {
               <button
                 className="modal-close"
                 onClick={() => setShowUploadModal(false)}
+                aria-label="Close"
               >
                 ×
               </button>
@@ -135,74 +143,15 @@ function VideosPage() {
       <GoogleDriveImportModal
         isOpen={showDriveImportModal}
         onClose={() => setShowDriveImportModal(false)}
+        onImportComplete={() => refetch()}
       />
 
-      {isLoading ? (
-        <div className="loading-state">
-          <div className="loading-spinner" />
-          <p>Loading videos...</p>
-        </div>
-      ) : videos.length === 0 ? (
-        <div className="empty-state">
-          <svg
-            className="empty-icon"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-            />
-          </svg>
-          <h3>No videos yet</h3>
-          <p>Upload your first video to get started with AI-powered analysis</p>
-          <button
-            className="upload-button"
-            onClick={() => setShowUploadModal(true)}
-          >
-            Upload Video
-          </button>
-        </div>
-      ) : (
-        <div className="videos-grid">
-          {videos.map((video) => (
-            <div
-              key={video.id}
-              className="video-card"
-              onClick={() => navigate(`/videos/${video.id}`)}
-            >
-              <div className="video-thumbnail">
-                <svg
-                  className="play-icon"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-                <span className={getStatusBadgeClass(video.status)}>
-                  {video.status}
-                </span>
-              </div>
-              <div className="video-info">
-                <h3 className="video-title">{video.title}</h3>
-                <div className="video-meta">
-                  <span>{formatDuration(video.duration)}</span>
-                  <span>•</span>
-                  <span>{video.width && video.height ? `${video.width}x${video.height}` : 'Unknown resolution'}</span>
-                  <span>•</span>
-                  <span>{formatFileSize(video.fileSize)}</span>
-                </div>
-                <div className="video-date">
-                  Uploaded {formatDate(video.createdAt)}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      <VideoGrid
+        videos={videos}
+        isLoading={isLoading}
+        onDelete={handleDelete}
+        onAnalyze={handleAnalyze}
+      />
     </div>
   );
 }

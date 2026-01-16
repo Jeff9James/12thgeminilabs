@@ -1,5 +1,5 @@
 import { apiClient } from './api';
-import { Video, VideoMetadata, UploadProgress } from '../../shared/types';
+import { Video, VideoMetadata, UploadProgress } from '@shared/types';
 
 export interface ChunkUploadResponse {
   videoId: string;

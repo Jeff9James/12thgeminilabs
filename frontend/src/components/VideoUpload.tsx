@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useVideoUpload, UseVideoUploadReturn } from '../hooks/useVideoUpload';
-import { UPLOAD_CONSTANTS } from '../../shared/constants';
+import { UPLOAD_CONSTANTS } from '@shared/constants';
 import './VideoUpload.css';
 
 interface VideoUploadProps {

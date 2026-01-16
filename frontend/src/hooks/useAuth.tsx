@@ -1,6 +1,6 @@
 import { useState, useEffect, createContext, useContext, useCallback } from 'react';
 import { apiClient } from '../services/api';
-import { User } from '../../shared/types';
+import { User } from '@shared/types';
 
 interface AuthContextType {
   user: User | null;
