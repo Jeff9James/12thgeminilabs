@@ -1,5 +1,5 @@
 import { apiClient } from './api';
-import { Video } from '@shared/types';
+import { Video, ApiResponse } from '@shared/types';
 
 export interface ChunkUploadResponse {
   videoId: string;
@@ -14,10 +14,10 @@ export interface VideoFinalizeResponse {
 
 export interface VideoApi {
   // List all videos
-  listVideos(): Promise<{ success: boolean; data: Video[] }>;
+  listVideos(): Promise<ApiResponse<Video[]>>;
   
   // Get single video
-  getVideo(id: string): Promise<{ success: boolean; data: Video }>;
+  getVideo(id: string): Promise<ApiResponse<Video>>;
   
   // Upload a chunk
   uploadChunk(
@@ -36,10 +36,10 @@ export interface VideoApi {
     title: string;
     mimeType: string;
     fileSize: number;
-  }): Promise<{ success: boolean; data: VideoFinalizeResponse }>;
+  }): Promise<ApiResponse<VideoFinalizeResponse>>;
   
   // Delete video
-  deleteVideo(id: string): Promise<{ success: boolean; message: string }>;
+  deleteVideo(id: string): Promise<ApiResponse<{ message: string }>>;
   
   // Get video stream URL
   getStreamUrl(id: string): string;
@@ -54,11 +54,11 @@ class VideoApiService implements VideoApi {
     this.finalizeUrl = '/videos/finalize';
   }
 
-  async listVideos(): Promise<{ success: boolean; data: Video[] }> {
+  async listVideos(): Promise<ApiResponse<Video[]>> {
     return apiClient.get<Video[]>('/videos');
   }
 
-  async getVideo(id: string): Promise<{ success: boolean; data: Video }> {
+  async getVideo(id: string): Promise<ApiResponse<Video>> {
     return apiClient.get<Video>(`/videos/${id}`);
   }
 
@@ -98,11 +98,11 @@ class VideoApiService implements VideoApi {
     title: string;
     mimeType: string;
     fileSize: number;
-  }): Promise<{ success: boolean; data: VideoFinalizeResponse }> {
+  }): Promise<ApiResponse<VideoFinalizeResponse>> {
     return apiClient.post<VideoFinalizeResponse>(this.finalizeUrl, data);
   }
 
-  async deleteVideo(id: string): Promise<{ success: boolean; message: string }> {
+  async deleteVideo(id: string): Promise<ApiResponse<{ message: string }>> {
     return apiClient.delete<{ message: string }>(`/videos/${id}`);
   }
 

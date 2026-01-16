@@ -30,7 +30,7 @@ class ApiClient {
     // Response interceptor to handle auth errors
     this.client.interceptors.response.use(
       (response) => response,
-      async (error: AxiosError<ApiResponse>) => {
+      async (error: AxiosError<ApiResponse<unknown>>) => {
         if (error.response?.status === 401) {
           // Try to refresh token
           const refreshToken = localStorage.getItem('refreshToken');

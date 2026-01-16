@@ -2,7 +2,7 @@ import { apiClient } from './api';
 import {
   RateLimitInfo,
   Bookmark
-} from '../../shared/types';
+} from '../../../shared/types';
 
 export interface SendMessageRequest {
   videoId: string;
