@@ -86,11 +86,28 @@ export const CREATE_CONVERSATIONS_TABLE = `
     id TEXT PRIMARY KEY,
     video_id TEXT NOT NULL,
     user_id TEXT NOT NULL,
+    title TEXT,
     messages TEXT NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    deleted_at DATETIME,
     FOREIGN KEY (video_id) REFERENCES videos(id) ON DELETE CASCADE,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+`;
+
+export const CREATE_BOOKMARKS_TABLE = `
+  CREATE TABLE IF NOT EXISTS bookmarks (
+    id TEXT PRIMARY KEY,
+    video_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    conversation_id TEXT,
+    timestamp_seconds REAL NOT NULL,
+    note TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (video_id) REFERENCES videos(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE SET NULL
   );
 `;
 
@@ -147,6 +164,20 @@ export const CREATE_INDEXES = `
   CREATE INDEX IF NOT EXISTS idx_indexing_queue_status ON indexing_queue(status);
 `;
 
+export const CREATE_RATE_LIMITS_TABLE = `
+  CREATE TABLE IF NOT EXISTS rate_limits (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    video_id TEXT NOT NULL,
+    action TEXT NOT NULL DEFAULT 'chat',
+    count INTEGER NOT NULL DEFAULT 0,
+    reset_time DATETIME NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (video_id) REFERENCES videos(id) ON DELETE CASCADE
+  );
+`;
+
 export const ALL_TABLES = [
   CREATE_USERS_TABLE,
   CREATE_VIDEOS_TABLE,
@@ -154,7 +185,21 @@ export const ALL_TABLES = [
   CREATE_VIDEO_TIMESTAMPS_TABLE,
   CREATE_ANALYSES_TABLE,
   CREATE_CONVERSATIONS_TABLE,
+  CREATE_BOOKMARKS_TABLE,
   CREATE_TEMPORAL_INDEX_TABLE,
   CREATE_INDEXING_QUEUE_TABLE,
+  CREATE_RATE_LIMITS_TABLE,
   CREATE_INDEXES,
 ];
+
+export const ADD_BOOKMARKS_INDEXES = `
+  CREATE INDEX IF NOT EXISTS idx_bookmarks_video_id ON bookmarks(video_id);
+  CREATE INDEX IF NOT EXISTS idx_bookmarks_user_id ON bookmarks(user_id);
+  CREATE INDEX IF NOT EXISTS idx_bookmarks_conversation_id ON bookmarks(conversation_id);
+  CREATE INDEX IF NOT EXISTS idx_bookmarks_timestamp ON bookmarks(timestamp_seconds);
+`;
+
+export const ADD_RATE_LIMITS_INDEXES = `
+  CREATE INDEX IF NOT EXISTS idx_rate_limits_user_video ON rate_limits(user_id, video_id, action);
+  CREATE INDEX IF NOT EXISTS idx_rate_limits_reset_time ON rate_limits(reset_time);
+`;

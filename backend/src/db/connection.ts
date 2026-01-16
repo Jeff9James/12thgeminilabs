@@ -1,7 +1,7 @@
 import sqlite3 from 'sqlite3';
 import path from 'path';
 import fs from 'fs';
-import { ALL_TABLES } from './schema';
+import { ALL_TABLES, ADD_BOOKMARKS_INDEXES, ADD_RATE_LIMITS_INDEXES } from './schema';
 
 class Database {
   private db: sqlite3.Database | null = null;
@@ -66,6 +66,8 @@ class Database {
 
   private async ensureSchemaUpgrades(): Promise<void> {
     await this.ensureVideosGoogleDriveColumns();
+    await this.ensureBookmarksTable();
+    await this.ensureRateLimitsTable();
   }
 
   private async ensureVideosGoogleDriveColumns(): Promise<void> {
@@ -87,6 +89,75 @@ class Database {
     if (!existing.has('google_drive_url')) {
       await this.run('ALTER TABLE videos ADD COLUMN google_drive_url TEXT');
     }
+  }
+
+  private async ensureBookmarksTable(): Promise<void> {
+    if (!this.db) return;
+
+    // Check if bookmarks table exists
+    const tables: Array<{ name: string }> = await new Promise((resolve, reject) => {
+      this.db!.all('SELECT name FROM sqlite_master WHERE type="table"', (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows as Array<{ name: string }>);
+      });
+    });
+
+    const existingTables = new Set(tables.map((t) => t.name));
+    
+    if (!existingTables.has('bookmarks')) {
+      // Create bookmarks table
+      await this.run(`
+        CREATE TABLE IF NOT EXISTS bookmarks (
+          id TEXT PRIMARY KEY,
+          video_id TEXT NOT NULL,
+          user_id TEXT NOT NULL,
+          conversation_id TEXT,
+          timestamp_seconds REAL NOT NULL,
+          note TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (video_id) REFERENCES videos(id) ON DELETE CASCADE,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+          FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE SET NULL
+        )
+      `);
+    }
+
+    // Create bookmarks indexes
+    await this.run(ADD_BOOKMARKS_INDEXES);
+  }
+
+  private async ensureRateLimitsTable(): Promise<void> {
+    if (!this.db) return;
+
+    // Check if rate_limits table exists
+    const tables: Array<{ name: string }> = await new Promise((resolve, reject) => {
+      this.db!.all('SELECT name FROM sqlite_master WHERE type="table"', (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows as Array<{ name: string }>);
+      });
+    });
+
+    const existingTables = new Set(tables.map((t) => t.name));
+    
+    if (!existingTables.has('rate_limits')) {
+      // Create rate_limits table
+      await this.run(`
+        CREATE TABLE IF NOT EXISTS rate_limits (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          video_id TEXT NOT NULL,
+          action TEXT NOT NULL DEFAULT 'chat',
+          count INTEGER NOT NULL DEFAULT 0,
+          reset_time DATETIME NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+          FOREIGN KEY (video_id) REFERENCES videos(id) ON DELETE CASCADE
+        )
+      `);
+    }
+
+    // Create rate limits indexes
+    await this.run(ADD_RATE_LIMITS_INDEXES);
   }
 
   getDb(): sqlite3.Database {

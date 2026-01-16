@@ -13,6 +13,7 @@ import videosRouter from './routes/videos';
 import analysisRouter from './routes/analysis';
 import searchRouter from './routes/search';
 import googleDriveRouter from './routes/googleDrive';
+import chatRouter from './routes/chat';
 
 function createApp(): Application {
   const app = express();
@@ -43,6 +44,9 @@ function createApp(): Application {
   
   // Analysis routes
   app.use('/api/videos', analysisRouter);
+
+  // Chat and advanced features routes
+  app.use('/api/videos', chatRouter);
 
   // Search routes
   app.use('/api/videos', searchRouter);

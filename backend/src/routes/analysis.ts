@@ -503,109 +503,6 @@ router.post(
   }
 );
 
-// POST /api/videos/:id/chat
-// Chat about video content
-router.post(
-  '/:id/chat',
-  authenticate,
-  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-    try {
-      const { id: videoId } = req.params;
-      const { message, conversationId } = req.body;
-      const userId = req.user!.id;
-
-      if (!message) {
-        res.status(400).json({
-          success: false,
-          error: 'Missing required parameter: message',
-        });
-        return;
-      }
-
-      const video = await getVideoForUser(videoId, userId);
-      if (!video) {
-        res.status(404).json({
-          success: false,
-          error: ERROR_MESSAGES.VIDEO_NOT_FOUND,
-        });
-        return;
-      }
-
-      const db = getDatabase();
-      let conversation: Conversation | undefined;
-      let conversationHistory: ConversationMessage[] = [];
-
-      // Get or create conversation
-      if (conversationId) {
-        conversation = await db.get<Conversation>(
-          'SELECT * FROM conversations WHERE id = ? AND user_id = ? AND video_id = ?',
-          [conversationId, userId, videoId]
-        );
-        if (conversation) {
-          conversationHistory = JSON.parse(conversation.messages);
-        }
-      }
-
-      if (!conversation) {
-        const newId = uuidv4();
-        await db.run(
-          `INSERT INTO conversations (id, video_id, user_id, messages, created_at, updated_at)
-           VALUES (?, ?, ?, '[]', ?, ?)`,
-          [newId, videoId, userId, new Date().toISOString(), new Date().toISOString()]
-        );
-        conversation = await db.get<Conversation>(
-          'SELECT * FROM conversations WHERE id = ?',
-          [newId]
-        );
-      }
-
-      // Add user message to history
-      const userMessage: ConversationMessage = {
-        role: 'user',
-        content: message,
-        timestamp: new Date(),
-      };
-      conversationHistory.push(userMessage);
-
-      // Get response from Gemini
-      const response = await geminiService.chatAboutVideo(
-        video.path,
-        message,
-        conversationHistory.slice(0, -1) // Don't include the message we just added
-      );
-
-      // Add assistant message to history
-      const assistantMessage: ConversationMessage = {
-        role: 'assistant',
-        content: response,
-        timestamp: new Date(),
-      };
-      conversationHistory.push(assistantMessage);
-
-      // Update conversation in database
-      await db.run(
-        'UPDATE conversations SET messages = ?, updated_at = ? WHERE id = ?',
-        [JSON.stringify(conversationHistory), new Date().toISOString(), conversation!.id]
-      );
-
-      res.json({
-        success: true,
-        data: {
-          conversationId: conversation!.id,
-          message: response,
-          history: conversationHistory,
-        },
-      });
-    } catch (error) {
-      logger.error('Chat error:', error);
-      res.status(500).json({
-        success: false,
-        error: ERROR_MESSAGES.ANALYSIS_FAILED,
-      });
-    }
-  }
-);
-
 // Background processing function
 async function processAnalysisJob(
   jobId: string,
@@ -628,10 +525,6 @@ async function processAnalysisJob(
       case 'search':
         if (!query) throw new Error('Query required for search analysis');
         result = await geminiService.searchVideo(videoPath, query);
-        break;
-      case 'custom':
-        if (!query) throw new Error('Query required for custom analysis');
-        result = await geminiService.analyzeWithCustomPrompt(videoPath, query);
         break;
       default:
         throw new Error(`Unknown analysis type: ${analysisType}`);

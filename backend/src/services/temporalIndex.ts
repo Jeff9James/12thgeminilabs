@@ -1,6 +1,5 @@
 import { getDatabase } from '../db/connection';
 import { geminiService } from './gemini';
-import { getStorageAdapter } from './storage';
 import { v4 as uuidv4 } from 'uuid';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -266,7 +265,7 @@ export class TemporalIndexService {
   async getIndexingStatusByVideo(videoId: string, userId: string): Promise<IndexingJob | null> {
     const db = getDatabase();
     
-    const job = await db.get(
+    const job = await db.get<any>(
       'SELECT * FROM indexing_queue WHERE video_id = ? AND user_id = ? ORDER BY created_at DESC LIMIT 1',
       [videoId, userId]
     );
@@ -292,12 +291,12 @@ export class TemporalIndexService {
   async isVideoIndexed(videoId: string, userId: string): Promise<boolean> {
     const db = getDatabase();
     
-    const result = await db.get(
+    const result = await db.get<{ count: number }>(
       'SELECT COUNT(*) as count FROM temporal_index WHERE video_id = ? AND user_id = ?',
       [videoId, userId]
     );
 
-    return result.count > 0;
+    return result && result.count > 0;
   }
 
   async deleteVideoIndex(videoId: string, userId: string): Promise<void> {
@@ -318,7 +317,7 @@ export class TemporalIndexService {
   async getVideoSegments(videoId: string, userId: string): Promise<TemporalSegment[]> {
     const db = getDatabase();
     
-    const segments = await db.all(
+    const segments = await db.all<any>(
       'SELECT * FROM temporal_index WHERE video_id = ? AND user_id = ? ORDER BY segment_number',
       [videoId, userId]
     );
