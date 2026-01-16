@@ -323,7 +323,7 @@ export class SemanticSearchService {
       const db = getDatabase();
       
       // Get all unique entities and scene types
-      const segments = await db.all(
+      const segments = await db.all<{ entities: string | null }>(
         'SELECT entities FROM temporal_index WHERE video_id = ? AND user_id = ?',
         [videoId, userId]
       );
@@ -332,10 +332,14 @@ export class SemanticSearchService {
 
       for (const segment of segments) {
         if (segment.entities) {
-          const entities = JSON.parse(segment.entities);
-          for (const entity of entities) {
-            const count = termCounts.get(entity) || 0;
-            termCounts.set(entity, count + 1);
+          try {
+            const entities = JSON.parse(segment.entities);
+            for (const entity of entities) {
+              const count = termCounts.get(entity) || 0;
+              termCounts.set(entity, count + 1);
+            }
+          } catch (e) {
+            logger.warn('Failed to parse entities:', e);
           }
         }
       }

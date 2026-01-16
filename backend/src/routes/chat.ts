@@ -92,12 +92,14 @@ router.post(
       let conversationHistory: ConversationMessage[] = [];
 
       // Get or create conversation
+      let conversationExists = false;
       if (conversationId) {
-        conversation = await db.get<Conversation>(
-          'SELECT * FROM conversations WHERE id = ? AND user_id = ? AND video_id = ? AND deleted_at IS NULL',
+        const conversation = await db.get<{ messages: string }>(
+          'SELECT messages FROM conversations WHERE id = ? AND user_id = ? AND video_id = ? AND deleted_at IS NULL',
           [conversationId, userId, videoId]
         );
         if (conversation) {
+          conversationExists = true;
           try {
             conversationHistory = JSON.parse(conversation.messages);
           } catch (e) {
@@ -107,7 +109,7 @@ router.post(
         }
       }
 
-      if (!conversation) {
+      if (!conversationExists) {
         const newId = uuidv4();
         let title = await geminiService.generateConversationTitle(message, video.title);
         

@@ -41,3 +41,5 @@ export function isFirebaseConfigured(): boolean {
 export { geminiService } from './gemini';
 export { temporalIndexService } from './temporalIndex';
 export { semanticSearchService } from './semanticSearch';
+export { metricsService } from './metrics';
+export { rateLimitService } from './rateLimit';
