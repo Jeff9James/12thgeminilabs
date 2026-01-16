@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { googleDriveApi } from '../services/googleDriveApi';
-import { GoogleDriveFile, GoogleDriveImportStatus } from '../../shared/types';
+import { GoogleDriveFile, GoogleDriveImportStatus } from '@shared/types';
 
 interface UseGoogleDriveReturn {
   files: GoogleDriveFile[];

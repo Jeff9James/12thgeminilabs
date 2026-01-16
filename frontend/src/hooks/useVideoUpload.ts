@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { videoApi } from '../services/videoApi';
 import { v4 as uuidv4 } from 'uuid';
-import { UPLOAD_CONSTANTS } from '../../shared/constants';
+import { UPLOAD_CONSTANTS } from '@shared/constants';
 
 export interface UseVideoUploadOptions {
   onSuccess?: (videoId: string) => void;

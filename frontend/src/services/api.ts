@@ -1,5 +1,5 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
-import { ApiResponse } from '../../shared/types';
+import { ApiResponse } from '@shared/types';
 
 class ApiClient {
   private client: AxiosInstance;

@@ -1,5 +1,5 @@
 import { apiClient } from './api';
-import { SearchRequest, SearchResponse, IndexingJob, TemporalSegment } from '../types';
+import { SearchRequest, SearchResponse, IndexingJob, TemporalSegment } from '@shared/types';
 
 export class SearchApiService {
   // Start indexing a video

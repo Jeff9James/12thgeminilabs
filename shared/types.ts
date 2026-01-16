@@ -17,6 +17,8 @@ export interface AuthResponse {
 }
 
 // Video Types
+export type VideoStatus = 'pending' | 'uploaded' | 'processing' | 'ready' | 'error';
+
 export interface Video {
   id: string;
   userId: string;
@@ -97,6 +99,15 @@ export interface VideoAnalysis {
   updatedAt: Date;
 }
 
+// Video Analysis Result - used by frontend
+export interface VideoAnalysisResult {
+  summary: string;
+  scenes: Scene[];
+  tags: string[];
+  entities: string[];
+  actions: string[];
+}
+
 export interface VideoTimestamp {
   time: number;
   description: string;
@@ -154,10 +165,12 @@ export interface Analysis {
 }
 
 export interface Scene {
+  id: string;
   timestamp: number;
   duration?: number;
   title: string;
   description: string;
+  thumbnailUrl?: string;
 }
 
 export interface SearchMatch {
@@ -183,9 +196,11 @@ export interface Conversation {
 }
 
 export interface ConversationMessage {
+  id: string;
   role: 'user' | 'assistant';
   content: string;
-  timestamp: Date;
+  timestamp?: number;
+  createdAt: Date;
 }
 
 export interface AnalysisJobResponse {

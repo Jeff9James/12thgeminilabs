@@ -1,18 +1,213 @@
-import { useParams } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useParams, useSearchParams } from 'react-router-dom';
+import { videoApi } from '../services/videoApi';
+import { analysisService } from '../services/analysisService';
+import { Video, VideoAnalysisResult, Scene } from '@shared/types';
+import { VideoPlayerWithSearch } from '../components/VideoPlayerWithSearch';
+import { SummaryTab } from '../components/SummaryTab';
+import { ScenesTab } from '../components/ScenesTab';
+import { SearchTab } from '../components/SearchTab';
+import { ChatTab } from '../components/ChatTab';
+import { MetadataTab } from '../components/MetadataTab';
+import './VideoDetailPage.css';
+
+type TabType = 'summary' | 'scenes' | 'search' | 'chat' | 'metadata';
 
 function VideoDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = (searchParams.get('tab') as TabType) || 'summary';
+
+  const [video, setVideo] = useState<Video | null>(null);
+  const [analysis, setAnalysis] = useState<VideoAnalysisResult | null>(null);
+  const [scenes, setScenes] = useState<Scene[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<TabType>(initialTab);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  const videoUrl = id ? videoApi.getStreamUrl(id) : '';
+
+  useEffect(() => {
+    if (id) {
+      loadVideo(id);
+      loadScenes(id);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    setSearchParams({ tab: activeTab });
+  }, [activeTab, setSearchParams]);
+
+  const loadVideo = async (videoId: string) => {
+    try {
+      setIsLoading(true);
+      const response = await videoApi.getVideo(videoId);
+      if (response.success && response.data) {
+        setVideo(response.data);
+        if (response.data.status === 'ready') {
+          loadAnalysis(videoId);
+        }
+      } else {
+        setError('Failed to load video');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load video');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadAnalysis = async (videoId: string) => {
+    const result = await analysisService.getVideoAnalysis(videoId);
+    if (result.success && result.data) {
+      setAnalysis(result.data);
+    }
+  };
+
+  const loadScenes = async (videoId: string) => {
+    const result = await analysisService.getScenes(videoId);
+    if (result.success && result.data) {
+      setScenes(result.data);
+    }
+  };
+
+  const handleAnalyze = async () => {
+    if (!id) return;
+    setIsAnalyzing(true);
+    const result = await analysisService.analyzeVideo(id);
+    if (result.success) {
+      setTimeout(async () => {
+        await loadAnalysis(id);
+        await loadScenes(id);
+        setIsAnalyzing(false);
+      }, 3000);
+    } else {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleSceneClick = (timestamp: number) => {
+    // This will be handled by the video player ref
+  };
+
+  const formatDuration = (seconds?: number): string => {
+    if (!seconds) return '--:--';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  if (isLoading) {
+    return (
+      <div className="video-detail-page">
+        <div className="loading-state">
+          <div className="loading-spinner" />
+          <p>Loading video...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !video) {
+    return (
+      <div className="video-detail-page">
+        <div className="error-state">
+          <svg className="error-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <h2>Error loading video</h2>
+          <p>{error || 'Video not found'}</p>
+          <button onClick={() => window.history.back()} className="btn-primary">
+            Go Back
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">
-        Video Details: {id}
-      </h1>
+    <div className="video-detail-page">
+      <div className="video-header">
+        <div className="video-header-info">
+          <h1 className="video-title">{video.title}</h1>
+          <div className="video-meta">
+            <span>{formatDuration(video.duration)}</span>
+            <span>•</span>
+            <span>{video.width && video.height ? `${video.width}x${video.height}` : 'Unknown resolution'}</span>
+            <span>•</span>
+            <span>Uploaded {new Date(video.createdAt).toLocaleDateString()}</span>
+          </div>
+        </div>
+        <div className="video-header-actions">
+          {video.status !== 'ready' && video.status !== 'error' && (
+            <button
+              className="btn-secondary"
+              onClick={handleAnalyze}
+              disabled={isAnalyzing}
+            >
+              {isAnalyzing ? 'Analyzing...' : 'Analyze Video'}
+            </button>
+          )}
+        </div>
+      </div>
 
-      <div className="bg-white shadow rounded-lg p-6">
-        <p className="text-gray-600">
-          Video details and analysis will be displayed here.
-        </p>
+      <div className="video-content">
+        <div className="video-main">
+          <VideoPlayerWithSearch
+            videoId={video.id}
+            videoUrl={videoUrl}
+            title={video.title}
+          />
+        </div>
+
+        <div className="video-tabs">
+          <div className="tab-header" role="tablist">
+            {[
+              { id: 'summary', label: 'Summary', icon: '📝' },
+              { id: 'scenes', label: 'Scenes', icon: '🎬' },
+              { id: 'search', label: 'Search', icon: '🔍' },
+              { id: 'chat', label: 'Chat', icon: '💬' },
+              { id: 'metadata', label: 'Info', icon: 'ℹ️' },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                role="tab"
+                aria-selected={activeTab === tab.id}
+                className={`tab-button ${activeTab === tab.id ? 'active' : ''}`}
+                onClick={() => setActiveTab(tab.id as TabType)}
+              >
+                <span className="tab-icon">{tab.icon}</span>
+                <span className="tab-label">{tab.label}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="tab-content" role="tabpanel">
+            {activeTab === 'summary' && (
+              <SummaryTab
+                videoId={video.id}
+                analysis={analysis}
+                onRegenerate={handleAnalyze}
+                isAnalyzing={isAnalyzing}
+              />
+            )}
+            {activeTab === 'scenes' && (
+              <ScenesTab
+                videoId={video.id}
+                scenes={scenes}
+                onSceneClick={handleSceneClick}
+              />
+            )}
+            {activeTab === 'search' && (
+              <SearchTab videoId={video.id} />
+            )}
+            {activeTab === 'chat' && (
+              <ChatTab videoId={video.id} />
+            )}
+            {activeTab === 'metadata' && <MetadataTab video={video} />}
+          </div>
+        </div>
       </div>
     </div>
   );

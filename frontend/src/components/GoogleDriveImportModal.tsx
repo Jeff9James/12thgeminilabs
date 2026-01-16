@@ -5,11 +5,13 @@ import './GoogleDriveImportModal.css';
 interface GoogleDriveImportModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onImportComplete?: () => void;
 }
 
 export function GoogleDriveImportModal({
   isOpen,
   onClose,
+  onImportComplete,
 }: GoogleDriveImportModalProps) {
   const { files, isLoading, error, importStatus, listFiles, importFile, getImportStatus, clearError } =
     useGoogleDrive();
@@ -42,6 +44,18 @@ export function GoogleDriveImportModal({
 
     return () => clearInterval(interval);
   }, [importingFiles, importStatus, getImportStatus]);
+
+  // Check if all imports are complete
+  useEffect(() => {
+    if (importingFiles.size > 0) {
+      const allComplete = Array.from(importingFiles).every(
+        (videoId) => importStatus.get(videoId)?.status === 'complete'
+      );
+      if (allComplete && onImportComplete) {
+        onImportComplete();
+      }
+    }
+  }, [importingFiles, importStatus, onImportComplete]);
 
   const handleSelectFile = (fileId: string) => {
     setSelectedFiles((prev) => {

@@ -3,8 +3,8 @@ import {
   GoogleDriveFile,
   GoogleDriveImportRequest,
   GoogleDriveImportStatus,
-} from '../../shared/types';
-import { API_ENDPOINTS } from '../../shared/constants';
+} from '@shared/types';
+import { API_ENDPOINTS } from '@shared/constants';
 
 export const googleDriveApi = {
   /**
