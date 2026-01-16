@@ -1,5 +1,6 @@
 import { getDatabase } from '../db/connection';
 import { geminiService } from './gemini';
+import { getStorageAdapter } from './index';
 import { v4 as uuidv4 } from 'uuid';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -21,10 +22,13 @@ export class TemporalIndexService {
 
   async startIndexing(videoId: string, userId: string): Promise<IndexingJob> {
     const db = getDatabase();
-    
+
     try {
       // Get video details
-      const video = await db.get('SELECT * FROM videos WHERE id = ? AND user_id = ?', [videoId, userId]);
+      const video = await db.get<{ duration_seconds: number }>(
+        'SELECT duration_seconds FROM videos WHERE id = ? AND user_id = ?',
+        [videoId, userId]
+      );
       if (!video) {
         throw new Error('Video not found');
       }
@@ -89,22 +93,25 @@ export class TemporalIndexService {
       );
 
       // Get video details
-      const video = await db.get('SELECT * FROM videos WHERE id = ? AND user_id = ?', [videoId, userId]);
+      const video = await db.get<{ duration_seconds: number; path: string }>(
+        'SELECT duration_seconds, path FROM videos WHERE id = ? AND user_id = ?',
+        [videoId, userId]
+      );
       if (!video) {
         throw new Error('Video not found');
       }
 
       const storageAdapter = getStorageAdapter();
-      const videoFile = await storageAdapter.getFile(video.path);
-      
+
       // Create temporary file for Gemini processing
       const tempDir = './tmp/indexing';
       if (!fs.existsSync(tempDir)) {
         fs.mkdirSync(tempDir, { recursive: true });
       }
-      
+
       const tempFile = path.join(tempDir, `${videoId}_temp.mp4`);
-      await storageAdapter.download(video.path, tempFile);
+      const buffer = await storageAdapter.download(video.path);
+      await fs.promises.writeFile(tempFile, buffer);
 
       try {
         const totalSegments = Math.ceil(video.duration_seconds / this.DEFAULT_SEGMENT_DURATION);
@@ -170,9 +177,10 @@ export class TemporalIndexService {
       }
     } catch (error) {
       // Mark job as error
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       await db.run(
         'UPDATE indexing_queue SET status = ?, error_message = ?, updated_at = ? WHERE id = ?',
-        ['error', error.message, new Date().toISOString(), jobId]
+        ['error', errorMessage, new Date().toISOString(), jobId]
       );
       throw error;
     }
@@ -238,8 +246,19 @@ export class TemporalIndexService {
 
   async getIndexingStatus(jobId: string): Promise<IndexingJob | null> {
     const db = getDatabase();
-    
-    const job = await db.get(
+
+    const job = await db.get<{
+      id: string;
+      video_id: string;
+      user_id: string;
+      status: string;
+      progress: number;
+      total_segments: number | null;
+      processed_segments: number | null;
+      error_message: string | null;
+      created_at: string;
+      updated_at: string;
+    }>(
       'SELECT * FROM indexing_queue WHERE id = ?',
       [jobId]
     );
@@ -252,11 +271,11 @@ export class TemporalIndexService {
       id: job.id,
       videoId: job.video_id,
       userId: job.user_id,
-      status: job.status,
+      status: job.status as 'pending' | 'processing' | 'complete' | 'error',
       progress: job.progress,
-      totalSegments: job.total_segments,
-      processedSegments: job.processed_segments,
-      errorMessage: job.error_message,
+      totalSegments: job.total_segments || 0,
+      processedSegments: job.processed_segments || 0,
+      errorMessage: job.error_message || undefined,
       createdAt: new Date(job.created_at),
       updatedAt: new Date(job.updated_at),
     };
@@ -264,8 +283,19 @@ export class TemporalIndexService {
 
   async getIndexingStatusByVideo(videoId: string, userId: string): Promise<IndexingJob | null> {
     const db = getDatabase();
-    
-    const job = await db.get<any>(
+
+    const job = await db.get<{
+      id: string;
+      video_id: string;
+      user_id: string;
+      status: string;
+      progress: number;
+      total_segments: number | null;
+      processed_segments: number | null;
+      error_message: string | null;
+      created_at: string;
+      updated_at: string;
+    }>(
       'SELECT * FROM indexing_queue WHERE video_id = ? AND user_id = ? ORDER BY created_at DESC LIMIT 1',
       [videoId, userId]
     );
@@ -278,11 +308,11 @@ export class TemporalIndexService {
       id: job.id,
       videoId: job.video_id,
       userId: job.user_id,
-      status: job.status,
+      status: job.status as 'pending' | 'processing' | 'complete' | 'error',
       progress: job.progress,
-      totalSegments: job.total_segments,
-      processedSegments: job.processed_segments,
-      errorMessage: job.error_message,
+      totalSegments: job.total_segments || 0,
+      processedSegments: job.processed_segments || 0,
+      errorMessage: job.error_message || undefined,
       createdAt: new Date(job.created_at),
       updatedAt: new Date(job.updated_at),
     };
@@ -290,13 +320,13 @@ export class TemporalIndexService {
 
   async isVideoIndexed(videoId: string, userId: string): Promise<boolean> {
     const db = getDatabase();
-    
+
     const result = await db.get<{ count: number }>(
       'SELECT COUNT(*) as count FROM temporal_index WHERE video_id = ? AND user_id = ?',
       [videoId, userId]
     );
 
-    return result && result.count > 0;
+    return !!(result && result.count > 0);
   }
 
   async deleteVideoIndex(videoId: string, userId: string): Promise<void> {

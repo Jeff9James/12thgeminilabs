@@ -1,15 +1,8 @@
 import { apiClient } from './api';
-import { 
-  ChatRequest, 
-  ChatResponse, 
-  CustomAnalysisRequest, 
-  CustomAnalysisResponse,
-  BookmarkRequest,
-  BookmarkResponse,
+import {
   RateLimitInfo,
-  Bookmark,
-  ConversationMessage 
-} from '../../../shared/types';
+  Bookmark
+} from '../../shared/types';
 
 export interface SendMessageRequest {
   videoId: string;

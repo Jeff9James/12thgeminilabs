@@ -11,7 +11,10 @@ export class GoogleDriveService {
   private oauth2Client: OAuth2Client;
 
   constructor(accessToken: string, refreshToken?: string) {
-    this.oauth2Client = new google.auth.OAuth2(config.googleClientId, config.googleClientSecret);
+    this.oauth2Client = new OAuth2Client(
+      config.googleClientId,
+      config.googleClientSecret
+    );
 
     this.oauth2Client.setCredentials({
       access_token: accessToken,
@@ -23,7 +26,7 @@ export class GoogleDriveService {
    * Get Drive API client
    */
   private getDriveClient(): drive_v3.Drive {
-    return google.drive({ version: 'v3', auth: this.oauth2Client });
+    return google.drive({ version: 'v3', auth: this.oauth2Client as any });
   }
 
   /**
@@ -77,7 +80,7 @@ export class GoogleDriveService {
       });
 
       const file = response.data;
-      
+
       return {
         id: file.id!,
         name: file.name!,
@@ -85,7 +88,7 @@ export class GoogleDriveService {
         size: parseInt(file.size || '0', 10),
         createdTime: file.createdTime!,
         webViewLink: file.webViewLink!,
-        thumbnailLink: file.thumbnailLink,
+        thumbnailLink: file.thumbnailLink || undefined,
       };
     } catch (error: any) {
       logger.error(`Error getting file metadata for ${fileId}:`, error);
