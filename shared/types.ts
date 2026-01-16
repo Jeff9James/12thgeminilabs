@@ -190,9 +190,11 @@ export interface Conversation {
   id: string;
   videoId: string;
   userId: string;
+  title?: string;
   messages: ConversationMessage[];
   createdAt: Date;
   updatedAt: Date;
+  deletedAt?: Date;
 }
 
 export interface ConversationMessage {
@@ -200,6 +202,16 @@ export interface ConversationMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp?: number;
+  createdAt: Date;
+}
+
+export interface Bookmark {
+  id: string;
+  videoId: string;
+  userId: string;
+  conversationId?: string;
+  timestampSeconds: number;
+  note?: string;
   createdAt: Date;
 }
 
@@ -303,4 +315,42 @@ export interface GoogleDriveImportStatus {
 export interface GoogleDriveImportResponse {
   video: Video;
   message: string;
+}
+
+// Chat and Analysis Types
+export interface ChatRequest {
+  message: string;
+  conversationId?: string;
+}
+
+export interface ChatResponse {
+  conversationId: string;
+  reply: string;
+  referencedTimestamps?: Array<{ start: number; end: number }>;
+  messageId: string;
+}
+
+export interface CustomAnalysisRequest {
+  prompt: string;
+}
+
+export interface CustomAnalysisResponse {
+  analysis: string;
+  referencedTimestamps?: Array<{ start: number; end: number }>;
+}
+
+export interface BookmarkRequest {
+  timestamp: number;
+  note?: string;
+  conversationId?: string;
+}
+
+export interface BookmarkResponse {
+  bookmark: Bookmark;
+}
+
+export interface RateLimitInfo {
+  remaining: number;
+  resetTime: Date;
+  limit: number;
 }

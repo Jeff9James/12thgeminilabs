@@ -50,7 +50,7 @@ export class GoogleDriveService {
         size: parseInt(file.size || '0', 10),
         createdTime: file.createdTime!,
         webViewLink: file.webViewLink!,
-        thumbnailLink: file.thumbnailLink,
+        thumbnailLink: file.thumbnailLink || undefined,
       }));
     } catch (error: any) {
       logger.error('Error listing Drive files:', error);

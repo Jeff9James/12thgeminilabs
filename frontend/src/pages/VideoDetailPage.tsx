@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { videoApi } from '../services/videoApi';
 import { analysisService } from '../services/analysisService';
+import { chatService } from '../services/chatService';
 import { Video, VideoAnalysisResult, Scene } from '@shared/types';
-import { VideoPlayerWithSearch } from '../components/VideoPlayerWithSearch';
+import { VideoPlayerWithAdvancedSearch } from '../components/VideoPlayerWithAdvancedSearch';
 import { SummaryTab } from '../components/SummaryTab';
 import { ScenesTab } from '../components/ScenesTab';
 import { SearchTab } from '../components/SearchTab';
@@ -91,6 +92,29 @@ function VideoDetailPage() {
     // This will be handled by the video player ref
   };
 
+  const handleTimestampClick = (timestamp: number) => {
+    // Handle timestamp clicks from chat
+    console.log('Jump to timestamp:', timestamp);
+  };
+
+  const handleCreateBookmark = async (timestamp: number, note: string) => {
+    try {
+      const response = await chatService.createBookmark({
+        videoId: video!.id,
+        timestamp,
+        note,
+      });
+      
+      if (response.success) {
+        console.log('Bookmark created successfully');
+      } else {
+        console.error('Failed to create bookmark:', response.error);
+      }
+    } catch (error) {
+      console.error('Error creating bookmark:', error);
+    }
+  };
+
   const formatDuration = (seconds?: number): string => {
     if (!seconds) return '--:--';
     const mins = Math.floor(seconds / 60);
@@ -154,7 +178,7 @@ function VideoDetailPage() {
 
       <div className="video-content">
         <div className="video-main">
-          <VideoPlayerWithSearch
+          <VideoPlayerWithAdvancedSearch
             videoId={video.id}
             videoUrl={videoUrl}
             title={video.title}

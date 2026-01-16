@@ -294,7 +294,7 @@ export class SemanticSearchService {
       const suggestions = new Set<string>();
       const query = partialQuery.toLowerCase();
 
-      for (const segment of segments) {
+      for (const segment of segments as any[]) {
         // Add entities
         if (segment.entities) {
           const entities = JSON.parse(segment.entities);
