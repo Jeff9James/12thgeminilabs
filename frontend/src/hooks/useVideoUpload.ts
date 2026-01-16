@@ -31,7 +31,7 @@ export function useVideoUpload(options: UseVideoUploadOptions = {}): UseVideoUpl
 
     try {
       // Validate file
-      if (!UPLOAD_CONSTANTS.SUPPORTED_FORMATS.includes(file.type as any)) {
+      if (!UPLOAD_CONSTANTS.SUPPORTED_FORMATS.includes(file.type)) {
         throw new Error(`Invalid file type. Supported types: ${UPLOAD_CONSTANTS.SUPPORTED_EXTENSIONS.join(', ')}`);
       }
 

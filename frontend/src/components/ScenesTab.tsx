@@ -3,12 +3,11 @@ import { Scene } from '@shared/types';
 import './ScenesTab.css';
 
 interface ScenesTabProps {
-  videoId: string;
   scenes: Scene[];
   onSceneClick?: (timestamp: number) => void;
 }
 
-export function ScenesTab({ videoId, scenes, onSceneClick }: ScenesTabProps) {
+export function ScenesTab({ scenes, onSceneClick }: ScenesTabProps) {
   const [expandedScene, setExpandedScene] = useState<string | null>(null);
 
   const formatTimestamp = (seconds: number): string => {

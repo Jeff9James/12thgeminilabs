@@ -13,9 +13,12 @@ export class SearchApiService {
     try {
       const response = await apiClient.get(`/videos/${videoId}/index/status`);
       return response.data.data;
-    } catch (error: any) {
-      if (error.response?.status === 404) {
-        return null;
+    } catch (error) {
+      if (error instanceof Error && 'response' in error) {
+        const httpError = error as { response?: { status?: number } };
+        if (httpError.response?.status === 404) {
+          return null;
+        }
       }
       throw error;
     }

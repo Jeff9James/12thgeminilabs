@@ -3,25 +3,13 @@ import { VideoAnalysisResult } from '@shared/types';
 import './SummaryTab.css';
 
 interface SummaryTabProps {
-  videoId: string;
   analysis?: VideoAnalysisResult | null;
   onRegenerate?: () => void;
   isAnalyzing?: boolean;
 }
 
-export function SummaryTab({ videoId, analysis, onRegenerate, isAnalyzing }: SummaryTabProps) {
+export function SummaryTab({ analysis, onRegenerate, isAnalyzing }: SummaryTabProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-
-  const formatTimestamp = (date: Date | string | undefined) => {
-    if (!date) return 'Unknown';
-    return new Date(date).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
 
   if (isAnalyzing) {
     return (

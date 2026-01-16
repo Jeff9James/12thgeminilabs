@@ -1,5 +1,5 @@
 import { apiClient } from './api';
-import { Video, VideoMetadata, UploadProgress } from '@shared/types';
+import { Video } from '@shared/types';
 
 export interface ChunkUploadResponse {
   videoId: string;
@@ -25,8 +25,7 @@ export interface VideoApi {
     videoId: string,
     chunkNumber: number,
     totalChunks: number,
-    filename: string,
-    onProgress?: (progress: UploadProgress) => void
+    filename: string
   ): Promise<{ success: boolean; data: ChunkUploadResponse }>;
   
   // Finalize upload
@@ -68,8 +67,7 @@ class VideoApiService implements VideoApi {
     videoId: string,
     chunkNumber: number,
     totalChunks: number,
-    filename: string,
-    onProgress?: (progress: UploadProgress) => void
+    filename: string
   ): Promise<{ success: boolean; data: ChunkUploadResponse }> {
     const formData = new FormData();
     formData.append('chunk', file);

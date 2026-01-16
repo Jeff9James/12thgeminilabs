@@ -17,7 +17,6 @@ export const SearchInterface: React.FC<SearchInterfaceProps> = ({
   const {
     indexingJob,
     isIndexing,
-    segments,
     isIndexed,
     searchResults,
     isSearching,
@@ -114,17 +113,6 @@ export const SearchInterface: React.FC<SearchInterfaceProps> = ({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const getSearchTypeLabel = (type: string): string => {
-    const labels = {
-      text: 'Text Search',
-      semantic: 'Semantic Search',
-      entity: 'Entity Search',
-      action: 'Action Search',
-      scene_type: 'Scene Type Search',
-    };
-    return labels[type as keyof typeof labels] || type;
-  };
-
   return (
     <div className={`search-interface ${className}`}>
       {/* Indexing Status */}
@@ -205,7 +193,7 @@ export const SearchInterface: React.FC<SearchInterfaceProps> = ({
                 value={searchOptions.searchType}
                 onChange={(e) => setSearchOptions(prev => ({ 
                   ...prev, 
-                  searchType: e.target.value as any 
+                  searchType: e.target.value as 'text' | 'semantic' | 'entity' | 'action' | 'scene_type'
                 }))}
                 className="search-type-select"
               >
@@ -266,7 +254,7 @@ export const SearchInterface: React.FC<SearchInterfaceProps> = ({
               </div>
 
               <div className="results-list">
-                {searchResults.matches.map((match, index) => (
+                {searchResults.matches.map((match) => (
                   <div
                     key={match.segmentId}
                     className="result-item"

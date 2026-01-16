@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { videoApi } from '../services/videoApi';
 import { Video } from '@shared/types';
 import { useVideos } from '../hooks/useVideos';
 import './SearchPage.css';

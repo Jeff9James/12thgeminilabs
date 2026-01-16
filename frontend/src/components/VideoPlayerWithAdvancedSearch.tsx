@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { ChatTab } from './ChatTab';
 import { BookmarksSidebar } from './BookmarksSidebar';
 import { chatService } from '../services/chatService';

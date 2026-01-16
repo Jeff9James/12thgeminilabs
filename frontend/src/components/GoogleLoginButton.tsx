@@ -40,7 +40,7 @@ export function GoogleLoginButton({ onSuccess, onError }: GoogleLoginButtonProps
               auto_select: false,
               cancel_on_tap_outside: true,
             });
-            window.google.accounts.id.prompt((notification: any) => {
+            window.google.accounts.id.prompt((notification) => {
               if (notification.isNotDisplayed()) {
                 handleError();
               }
@@ -75,15 +75,34 @@ export function GoogleLoginButton({ onSuccess, onError }: GoogleLoginButtonProps
 }
 
 // Add Google type declaration
+interface GoogleCredentialResponse {
+  credential: string;
+  select_by?: string;
+}
+
+interface GoogleNotification {
+  isNotDisplayed: () => boolean;
+  isSkippedMoment: () => boolean;
+  isDismissedMoment: () => boolean;
+  getMomentType: () => string;
+}
+
+interface GoogleAccounts {
+  id: {
+    initialize: (config: {
+      client_id: string;
+      callback: (response: GoogleCredentialResponse) => void;
+      auto_select?: boolean;
+      cancel_on_tap_outside?: boolean;
+    }) => void;
+    prompt: (callback: (notification: GoogleNotification) => void) => void;
+  };
+}
+
 declare global {
   interface Window {
     google?: {
-      accounts: {
-        id: {
-          initialize: (config: any) => void;
-          prompt: (callback: (notification: any) => void) => void;
-        };
-      };
+      accounts: GoogleAccounts;
     };
   }
 }

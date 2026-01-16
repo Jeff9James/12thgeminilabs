@@ -90,8 +90,11 @@ class ChatService {
         success: true,
         data: response.data,
       };
-    } catch (error: any) {
-      const message = error.response?.data?.error || error.message || 'Failed to send message';
+    } catch (error) {
+      const message = error instanceof Error && 'response' in error
+        ? ((error as { response?: { data?: { error?: string } }; message?: string }).response?.data?.error || 
+           (error as { message?: string }).message || 'Failed to send message')
+        : 'Failed to send message';
       return {
         success: false,
         error: message,
@@ -115,8 +118,11 @@ class ChatService {
         success: true,
         data: response.data,
       };
-    } catch (error: any) {
-      const message = error.response?.data?.error || error.message || 'Custom analysis failed';
+    } catch (error) {
+      const message = error instanceof Error && 'response' in error
+        ? ((error as { response?: { data?: { error?: string } }; message?: string }).response?.data?.error || 
+           (error as { message?: string }).message || 'Custom analysis failed')
+        : 'Custom analysis failed';
       return {
         success: false,
         error: message,
@@ -141,8 +147,11 @@ class ChatService {
         success: true,
         data: response.data,
       };
-    } catch (error: any) {
-      const message = error.response?.data?.error || error.message || 'Failed to create bookmark';
+    } catch (error) {
+      const message = error instanceof Error && 'response' in error
+        ? ((error as { response?: { data?: { error?: string } }; message?: string }).response?.data?.error || 
+           (error as { message?: string }).message || 'Failed to create bookmark')
+        : 'Failed to create bookmark';
       return {
         success: false,
         error: message,
@@ -163,8 +172,11 @@ class ChatService {
         success: true,
         data: response.data,
       };
-    } catch (error: any) {
-      const message = error.response?.data?.error || error.message || 'Failed to get bookmarks';
+    } catch (error) {
+      const message = error instanceof Error && 'response' in error
+        ? ((error as { response?: { data?: { error?: string } }; message?: string }).response?.data?.error || 
+           (error as { message?: string }).message || 'Failed to get bookmarks')
+        : 'Failed to get bookmarks';
       return {
         success: false,
         error: message,
@@ -183,8 +195,11 @@ class ChatService {
         success: true,
         message: 'Bookmark deleted successfully',
       };
-    } catch (error: any) {
-      const message = error.response?.data?.error || error.message || 'Failed to delete bookmark';
+    } catch (error) {
+      const message = error instanceof Error && 'response' in error
+        ? ((error as { response?: { data?: { error?: string } }; message?: string }).response?.data?.error || 
+           (error as { message?: string }).message || 'Failed to delete bookmark')
+        : 'Failed to delete bookmark';
       return {
         success: false,
         error: message,
@@ -203,8 +218,11 @@ class ChatService {
         success: true,
         data: response.data,
       };
-    } catch (error: any) {
-      const message = error.response?.data?.error || error.message || 'Failed to get rate limit';
+    } catch (error) {
+      const message = error instanceof Error && 'response' in error
+        ? ((error as { response?: { data?: { error?: string } }; message?: string }).response?.data?.error || 
+           (error as { message?: string }).message || 'Failed to get rate limit')
+        : 'Failed to get rate limit';
       return {
         success: false,
         error: message,

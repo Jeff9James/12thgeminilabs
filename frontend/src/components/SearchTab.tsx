@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { searchApiService } from '../services/searchApi';
 import { SearchRequest, SearchMatchResult } from '@shared/types';
 import './SearchTab.css';

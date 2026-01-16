@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { userService } from '../services/userService';
-import { GoogleOAuthStatus, UserSettings } from '../types/video';
+import { GoogleOAuthStatus } from '../types/video';
 import './SettingsPage.css';
 
 interface StorageInfo {
@@ -15,7 +15,6 @@ export function SettingsPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [oauthStatus, setOauthStatus] = useState<GoogleOAuthStatus | null>(null);
-  const [settings, setSettings] = useState<UserSettings | null>(null);
   const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRevoking, setIsRevoking] = useState(false);
@@ -28,17 +27,13 @@ export function SettingsPage() {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [oauthResult, settingsResult, storageResult] = await Promise.all([
+      const [oauthResult, storageResult] = await Promise.all([
         userService.getGoogleOAuthStatus(),
-        userService.getSettings(),
         userService.getStorageInfo(),
       ]);
 
       if (oauthResult.success && oauthResult.data) {
         setOauthStatus(oauthResult.data);
-      }
-      if (settingsResult) {
-        setSettings(settingsResult);
       }
       if (storageResult) {
         setStorageInfo(storageResult);

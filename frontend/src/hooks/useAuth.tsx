@@ -29,48 +29,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  useEffect(() => {
-    checkAuth();
+  const logout = useCallback(() => {
+    setUser(null);
+    localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('user');
+    
+    // Call backend logout to clear cookies
+    apiClient.post('/auth/logout').catch(console.error);
   }, []);
-
-  const checkAuth = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const refreshToken = localStorage.getItem('refreshToken');
-      const storedUser = localStorage.getItem('user');
-
-      if (token && storedUser) {
-        // Check if token needs refresh
-        if (isTokenExpiringSoon(token) && refreshToken) {
-          await refreshToken();
-          return;
-        }
-
-        setUser(JSON.parse(storedUser));
-        
-        // Verify token with backend
-        const response = await apiClient.get<User>('/auth/me');
-        if (response.success && response.data) {
-          setUser(response.data);
-          localStorage.setItem('user', JSON.stringify(response.data));
-        } else {
-          // Token is invalid, try to refresh
-          if (refreshToken) {
-            await refreshToken();
-          } else {
-            logout();
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Auth check failed:', error);
-      localStorage.removeItem('token');
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('user');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const refreshToken = async () => {
     try {
@@ -95,6 +62,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       logout();
     }
   };
+
+  const checkAuth = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const refreshTokenValue = localStorage.getItem('refreshToken');
+      const storedUser = localStorage.getItem('user');
+
+      if (token && storedUser) {
+        // Check if token needs refresh
+        if (isTokenExpiringSoon(token) && refreshTokenValue) {
+          await refreshToken();
+          return;
+        }
+
+        setUser(JSON.parse(storedUser));
+        
+        // Verify token with backend
+        const response = await apiClient.get<User>('/auth/me');
+        if (response.success && response.data) {
+          setUser(response.data);
+          localStorage.setItem('user', JSON.stringify(response.data));
+        } else {
+          // Token is invalid, try to refresh
+          if (refreshTokenValue) {
+            await refreshToken();
+          } else {
+            logout();
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Auth check failed:', error);
+      localStorage.removeItem('token');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('user');
+    } finally {
+      setIsLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [logout]);
+
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
 
   const login = async (idToken: string, accessToken?: string) => {
     try {
@@ -121,16 +132,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const logout = useCallback(() => {
-    setUser(null);
-    localStorage.removeItem('token');
-    localStorage.removeItem('refreshToken');
-    localStorage.removeItem('user');
-    
-    // Call backend logout to clear cookies
-    apiClient.post('/auth/logout').catch(console.error);
-  }, []);
-
   return (
     <AuthContext.Provider
       value={{
@@ -147,6 +148,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
