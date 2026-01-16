@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '../utils/env';
-import { ERROR_MESSAGES } from '../../../shared/constants';
+import { ERROR_MESSAGES } from '@gemini-video-platform/shared';
 import logger from '../utils/logger';
 
 interface AuthenticatedUser {

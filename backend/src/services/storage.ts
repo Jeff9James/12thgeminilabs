@@ -1,4 +1,4 @@
-import { VideoMetadata } from '../../../shared/types';
+import { VideoMetadata } from '@gemini-video-platform/shared';
 
 export interface StorageAdapter {
   upload(filePath: string, destination: string): Promise<string>;

@@ -8,8 +8,8 @@ import { authenticate } from '../middleware/auth';
 import { getStorageAdapter } from '../services';
 import { extractVideoMetadata } from '../services/metadata';
 import { fileQueue } from '../services/queue';
-import { Video, VideoMetadata, ChunkUploadResponse, VideoFinalizeResponse } from '../../../shared/types';
-import { UPLOAD_CONSTANTS, VIDEO_STATUS, ERROR_MESSAGES } from '../../../shared/constants';
+import { Video, VideoMetadata, ChunkUploadResponse, VideoFinalizeResponse } from '@gemini-video-platform/shared';
+import { UPLOAD_CONSTANTS, VIDEO_STATUS, ERROR_MESSAGES } from '@gemini-video-platform/shared';
 import logger from '../utils/logger';
 
 // Type for authenticated request

@@ -4,6 +4,8 @@
     "module": "commonjs",
     "lib": ["ES2020"],
     "outDir": "./dist",
+    "declaration": true,
+    "declarationMap": true,
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -11,12 +13,8 @@
     "resolveJsonModule": true,
     "moduleResolution": "node",
     "allowSyntheticDefaultImports": true,
-    "types": ["node"],
-    "baseUrl": ".",
-    "paths": {
-      "@shared/*": ["../shared/*"]
-    }
+    "types": ["node"]
   },
-  "include": ["./src/**/*"],
+  "include": ["./**/*"],
   "exclude": ["node_modules", "dist"]
 }

@@ -2,7 +2,7 @@ import { getDatabase } from '../db/connection';
 import { geminiService } from './gemini';
 import { v4 as uuidv4 } from 'uuid';
 import logger from '../utils/logger';
-import { SearchRequest, SearchResponse, SearchMatchResult, TemporalSegment } from '../../../shared/types';
+import { SearchRequest, SearchResponse, SearchMatchResult, TemporalSegment } from '@gemini-video-platform/shared';
 
 export class SemanticSearchService {
   async searchVideo(

@@ -16,8 +16,8 @@ import {
   BookmarkResponse,
   RateLimitInfo,
   Bookmark
-} from '../../../shared/types';
-import { ERROR_MESSAGES } from '../../../shared/constants';
+} from '@gemini-video-platform/shared';
+import { ERROR_MESSAGES } from '@gemini-video-platform/shared';
 import logger from '../utils/logger';
 
 type AuthenticatedRequest = Request & {
