@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { useVideoUpload, UseVideoUploadReturn } from '../hooks/useVideoUpload';
+import { useVideoUpload } from '../hooks/useVideoUpload';
 import { UPLOAD_CONSTANTS } from '@shared/constants';
 import './VideoUpload.css';
 
@@ -9,14 +9,10 @@ interface VideoUploadProps {
   acceptedFormats?: string[];
 }
 
-interface VideoUploadWithProgressProps extends VideoUploadProps {
-  uploadHook: UseVideoUploadReturn;
-}
-
 export function VideoUpload({
   onUploadComplete,
   maxSize = UPLOAD_CONSTANTS.MAX_FILE_SIZE,
-  acceptedFormats = UPLOAD_CONSTANTS.SUPPORTED_FORMATS,
+  acceptedFormats = [...UPLOAD_CONSTANTS.SUPPORTED_FORMATS],
 }: VideoUploadProps): React.ReactElement {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');

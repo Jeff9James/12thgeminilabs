@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { chatService, CustomAnalysisRequest } from '../services/chatService';
-import { Bookmark, ConversationMessage } from '../../../shared/types';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { chatService } from '../services/chatService';
+import { ConversationMessage } from '../../../shared/types';
 import './ChatTab.css';
 
 interface ChatTabProps {
@@ -38,11 +38,7 @@ export function ChatTab({ videoId, currentTime, onTimestampClick, onCreateBookma
     scrollToBottom();
   }, [state.messages]);
 
-  useEffect(() => {
-    loadRateLimit();
-  }, [videoId]);
-
-  const loadRateLimit = async () => {
+  const loadRateLimit = useCallback(async () => {
     try {
       const response = await chatService.getRateLimit(videoId);
       if (response.success && response.data) {
@@ -54,7 +50,11 @@ export function ChatTab({ videoId, currentTime, onTimestampClick, onCreateBookma
     } catch (error) {
       console.error('Failed to load rate limit:', error);
     }
-  };
+  }, [videoId]);
+
+  useEffect(() => {
+    loadRateLimit();
+  }, [loadRateLimit]);
 
   const handleSend = async () => {
     if (!input.trim() || state.isLoading) return;

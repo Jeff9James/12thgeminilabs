@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { videoApi } from '../services/videoApi';
 import { Video } from '@shared/types';
@@ -13,6 +13,7 @@ interface VideoGridProps {
 
 export function VideoGrid({ videos, isLoading, onDelete, onAnalyze }: VideoGridProps) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const deleteMutation = useMutation({
     mutationFn: (videoId: string) => videoApi.deleteVideo(videoId),
@@ -20,8 +21,6 @@ export function VideoGrid({ videos, isLoading, onDelete, onAnalyze }: VideoGridP
       queryClient.invalidateQueries({ queryKey: ['videos'] });
     },
   });
-
-  const queryClient = useQueryClient();
 
   const formatDuration = (seconds?: number): string => {
     if (!seconds) return '--:--';

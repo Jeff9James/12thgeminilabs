@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { SearchInterface } from './SearchInterface';
 import './VideoPlayerWithSearch.css';
 
@@ -22,7 +22,7 @@ export const VideoPlayerWithSearch: React.FC<VideoPlayerWithSearchProps> = ({
   const [showSearch, setShowSearch] = useState(false);
 
   // Handle search result click - jump to timestamp
-  const handleSearchResultClick = (startTime: number, endTime: number) => {
+  const handleSearchResultClick = (startTime: number) => {
     if (videoRef.current) {
       videoRef.current.currentTime = startTime;
       videoRef.current.play();

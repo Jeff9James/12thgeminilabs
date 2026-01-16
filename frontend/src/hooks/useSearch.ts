@@ -48,11 +48,28 @@ export function useSearch(options: UseSearchOptions): UseSearchReturn {
   
   // Polling
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
-  const [isPolling, setIsPolling] = useState(false);
 
   // Computed values
   const isIndexing = indexingJob?.status === 'processing' || indexingJob?.status === 'pending';
   const isIndexed = segments.length > 0 && !isIndexing;
+
+  // Stop polling
+  const stopPolling = useCallback(() => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+  }, []);
+
+  // Load segments
+  const loadSegments = useCallback(async () => {
+    try {
+      const loadedSegments = await searchApiService.getVideoSegments(videoId);
+      setSegments(loadedSegments);
+    } catch (error) {
+      console.error('Error loading segments:', error);
+    }
+  }, [videoId]);
 
   // Check indexing status
   const checkIndexingStatus = useCallback(async () => {
@@ -71,17 +88,16 @@ export function useSearch(options: UseSearchOptions): UseSearchReturn {
       console.error('Error checking indexing status:', error);
       stopPolling();
     }
-  }, [videoId]);
+  }, [videoId, loadSegments, stopPolling]);
 
-  // Load segments
-  const loadSegments = useCallback(async () => {
-    try {
-      const loadedSegments = await searchApiService.getVideoSegments(videoId);
-      setSegments(loadedSegments);
-    } catch (error) {
-      console.error('Error loading segments:', error);
+  // Start polling for indexing status
+  const startPolling = useCallback(() => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
     }
-  }, [videoId]);
+    
+    pollingRef.current = setInterval(checkIndexingStatus, pollingInterval);
+  }, [checkIndexingStatus, pollingInterval]);
 
   // Start indexing
   const startIndexing = useCallback(async () => {
@@ -94,7 +110,7 @@ export function useSearch(options: UseSearchOptions): UseSearchReturn {
       console.error('Error starting indexing:', error);
       throw error;
     }
-  }, [videoId]);
+  }, [videoId, startPolling]);
 
   // Perform search
   const search = useCallback(async (request: SearchRequest) => {
@@ -109,8 +125,11 @@ export function useSearch(options: UseSearchOptions): UseSearchReturn {
     try {
       const results = await searchApiService.searchVideo(videoId, request);
       setSearchResults(results);
-    } catch (error: any) {
-      setSearchError(error.response?.data?.error || 'Search failed');
+    } catch (error) {
+      const errorMessage = error instanceof Error && 'response' in error 
+        ? ((error as { response?: { data?: { error?: string } } }).response?.data?.error || 'Search failed')
+        : 'Search failed';
+      setSearchError(errorMessage);
       setSearchResults(null);
     } finally {
       setIsSearching(false);
@@ -151,31 +170,12 @@ export function useSearch(options: UseSearchOptions): UseSearchReturn {
       console.error('Error re-indexing:', error);
       throw error;
     }
-  }, [videoId]);
+  }, [videoId, startPolling]);
 
   // Clear search results
   const clearSearch = useCallback(() => {
     setSearchResults(null);
     setSearchError(null);
-  }, []);
-
-  // Start polling for indexing status
-  const startPolling = useCallback(() => {
-    if (pollingRef.current) {
-      clearInterval(pollingRef.current);
-    }
-    
-    setIsPolling(true);
-    pollingRef.current = setInterval(checkIndexingStatus, pollingInterval);
-  }, [checkIndexingStatus, pollingInterval]);
-
-  // Stop polling
-  const stopPolling = useCallback(() => {
-    if (pollingRef.current) {
-      clearInterval(pollingRef.current);
-      pollingRef.current = null;
-    }
-    setIsPolling(false);
   }, []);
 
   // Initialize - check indexing status and optionally start indexing

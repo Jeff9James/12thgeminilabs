@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { chatService } from '../services/chatService';
 import { Bookmark } from '../../../shared/types';
 import './BookmarksSidebar.css';
@@ -23,13 +23,7 @@ export function BookmarksSidebar({ videoId, onTimestampClick, isOpen, onToggle }
     error: null,
   });
 
-  useEffect(() => {
-    if (isOpen) {
-      loadBookmarks();
-    }
-  }, [isOpen, videoId]);
-
-  const loadBookmarks = async () => {
+  const loadBookmarks = useCallback(async () => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
     
     try {
@@ -54,7 +48,13 @@ export function BookmarksSidebar({ videoId, onTimestampClick, isOpen, onToggle }
         isLoading: false,
       }));
     }
-  };
+  }, [videoId]);
+
+  useEffect(() => {
+    if (isOpen) {
+      loadBookmarks();
+    }
+  }, [isOpen, loadBookmarks]);
 
   const handleDeleteBookmark = async (bookmarkId: string) => {
     if (!confirm('Are you sure you want to delete this bookmark?')) {
@@ -86,8 +86,8 @@ export function BookmarksSidebar({ videoId, onTimestampClick, isOpen, onToggle }
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const formatDate = (dateString: string): string => {
-    const date = new Date(dateString);
+  const formatDate = (dateString: string | Date): string => {
+    const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
     return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
   };
 

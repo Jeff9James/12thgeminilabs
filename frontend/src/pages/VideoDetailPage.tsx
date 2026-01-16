@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { videoApi } from '../services/videoApi';
 import { analysisService } from '../services/analysisService';
-import { chatService } from '../services/chatService';
 import { Video, VideoAnalysisResult, Scene } from '@shared/types';
 import { VideoPlayerWithAdvancedSearch } from '../components/VideoPlayerWithAdvancedSearch';
 import { SummaryTab } from '../components/SummaryTab';
@@ -29,16 +28,19 @@ function VideoDetailPage() {
 
   const videoUrl = id ? videoApi.getStreamUrl(id) : '';
 
-  useEffect(() => {
-    if (id) {
-      loadVideo(id);
-      loadScenes(id);
+  const loadAnalysis = async (videoId: string) => {
+    const result = await analysisService.getVideoAnalysis(videoId);
+    if (result.success && result.data) {
+      setAnalysis(result.data);
     }
-  }, [id]);
+  };
 
-  useEffect(() => {
-    setSearchParams({ tab: activeTab });
-  }, [activeTab, setSearchParams]);
+  const loadScenes = async (videoId: string) => {
+    const result = await analysisService.getScenes(videoId);
+    if (result.success && result.data) {
+      setScenes(result.data);
+    }
+  };
 
   const loadVideo = async (videoId: string) => {
     try {
@@ -59,19 +61,17 @@ function VideoDetailPage() {
     }
   };
 
-  const loadAnalysis = async (videoId: string) => {
-    const result = await analysisService.getVideoAnalysis(videoId);
-    if (result.success && result.data) {
-      setAnalysis(result.data);
+  useEffect(() => {
+    if (id) {
+      loadVideo(id);
+      loadScenes(id);
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
-  const loadScenes = async (videoId: string) => {
-    const result = await analysisService.getScenes(videoId);
-    if (result.success && result.data) {
-      setScenes(result.data);
-    }
-  };
+  useEffect(() => {
+    setSearchParams({ tab: activeTab });
+  }, [activeTab, setSearchParams]);
 
   const handleAnalyze = async () => {
     if (!id) return;
@@ -88,31 +88,8 @@ function VideoDetailPage() {
     }
   };
 
-  const handleSceneClick = (timestamp: number) => {
+  const handleSceneClick = () => {
     // This will be handled by the video player ref
-  };
-
-  const handleTimestampClick = (timestamp: number) => {
-    // Handle timestamp clicks from chat
-    console.log('Jump to timestamp:', timestamp);
-  };
-
-  const handleCreateBookmark = async (timestamp: number, note: string) => {
-    try {
-      const response = await chatService.createBookmark({
-        videoId: video!.id,
-        timestamp,
-        note,
-      });
-      
-      if (response.success) {
-        console.log('Bookmark created successfully');
-      } else {
-        console.error('Failed to create bookmark:', response.error);
-      }
-    } catch (error) {
-      console.error('Error creating bookmark:', error);
-    }
   };
 
   const formatDuration = (seconds?: number): string => {
@@ -210,7 +187,6 @@ function VideoDetailPage() {
           <div className="tab-content" role="tabpanel">
             {activeTab === 'summary' && (
               <SummaryTab
-                videoId={video.id}
                 analysis={analysis}
                 onRegenerate={handleAnalyze}
                 isAnalyzing={isAnalyzing}
@@ -218,7 +194,6 @@ function VideoDetailPage() {
             )}
             {activeTab === 'scenes' && (
               <ScenesTab
-                videoId={video.id}
                 scenes={scenes}
                 onSceneClick={handleSceneClick}
               />
@@ -227,7 +202,12 @@ function VideoDetailPage() {
               <SearchTab videoId={video.id} />
             )}
             {activeTab === 'chat' && (
-              <ChatTab videoId={video.id} />
+              <ChatTab 
+                videoId={video.id}
+                currentTime={0}
+                onTimestampClick={() => {}}
+                onCreateBookmark={async () => {}}
+              />
             )}
             {activeTab === 'metadata' && <MetadataTab video={video} />}
           </div>
