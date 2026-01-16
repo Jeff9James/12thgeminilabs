@@ -1,30 +1,27 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
 import { GoogleLoginButton } from '../components/GoogleLoginButton';
 
 function LoginPage() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleGoogleSuccess = async (response: any) => {
+  const handleGoogleSuccess = async () => {
     setError('');
     setIsLoading(true);
 
     try {
-      // The GoogleLoginButton already calls login() internally
-      // So we just need to handle success
       navigate('/');
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Login failed');
+    } catch (err) {
+      const errorMessage = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      setError(errorMessage || 'Login failed');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleGoogleError = (error: any) => {
+  const handleGoogleError = (error: unknown) => {
     console.error('Google login failed:', error);
     setError('Google authentication failed. Please try again.');
   };

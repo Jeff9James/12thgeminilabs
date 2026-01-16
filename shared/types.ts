@@ -32,6 +32,8 @@ export interface Video {
   frameCount?: number;
   status: 'pending' | 'uploaded' | 'processing' | 'ready' | 'error';
   uploadError?: string;
+  googleDriveId?: string;
+  googleDriveUrl?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -256,4 +258,34 @@ export interface SearchResponse {
   totalResults: number;
   searchTime: number;
   query: string;
+}
+
+// Google Drive Types
+export interface GoogleDriveFile {
+  id: string;
+  name: string;
+  mimeType: string;
+  size: number;
+  createdTime: string;
+  webViewLink: string;
+  thumbnailLink?: string;
+}
+
+export interface GoogleDriveImportRequest {
+  fileId: string;
+  title?: string;
+}
+
+export interface GoogleDriveImportStatus {
+  videoId: string;
+  driveFileId?: string;
+  status: 'pending' | 'downloading' | 'processing' | 'complete' | 'error';
+  progress: number;
+  message?: string;
+  error?: string;
+}
+
+export interface GoogleDriveImportResponse {
+  video: Video;
+  message: string;
 }

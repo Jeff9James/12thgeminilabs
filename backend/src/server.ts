@@ -12,6 +12,7 @@ import authRouter from './routes/auth';
 import videosRouter from './routes/videos';
 import analysisRouter from './routes/analysis';
 import searchRouter from './routes/search';
+import googleDriveRouter from './routes/googleDrive';
 
 function createApp(): Application {
   const app = express();
@@ -45,6 +46,9 @@ function createApp(): Application {
 
   // Search routes
   app.use('/api/videos', searchRouter);
+
+  // Google Drive routes
+  app.use('/api/google-drive', googleDriveRouter);
 
   // 404 handler
   app.use(notFoundHandler);

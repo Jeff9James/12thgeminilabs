@@ -40,8 +40,12 @@ class Database {
         let tableIndex = 0;
         const createNextTable = () => {
           if (tableIndex >= ALL_TABLES.length) {
-            console.log('Database schema initialized');
-            resolve();
+            this.ensureSchemaUpgrades()
+              .then(() => {
+                console.log('Database schema initialized');
+                resolve();
+              })
+              .catch(reject);
             return;
           }
 
@@ -58,6 +62,31 @@ class Database {
         createNextTable();
       });
     });
+  }
+
+  private async ensureSchemaUpgrades(): Promise<void> {
+    await this.ensureVideosGoogleDriveColumns();
+  }
+
+  private async ensureVideosGoogleDriveColumns(): Promise<void> {
+    if (!this.db) return;
+
+    const columns: Array<{ name: string }> = await new Promise((resolve, reject) => {
+      this.db!.all('PRAGMA table_info(videos)', (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows as Array<{ name: string }>);
+      });
+    });
+
+    const existing = new Set(columns.map((c) => c.name));
+
+    if (!existing.has('google_drive_id')) {
+      await this.run('ALTER TABLE videos ADD COLUMN google_drive_id TEXT');
+    }
+
+    if (!existing.has('google_drive_url')) {
+      await this.run('ALTER TABLE videos ADD COLUMN google_drive_url TEXT');
+    }
   }
 
   getDb(): sqlite3.Database {
