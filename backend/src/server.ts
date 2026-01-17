@@ -127,25 +127,86 @@ function createApp(): Application {
 
 async function startServer(): Promise<void> {
   try {
-    // Validate environment variables
+    // Log startup initiation
+    console.log('========================================');
+    console.log('SERVER STARTUP - INITIALIZING');
+    console.log('========================================');
+    
+    // Log environment variable presence (sanitized)
+    const envKeys = Object.keys(process.env);
+    const relevantKeys = envKeys.filter(k => 
+      k.includes('GEMINI') || 
+      k.includes('JWT') || 
+      k.includes('GOOGLE') || 
+      k.includes('DATABASE') ||
+      k.includes('FRONTEND') ||
+      k.includes('VIDEO') ||
+      k.includes('FIREBASE') ||
+      k.includes('NODE') ||
+      k.includes('PORT') ||
+      k.includes('DEBUG')
+    );
+    
+    console.log('Environment variables detected:', relevantKeys.length);
+    console.log('Environment variable keys:', relevantKeys);
+    console.log('NODE_ENV:', process.env.NODE_ENV);
+    console.log('PORT:', process.env.PORT);
+    console.log('RAILWAY_ENVIRONMENT_ID:', process.env.RAILWAY_ENVIRONMENT_ID ? 'present' : 'absent');
+
+    // Phase 1: Environment validation
+    console.log('');
+    console.log('Phase 1: Validating environment variables...');
     validateEnv();
+    console.log('✓ Environment variables validated');
 
-    // Initialize database
+    // Phase 2: Database initialization
+    console.log('');
+    console.log('Phase 2: Initializing database...');
     const db = initDatabase(config.databasePath);
+    console.log('✓ Database initialized');
+    console.log('  - Database path:', config.databasePath);
+    
+    console.log('  - Connecting to database...');
     await db.connect();
+    console.log('✓ Database connected');
+    
+    console.log('  - Running database migrations...');
     await db.initialize();
+    console.log('✓ Database migrations completed');
 
-    // Create Express app
+    // Phase 3: Creating Express app
+    console.log('');
+    console.log('Phase 3: Creating Express application...');
     const app = createApp();
+    console.log('✓ Express app created');
 
-    // Start server
+    // Phase 4: Starting server
+    console.log('');
+    console.log('Phase 4: Starting HTTP server...');
+    console.log('  - Binding to port:', config.port);
+    
     app.listen(config.port, () => {
+      console.log('========================================');
+      console.log('✓ SERVER STARTED SUCCESSFULLY');
+      console.log('========================================');
       logger.info(`Server running on port ${config.port}`);
       logger.info(`Environment: ${config.nodeEnv}`);
       logger.info(`Frontend URL: ${config.frontendUrl}`);
+      console.log('Port:', config.port);
+      console.log('Environment:', config.nodeEnv);
+      console.log('Frontend URL:', config.frontendUrl);
     });
   } catch (error) {
-    logger.error('Failed to start server:', error);
+    console.error('========================================');
+    console.error('FATAL STARTUP ERROR');
+    console.error('========================================');
+    console.error('Error details:');
+    console.error('  - Message:', error instanceof Error ? error.message : String(error));
+    console.error('  - Type:', error instanceof Error ? error.name : typeof error);
+    console.error('  - Stack trace:', error instanceof Error ? error.stack : 'No stack trace available');
+    console.error('========================================');
+    
+    logger.error('Failed to start server:', error instanceof Error ? error.message : String(error));
     process.exit(1);
   }
 }
