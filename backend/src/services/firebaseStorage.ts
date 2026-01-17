@@ -4,7 +4,7 @@ import { StorageAdapter } from './storage';
 import { config } from '../utils/env';
 import logger from '../utils/logger';
 
-export class FirebaseStorageAdapter implements StorageAdapter {
+class FirebaseStorageAdapter implements StorageAdapter {
   private storage: Storage;
   private bucketName: string;
 
@@ -118,4 +118,11 @@ export class FirebaseStorageAdapter implements StorageAdapter {
   }
 }
 
-export const firebaseStorageAdapter = new FirebaseStorageAdapter();
+let firebaseStorageAdapterInstance: FirebaseStorageAdapter | null = null;
+
+export function getFirebaseStorageAdapter(): StorageAdapter {
+  if (!firebaseStorageAdapterInstance) {
+    firebaseStorageAdapterInstance = new FirebaseStorageAdapter();
+  }
+  return firebaseStorageAdapterInstance;
+}
