@@ -1,7 +1,7 @@
 import { config } from '../utils/env';
 import { StorageAdapter } from './storage';
 import { localStorageAdapter } from './localStorage';
-import { firebaseStorageAdapter } from './firebaseStorage';
+import { getFirebaseStorageAdapter } from './firebaseStorage';
 import { STORAGE_TYPES } from '@gemini-video-platform/shared';
 import logger from '../utils/logger';
 
@@ -17,7 +17,7 @@ export function getStorageAdapter(): StorageAdapter {
   switch (storageType) {
     case STORAGE_TYPES.FIREBASE:
       logger.info('Using Firebase storage adapter');
-      storageAdapter = firebaseStorageAdapter;
+      storageAdapter = getFirebaseStorageAdapter();
       break;
     case STORAGE_TYPES.LOCAL:
     default:
