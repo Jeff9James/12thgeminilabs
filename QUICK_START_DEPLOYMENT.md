@@ -33,6 +33,8 @@ Pick one of these deployment options:
 
 ### Option 1: Railway (Easiest) ⭐
 
+**⚠️ IMPORTANT:** Railway Shared Variables require explicit configuration! See [RAILWAY_SETUP.md](./RAILWAY_SETUP.md) for detailed instructions to avoid deployment crashes.
+
 1. **Push code to GitHub**
    ```bash
    git init
@@ -47,9 +49,9 @@ Pick one of these deployment options:
    - Click **New Project** → **Deploy from GitHub repo**
    - Select your repository
 
-3. **Configure Environment**
-   - Add all environment variables from prerequisites
-   - Click **Settings** → **Variables**
+3. **Configure Shared Variables (CRITICAL!)**
+   - Go to **Project Settings** (gear icon) → **Shared Variables**
+   - Select your environment (usually "production")
    - Add these variables:
      ```
      GEMINI_API_KEY=your_api_key_here
@@ -59,11 +61,16 @@ Pick one of these deployment options:
      JWT_REFRESH_SECRET=your_refresh_secret_here
      DATABASE_PATH=/data/database.db
      VIDEO_STORAGE_PATH=/data/videos
+     VIDEO_STORAGE_TYPE=local
      FRONTEND_URL=https://your-app-name.railway.app
      NODE_ENV=production
      PORT=3001
      LOG_LEVEL=info
      ```
+   - **CRITICAL STEP:** For EACH variable, click **Share** → Select your backend service
+   - OR: Go to backend service → Variables tab → Shared Variable → Add all variables
+
+   > **Why this is critical:** Railway's Shared Variables DO NOT automatically inherit to services. You must explicitly share them! This is the #1 cause of "npm error code 1" crashes. See [RAILWAY_SETUP.md](./RAILWAY_SETUP.md) for troubleshooting.
 
 4. **Add Persistent Volume**
    - Go to **Settings** → **Volumes**

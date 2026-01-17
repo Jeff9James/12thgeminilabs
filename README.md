@@ -181,6 +181,8 @@ npm run preview
 
 Deploy in 10 minutes with our [Quick Start Deployment Guide](QUICK_START_DEPLOYMENT.md).
 
+**Railway users:** If you are using Railway "Shared Variables", read [RAILWAY_SETUP.md](./RAILWAY_SETUP.md) to ensure your backend service explicitly inherits them (missing Shared Variable references are a common cause of `npm error code 1` startup crashes).
+
 ### Supported Platforms
 
 This platform can be deployed to any Node.js hosting service:
@@ -195,6 +197,7 @@ No Docker or container orchestration required!
 ### Documentation
 
 - [Quick Start Deployment Guide](QUICK_START_DEPLOYMENT.md) - Get deployed in 10 minutes
+- [Railway Setup Guide](RAILWAY_SETUP.md) - Fix Railway Shared Variables configuration issues
 - [Full Deployment Guide](DEPLOYMENT.md) - Comprehensive deployment documentation
 - [Monitoring Guide](MONITORING.md) - Performance optimization and monitoring
 
