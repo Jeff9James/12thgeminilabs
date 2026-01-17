@@ -4,13 +4,14 @@ import { ENV_VARS } from '@gemini-video-platform/shared';
 dotenv.config();
 
 export function validateEnv(): void {
+  const debug = process.env.DEBUG_ENV === 'true';
+
   const requiredVars = [
     ENV_VARS.GEMINI_API_KEY,
     ENV_VARS.GOOGLE_CLIENT_ID,
     ENV_VARS.GOOGLE_CLIENT_SECRET,
     ENV_VARS.DATABASE_PATH,
     ENV_VARS.FRONTEND_URL,
-    ENV_VARS.VIDEO_STORAGE_TYPE,
     ENV_VARS.JWT_SECRET,
     ENV_VARS.JWT_REFRESH_SECRET,
   ];
@@ -23,22 +24,50 @@ export function validateEnv(): void {
     }
   }
 
-  if (missingVars.length > 0) {
+  if (debug) {
+    const debugVars = [
+      ...requiredVars,
+      ENV_VARS.VIDEO_STORAGE_TYPE,
+      ENV_VARS.VIDEO_STORAGE_PATH,
+      ENV_VARS.NODE_ENV,
+      ENV_VARS.PORT,
+      'RAILWAY_ENVIRONMENT_ID',
+      'RAILWAY_SERVICE_NAME',
+    ];
+
+    const availability = Object.fromEntries(
+      debugVars.map((k) => [k, Boolean(process.env[k])])
+    );
+
+    // eslint-disable-next-line no-console
+    console.error('[DEBUG_ENV] Environment variable availability:', availability);
+    // eslint-disable-next-line no-console
+    console.error('[DEBUG_ENV] Total process.env keys:', Object.keys(process.env).length);
+  }
+
+  // VIDEO_STORAGE_TYPE is optional; default is "local"
+  const validStorageTypes = ['local', 'firebase'];
+  const storageType = process.env.VIDEO_STORAGE_TYPE || 'local';
+  if (!validStorageTypes.includes(storageType)) {
     throw new Error(
-      `Missing required environment variables: ${missingVars.join(', ')}`
+      `Invalid VIDEO_STORAGE_TYPE. Must be one of: ${validStorageTypes.join(', ')}`
     );
   }
 
-  // Validate VIDEO_STORAGE_TYPE
-  const validStorageTypes = ['local', 'firebase'];
-  if (
-    process.env.VIDEO_STORAGE_TYPE &&
-    !validStorageTypes.includes(process.env.VIDEO_STORAGE_TYPE)
-  ) {
+  if (missingVars.length > 0) {
+    const isRailway = process.env.RAILWAY_ENVIRONMENT_ID;
+    const troubleshootingHelp = isRailway
+      ? '\n\n🚨 Railway Deployment Detected!\n' +
+        'Shared Variables must be explicitly shared with your backend service.\n' +
+        'See RAILWAY_SETUP.md for step-by-step instructions.\n' +
+        'Quick fix:\n' +
+        '  1. Go to Project Settings → Shared Variables\n' +
+        '  2. For each variable, click Share → Select backend service\n' +
+        '  OR: Go to backend service → Variables → Shared Variable → Add all\n'
+      : '\n\nSee .env.example for required environment variables.';
+
     throw new Error(
-      `Invalid VIDEO_STORAGE_TYPE. Must be one of: ${validStorageTypes.join(
-        ', '
-      )}`
+      `Missing required environment variables: ${missingVars.join(', ')}${troubleshootingHelp}`
     );
   }
 
