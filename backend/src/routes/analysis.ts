@@ -14,8 +14,8 @@ import {
   Scene,
   SearchMatch,
   SummaryResult,
-} from '../../../shared/types';
-import { ANALYSIS_CONSTANTS, ERROR_MESSAGES } from '../../../shared/constants';
+} from '@gemini-video-platform/shared';
+import { ANALYSIS_CONSTANTS, ERROR_MESSAGES } from '@gemini-video-platform/shared';
 import logger from '../utils/logger';
 
 type AuthenticatedRequest = Request & {

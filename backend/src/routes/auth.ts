@@ -3,7 +3,7 @@ import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
 import { getDatabase } from '../db/connection';
 import { authenticate, generateToken, generateRefreshToken } from '../middleware/auth';
-import { ApiResponse, AuthResponse, User } from '../../../shared/types';
+import { ApiResponse, AuthResponse, User } from '@gemini-video-platform/shared';
 import { config } from '../utils/env';
 import logger from '../utils/logger';
 import { v4 as uuidv4 } from 'uuid';

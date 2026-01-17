@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { config } from '../utils/env';
 import logger from '../utils/logger';
-import { Scene, SearchMatch, SummaryResult, ConversationMessage } from '../../../shared/types';
+import { Scene, SearchMatch, SummaryResult, ConversationMessage } from '@gemini-video-platform/shared';
 
 export class GeminiVideoService {
   private genAI: GoogleGenerativeAI;

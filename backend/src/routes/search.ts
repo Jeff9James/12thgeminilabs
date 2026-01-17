@@ -6,7 +6,7 @@ import {
   SearchRequest, 
   IndexingJob,
   TemporalSegment 
-} from '../../../shared/types';
+} from '@gemini-video-platform/shared';
 import logger from '../utils/logger';
 
 // Type for authenticated request

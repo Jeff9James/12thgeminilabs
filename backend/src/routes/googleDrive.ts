@@ -16,8 +16,8 @@ import {
   GoogleDriveImportStatus,
   Video,
   VideoMetadata,
-} from '../../../shared/types';
-import { ERROR_MESSAGES, UPLOAD_CONSTANTS, VIDEO_STATUS } from '../../../shared/constants';
+} from '@gemini-video-platform/shared';
+import { ERROR_MESSAGES, UPLOAD_CONSTANTS, VIDEO_STATUS } from '@gemini-video-platform/shared';
 import { config } from '../utils/env';
 import logger from '../utils/logger';
 

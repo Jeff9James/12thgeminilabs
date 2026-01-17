@@ -8,7 +8,8 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "db:migrate": "ts-node src/db/migrate.ts",
-    "db:seed": "ts-node src/db/seed.ts"
+    "db:seed": "ts-node src/db/seed.ts",
+    "prebuild": "cd ../shared && npm run build"
   },
   "keywords": [
     "video",
@@ -19,6 +20,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@gemini-video-platform/shared": "file:../shared",
     "@google-cloud/storage": "^7.7.0",
     "@google/generative-ai": "^0.21.0",
     "compression": "^1.8.1",

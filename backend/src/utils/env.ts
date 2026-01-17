@@ -1,5 +1,5 @@
 import dotenv from 'dotenv';
-import { ENV_VARS } from '../../../shared/constants';
+import { ENV_VARS } from '@gemini-video-platform/shared';
 
 dotenv.config();
 

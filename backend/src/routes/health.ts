@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { ApiResponse } from '../../../shared/types';
+import { ApiResponse } from '@gemini-video-platform/shared';
 import { getDatabase } from '../db/connection';
 import { metricsService } from '../services/metrics';
 

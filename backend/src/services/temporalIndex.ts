@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import * as fs from 'fs';
 import * as path from 'path';
 import logger from '../utils/logger';
-import { TemporalSegment, IndexingJob } from '../../../shared/types';
+import { TemporalSegment, IndexingJob } from '@gemini-video-platform/shared';
 
 export interface SegmentAnalysis {
   segmentNumber: number;

@@ -2,7 +2,7 @@ import { config } from '../utils/env';
 import { StorageAdapter } from './storage';
 import { localStorageAdapter } from './localStorage';
 import { firebaseStorageAdapter } from './firebaseStorage';
-import { STORAGE_TYPES } from '../../../shared/constants';
+import { STORAGE_TYPES } from '@gemini-video-platform/shared';
 import logger from '../utils/logger';
 
 let storageAdapter: StorageAdapter | null = null;
