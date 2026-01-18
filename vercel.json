@@ -3,6 +3,6 @@
   "outputDirectory": "frontend/dist",
   "framework": "vite",
   "env": {
-    "VITE_API_URL": "@vite-api-url"
+    "VITE_API_URL": "@VITE_API_URL"
   }
 }
