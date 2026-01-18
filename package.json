@@ -4,7 +4,6 @@
   "description": "AI-powered video understanding platform using Google's Gemini 3",
   "private": true,
   "scripts": {
-    "postinstall": "npm run build:shared",
     "install:all": "npm install && npm run build:shared && cd backend && npm install && cd ../frontend && npm install",
     "dev:backend": "cd backend && npm run dev",
     "dev:frontend": "cd frontend && npm run dev",
@@ -15,6 +14,7 @@
     "build": "npm run build:shared && npm run build:backend && npm run build:frontend"
   },
   "devDependencies": {
+    "@types/rollup": "^0.51.4",
     "concurrently": "^8.2.2",
     "terser": "^5.46.0"
   },
