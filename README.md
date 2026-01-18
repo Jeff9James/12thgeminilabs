@@ -50,6 +50,16 @@ gemini-video-platform/
 └── .env.example
 ```
 
+### Monorepo / npm workspaces
+
+This repo uses npm workspaces. Running `npm install` from the repository root installs all packages and (via the root `postinstall` hook) builds the `shared` package into `shared/dist`.
+
+If the build ever fails, you can get full TypeScript diagnostics by running:
+
+```bash
+cd shared && npm run build
+```
+
 ## Getting Started
 
 ### Prerequisites
