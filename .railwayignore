@@ -13,4 +13,3 @@ build
 coverage
 *.md
 .DS_Store
-frontend
