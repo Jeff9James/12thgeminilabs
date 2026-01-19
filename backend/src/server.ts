@@ -184,18 +184,61 @@ async function startServer(): Promise<void> {
     console.log('');
     console.log('Phase 4: Starting HTTP server...');
     console.log('  - Binding to port:', config.port);
-    
-    app.listen(config.port, () => {
+    console.log('  - Node version:', process.version);
+    console.log('  - Platform:', process.platform);
+    console.log('  - Architecture:', process.arch);
+    console.log('  - PID:', process.pid);
+    console.log('  - Memory usage:', JSON.stringify(process.memoryUsage(), null, 2));
+    console.log('  - Working directory:', process.cwd());
+
+    const server = app.listen(config.port, () => {
+      const timestamp = new Date().toISOString();
       console.log('========================================');
       console.log('✓ SERVER STARTED SUCCESSFULLY');
       console.log('========================================');
-      logger.info(`Server running on port ${config.port}`);
-      logger.info(`Environment: ${config.nodeEnv}`);
-      logger.info(`Frontend URL: ${config.frontendUrl}`);
+      console.log('Timestamp:', timestamp);
       console.log('Port:', config.port);
       console.log('Environment:', config.nodeEnv);
       console.log('Frontend URL:', config.frontendUrl);
+      console.log('Process ID:', process.pid);
+      console.log('Node version:', process.version);
+      console.log('Memory usage:', JSON.stringify({
+        rss: Math.round(process.memoryUsage().rss / 1024 / 1024) + ' MB',
+        heapUsed: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + ' MB',
+        heapTotal: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + ' MB',
+        external: Math.round(process.memoryUsage().external / 1024 / 1024) + ' MB',
+      }, null, 2));
+      console.log('========================================');
+      console.log('✓ Server is ready to accept requests');
+      console.log('✓ Health check endpoint: /api/health');
+      console.log('========================================');
+
+      logger.info(`Server running on port ${config.port}`);
+      logger.info(`Environment: ${config.nodeEnv}`);
+      logger.info(`Frontend URL: ${config.frontendUrl}`);
     });
+
+    // Log when server starts listening
+    server.on('listening', () => {
+      console.log('✓ Server socket is listening');
+    });
+
+    // Handle server errors
+    server.on('error', (error) => {
+      console.error('Server error:', error);
+      if (error instanceof Error) {
+        console.error('  - Code:', error.message);
+        console.error('  - Stack:', error.stack);
+      }
+      process.exit(1);
+    });
+
+    // Log periodic heartbeat (every 30 seconds) to show server is running
+    setInterval(() => {
+      const uptime = process.uptime();
+      const mem = process.memoryUsage();
+      console.log(`[HEARTBEAT] Server alive - Uptime: ${Math.round(uptime)}s, Memory: ${Math.round(mem.heapUsed / 1024 / 1024)}MB / ${Math.round(mem.heapTotal / 1024 / 1024)}MB`);
+    }, 30000);
   } catch (error) {
     console.error('========================================');
     console.error('FATAL STARTUP ERROR');
@@ -214,13 +257,46 @@ async function startServer(): Promise<void> {
 // Handle uncaught exceptions
 process.on('uncaughtException', (error) => {
   logger.error('Uncaught Exception:', error);
+  console.error('Uncaught Exception:', error);
   process.exit(1);
 });
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (reason, promise) => {
   logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
   process.exit(1);
+});
+
+// Handle SIGTERM (Railway uses this to stop containers)
+process.on('SIGTERM', () => {
+  console.log('========================================');
+  console.log('SIGTERM RECEIVED - Graceful Shutdown');
+  console.log('========================================');
+  console.log('Timestamp:', new Date().toISOString());
+  console.log('Uptime:', process.uptime(), 'seconds');
+  console.log('Memory usage:', JSON.stringify(process.memoryUsage(), null, 2));
+  
+  // Give logs time to flush before exit
+  setTimeout(() => {
+    console.log('Exiting gracefully...');
+    process.exit(0);
+  }, 1000);
+});
+
+// Handle SIGINT (Ctrl+C)
+process.on('SIGINT', () => {
+  console.log('========================================');
+  console.log('SIGINT RECEIVED - Graceful Shutdown');
+  console.log('========================================');
+  console.log('Timestamp:', new Date().toISOString());
+  console.log('Uptime:', process.uptime(), 'seconds');
+  
+  // Give logs time to flush before exit
+  setTimeout(() => {
+    console.log('Exiting gracefully...');
+    process.exit(0);
+  }, 1000);
 });
 
 // Start the server

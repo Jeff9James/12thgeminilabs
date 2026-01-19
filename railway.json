@@ -37,18 +37,24 @@
       "Persistent Volume Required:",
       "  1. Go to backend service → Settings → Volumes",
       "  2. Create volume: Name='data', Mount='/data', Size=1GB+",
-      "  3. Railway auto-redeploys with volume attached"
+      "  3. Railway auto-redeploys with volume attached",
+      "",
+      "Health Check Configuration:",
+      "  - healthcheckTimeout: 30000 (30 seconds) - Increased from 100ms to prevent SIGTERM crashes",
+      "  - Server needs time to: validate env → connect to DB → run migrations → start → respond to health check",
+      "  - Typical startup time on Railway: 2-5 seconds with slower I/O",
+      "  - SIGTERM crash loop symptom indicates health check timing out before server is ready"
     ]
   },
   "build": {
     "builder": "NIXPACKS",
-    "buildCommand": "cd shared && npm install && npm run build && cd ../backend && npm install && npm run build",
+    "buildCommand": "npm install && npm run build:shared && npm run build:backend",
     "watchPatterns": ["backend/**", "shared/**"]
   },
   "deploy": {
     "startCommand": "cd backend && npm start",
     "healthcheckPath": "/api/health",
-    "healthcheckTimeout": 100,
+    "healthcheckTimeout": 30000,
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10
   }
