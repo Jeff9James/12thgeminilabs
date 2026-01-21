@@ -1,5 +1,5 @@
-import express, { Application } from 'express';
-import cors from 'cors';
+import express, { Application, Request } from 'express';
+import cors, { type CorsOptionsDelegate } from 'cors';
 import compression from 'compression';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
@@ -23,6 +23,10 @@ import chatRouter from './routes/chat';
 function createApp(): Application {
   const app = express();
 
+  // Request ID middleware
+  // (Placed early so that preflight/OPTIONS requests also get an ID and can be correlated in logs)
+  app.use(requestIdMiddleware);
+
   // Security middleware
   app.use(helmet({
     contentSecurityPolicy: {
@@ -41,16 +45,165 @@ function createApp(): Application {
     crossOriginEmbedderPolicy: false,
   }));
 
-  // CORS configuration
-  app.use(cors({
-    origin: config.frontendUrl,
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-  }));
+  const normalizeOrigin = (urlOrOrigin: string): string => {
+    const trimmed = urlOrOrigin.trim().replace(/\/+$/, '');
+    if (!trimmed) return trimmed;
 
-  // Request ID middleware
-  app.use(requestIdMiddleware);
+    const hasProtocol = /^[a-zA-Z][a-zA-Z\d+\-.]*:\/\//.test(trimmed);
+    const isLocal = /^(localhost|127\.0\.0\.1|0\.0\.0\.0)(:|$)/.test(trimmed);
+    const candidate = hasProtocol ? trimmed : `${isLocal ? 'http' : 'https'}://${trimmed}`;
+
+    try {
+      return new URL(candidate).origin;
+    } catch {
+      return trimmed;
+    }
+  };
+
+  const configuredFrontendOrigin = normalizeOrigin(config.frontendUrl);
+  const nodeEnv = config.nodeEnv || 'development';
+
+  const alternateFrontendOrigin = (() => {
+    try {
+      const url = new URL(configuredFrontendOrigin);
+      const hostname = url.hostname;
+
+      if (hostname.endsWith('.vercel.app')) return null;
+      if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0') return null;
+
+      if (hostname.startsWith('www.')) {
+        url.hostname = hostname.replace(/^www\./, '');
+        return url.origin;
+      }
+
+      url.hostname = `www.${hostname}`;
+      return url.origin;
+    } catch {
+      return null;
+    }
+  })();
+
+  const additionalAllowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean)
+    .map(normalizeOrigin);
+
+  const allowedOrigins = new Set<string>([
+    configuredFrontendOrigin,
+    ...(alternateFrontendOrigin ? [alternateFrontendOrigin] : []),
+    ...additionalAllowedOrigins,
+    'https://accounts.google.com',
+    'https://gsi.gstatic.com',
+  ]);
+
+  // If we're deployed on Vercel, allow preview deployments (e.g. <project>-<hash>.vercel.app)
+  const vercelPreviewBase = (() => {
+    try {
+      const { hostname } = new URL(configuredFrontendOrigin);
+      if (!hostname.endsWith('.vercel.app')) return null;
+      const base = hostname.replace(/\.vercel\.app$/, '');
+      return base || null;
+    } catch {
+      return null;
+    }
+  })();
+
+  const isAllowedOrigin = (origin: string): boolean => {
+    if (allowedOrigins.has(origin)) return true;
+
+    // Allow localhost during development
+    if (nodeEnv !== 'production') {
+      if (/^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?$/.test(origin)) {
+        return true;
+      }
+    }
+
+    // Allow Vercel preview origins for the same project
+    if (vercelPreviewBase) {
+      try {
+        const { protocol, hostname } = new URL(origin);
+        if (protocol !== 'https:') return false;
+        if (!hostname.endsWith('.vercel.app')) return false;
+        return hostname === `${vercelPreviewBase}.vercel.app` || hostname.startsWith(`${vercelPreviewBase}-`);
+      } catch {
+        return false;
+      }
+    }
+
+    return false;
+  };
+
+  const shouldLogCors = (req: Request): boolean => {
+    // Always log auth endpoints + all preflight requests (OPTIONS)
+    return req.method === 'OPTIONS' || req.path.startsWith('/api/auth');
+  };
+
+  // CORS configuration
+  // Uses FRONTEND_URL (config.frontendUrl) for the primary allowed origin.
+  // Also supports:
+  // - CORS_ALLOWED_ORIGINS (comma-separated)
+  // - Vercel preview deployments for the same project
+  // - https://accounts.google.com (needed by Google Identity Services in some modes)
+  const corsOptionsDelegate: CorsOptionsDelegate<Request> = (req, callback) => {
+    const requestOriginHeader = req.header('Origin');
+    const requestOrigin = requestOriginHeader ? normalizeOrigin(requestOriginHeader) : undefined;
+
+    const allowed = requestOrigin ? isAllowedOrigin(requestOrigin) : true;
+
+    if (shouldLogCors(req)) {
+      // eslint-disable-next-line no-console
+      console.log('[CORS] Incoming request', {
+        requestId: req.id,
+        method: req.method,
+        url: req.originalUrl,
+        origin: requestOriginHeader || null,
+        normalizedOrigin: requestOrigin || null,
+        configuredFrontendOrigin,
+        frontendOriginMatches: requestOrigin ? requestOrigin === configuredFrontendOrigin : false,
+        allowed,
+        allowedOrigins: Array.from(allowedOrigins),
+        vercelPreviewBase,
+      });
+    }
+
+    callback(null, {
+      origin: allowed && requestOrigin ? requestOrigin : false,
+      credentials: true,
+      methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      exposedHeaders: ['X-Request-ID'],
+      optionsSuccessStatus: 204,
+      maxAge: 86400,
+    });
+  };
+
+  // Log CORS response headers (especially useful for debugging preflight failures)
+  app.use((req, res, next) => {
+    if (!shouldLogCors(req)) {
+      next();
+      return;
+    }
+
+    res.on('finish', () => {
+      // eslint-disable-next-line no-console
+      console.log('[CORS] Response', {
+        requestId: req.id,
+        method: req.method,
+        url: req.originalUrl,
+        statusCode: res.statusCode,
+        origin: req.header('Origin') || null,
+        accessControlAllowOrigin: res.getHeader('access-control-allow-origin') || null,
+        accessControlAllowCredentials: res.getHeader('access-control-allow-credentials') || null,
+        accessControlAllowMethods: res.getHeader('access-control-allow-methods') || null,
+        accessControlAllowHeaders: res.getHeader('access-control-allow-headers') || null,
+      });
+    });
+
+    next();
+  });
+
+  app.use(cors(corsOptionsDelegate));
+  app.options('*', cors(corsOptionsDelegate));
 
   // Compression middleware (gzip)
   app.use(compression());
