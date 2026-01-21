@@ -10,19 +10,33 @@ interface GoogleLoginButtonProps {
 export function GoogleLoginButton({ onSuccess, onError }: GoogleLoginButtonProps) {
   const { login } = useAuth();
 
+  // Log component mount and window.google availability
+  React.useEffect(() => {
+    console.log('[Google Auth] Component mounted');
+    console.log('[Google Auth] window.google available:', !!window.google);
+    console.log('[Google Auth] window.google.accounts available:', !!window.google?.accounts);
+    console.log('[Google Auth] VITE_GOOGLE_CLIENT_ID:', import.meta.env.VITE_GOOGLE_CLIENT_ID || 'NOT_SET');
+  }, []);
+
   const handleSuccess = async (response: { credential: string }) => {
     try {
       const idToken = response.credential;
+      console.log('[Google Auth] Received idToken from Google (length:', idToken.length, ')');
+      console.log('[Google Auth] Calling backend with idToken...');
       await login(idToken);
+      console.log('[Google Auth] Login successful, calling onSuccess callback');
       onSuccess?.();
     } catch (error) {
-      console.error('Login failed:', error);
+      console.error('[Google Auth] Backend login failed:', error);
       onError?.(error);
     }
   };
 
-  const handleError = () => {
-    console.error('Google login error');
+  const handleError = (error?: unknown) => {
+    console.error('[Google Auth] Google login error');
+    if (error) {
+      console.error('[Google Auth] Error details:', error);
+    }
     onError?.(new Error('Google login failed'));
   };
 
@@ -32,21 +46,44 @@ export function GoogleLoginButton({ onSuccess, onError }: GoogleLoginButtonProps
         type="button"
         className="google-login-btn"
         onClick={() => {
+          console.log('[Google Auth] Button clicked');
+          const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+          console.log('[Google Auth] Using client_id:', clientId || 'NOT_SET');
+
           // Initialize Google OAuth manually
           if (window.google?.accounts) {
-            window.google.accounts.id.initialize({
-              client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || '',
-              callback: handleSuccess,
-              auto_select: false,
-              cancel_on_tap_outside: true,
-            });
-            window.google.accounts.id.prompt((notification) => {
-              if (notification.isNotDisplayed()) {
-                handleError();
-              }
-            });
+            try {
+              console.log('[Google Auth] Initializing Google accounts...');
+              window.google.accounts.id.initialize({
+                client_id: clientId,
+                callback: handleSuccess,
+                auto_select: false,
+                cancel_on_tap_outside: true,
+              });
+              console.log('[Google Auth] Google accounts initialized successfully');
+              console.log('[Google Auth] Showing Google prompt/popup...');
+
+              window.google.accounts.id.prompt((notification) => {
+                console.log('[Google Auth] Google prompt notification:', notification.getMomentType());
+                if (notification.isNotDisplayed()) {
+                  console.error('[Google Auth] Google prompt not displayed');
+                  handleError(new Error('Google prompt not displayed'));
+                } else if (notification.isSkippedMoment()) {
+                  console.warn('[Google Auth] Google prompt was skipped');
+                  handleError(new Error('Google prompt was skipped'));
+                } else if (notification.isDismissedMoment()) {
+                  console.warn('[Google Auth] Google prompt was dismissed by user');
+                  handleError(new Error('Google prompt was dismissed'));
+                }
+              });
+            } catch (error) {
+              console.error('[Google Auth] Google initialization error:', error);
+              handleError(error);
+            }
           } else {
-            handleError();
+            console.error('[Google Auth] window.google.accounts not available');
+            console.error('[Google Auth] Make sure Google Script is loaded before using this component');
+            handleError(new Error('Google accounts not available'));
           }
         }}
       >

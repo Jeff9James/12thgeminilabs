@@ -109,25 +109,73 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (idToken: string, accessToken?: string) => {
     try {
-      const response = await apiClient.post<{ 
-        user: User; 
-        token: string; 
-        refreshToken: string; 
-      }>('/auth/google-callback', { 
-        idToken, 
-        accessToken 
+      console.log('[Auth] login called with idToken (length:', idToken.length, ')');
+      if (accessToken) {
+        console.log('[Auth] accessToken provided (length:', accessToken.length, ')');
+      }
+
+      console.log('[Auth] Sending request to /auth/google-callback');
+      const response = await apiClient.post<{
+        user: User;
+        token: string;
+        refreshToken: string;
+      }>('/auth/google-callback', {
+        idToken,
+        accessToken
       });
 
+      console.log('[Auth] Backend response received');
+      console.log('[Auth] Response success:', response.success);
+      console.log('[Auth] Response data present:', !!response.data);
+
       if (response.success && response.data) {
+        console.log('[Auth] Setting user in state:', response.data.user.email || response.data.user.id);
         setUser(response.data.user);
-        
+
         // Store tokens in localStorage
+        console.log('[Auth] Storing tokens in localStorage');
+        console.log('[Auth] Token length:', response.data.token.length);
+        console.log('[Auth] Refresh token length:', response.data.refreshToken.length);
+
         localStorage.setItem('token', response.data.token);
         localStorage.setItem('refreshToken', response.data.refreshToken);
         localStorage.setItem('user', JSON.stringify(response.data.user));
+
+        console.log('[Auth] Login completed successfully');
+      } else {
+        console.error('[Auth] Backend response indicates failure');
+        console.error('[Auth] Response success:', response.success);
+        console.error('[Auth] Response data:', response.data);
+        throw new Error('Backend login failed');
       }
     } catch (error) {
-      console.error('Login failed:', error);
+      console.error('[Auth] Login request failed');
+      console.error('[Auth] Error:', error);
+
+      // Log more details about the error
+      if (error instanceof Error) {
+        console.error('[Auth] Error message:', error.message);
+        console.error('[Auth] Error stack:', error.stack);
+      }
+
+      // Check if it's a network error
+      if (error && typeof error === 'object') {
+        if ('message' in error) {
+          console.error('[Auth] Error message:', error.message);
+        }
+        if ('code' in error) {
+          console.error('[Auth] Error code:', error.code);
+        }
+        if ('status' in error) {
+          console.error('[Auth] HTTP status:', error.status);
+        }
+        if ('response' in error) {
+          const err = error as { response?: { data?: unknown; status?: number } };
+          console.error('[Auth] Response data:', err.response?.data);
+          console.error('[Auth] Response status:', err.response?.status);
+        }
+      }
+
       throw error;
     }
   };
