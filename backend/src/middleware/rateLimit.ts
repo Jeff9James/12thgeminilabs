@@ -6,6 +6,7 @@ export const authRateLimit = rateLimit({
   message: 'Too many authentication attempts, please try again later',
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => req.method === 'OPTIONS',
 });
 
 export const apiRateLimit = rateLimit({
@@ -15,6 +16,8 @@ export const apiRateLimit = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req) => {
+    if (req.method === 'OPTIONS') return true;
+
     // Skip rate limiting for streaming endpoints
     return req.url.includes('/stream');
   },
