@@ -43,7 +43,7 @@ export function GoogleLoginButton({ onSuccess, onError }: GoogleLoginButtonProps
         theme="outline"
         size="large"
         shape="rectangular"
-        width="100%"
+        width="350"
         text="continue_with"
       />
     </div>
