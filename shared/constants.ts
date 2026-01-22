@@ -28,11 +28,11 @@ export const API_ENDPOINTS = {
     SEMANTIC: '/api/search/semantic',
   },
   GOOGLE_DRIVE: {
-    AUTH_START: '/api/google-drive/auth/start',
-    AUTH_CALLBACK: '/api/google-drive/auth/callback',
-    FILES: '/api/google-drive/files',
-    IMPORT: '/api/google-drive/import/:fileId',
-    IMPORT_STATUS: '/api/google-drive/import/:fileId/status',
+    AUTH_START: '/google-drive/auth/start',
+    AUTH_CALLBACK: '/google-drive/auth/callback',
+    FILES: '/google-drive/files',
+    IMPORT: '/google-drive/import/:fileId',
+    IMPORT_STATUS: '/google-drive/import/:fileId/status',
   },
 } as const;
 

@@ -111,7 +111,13 @@ export function GoogleDriveImportModal({
   const handleConnectGoogleDrive = () => {
     // Redirect to backend OAuth start endpoint
     const apiBase = import.meta.env.VITE_API_URL || '/api';
-    window.location.href = `${apiBase}/google-drive/auth/start`;
+    // Remove trailing slash if present to avoid double slashes when joining
+    const baseUrl = apiBase.endsWith('/') ? apiBase.slice(0, -1) : apiBase;
+    // API_ENDPOINTS.GOOGLE_DRIVE.AUTH_START now starts with /google-drive/... (no /api prefix)
+    // But since apiBase might include /api (e.g. localhost:3000/api), we just need to append the path.
+    // However, we updated constants to NOT have /api.
+    // If apiBase is '/api', and we append '/google-drive/auth/start', we get '/api/google-drive/auth/start'. Correct.
+    window.location.href = `${baseUrl}/google-drive/auth/start`;
   };
 
   if (!isOpen) return null;

@@ -43,6 +43,7 @@ function createApp(): Application {
       },
     },
     crossOriginEmbedderPolicy: false,
+    crossOriginOpenerPolicy: { policy: "unsafe-none" },
   }));
 
   const normalizeOrigin = (urlOrOrigin: string): string => {
@@ -216,7 +217,7 @@ function createApp(): Application {
   // Request logging and metrics
   app.use((req, res, next) => {
     const startTime = Date.now();
-    
+
     metricsService.incrementActiveRequest();
     logger.info(`${req.method} ${req.url}`, {
       requestId: req.id,
@@ -228,10 +229,10 @@ function createApp(): Application {
     res.on('finish', () => {
       const responseTime = Date.now() - startTime;
       const statusCode = res.statusCode;
-      
+
       metricsService.decrementActiveRequest();
       metricsService.incrementApiCall(req.method, req.route?.path || req.path);
-      
+
       logger.info(`${req.method} ${req.url} ${statusCode}`, {
         requestId: req.id,
         responseTime: `${responseTime}ms`,
@@ -256,7 +257,7 @@ function createApp(): Application {
 
   // Video routes with rate limiting
   app.use('/api/videos', apiRateLimit, videosRouter);
-  
+
   // Analysis routes with rate limiting
   app.use('/api/videos', apiRateLimit, analysisRouter);
 
@@ -284,13 +285,13 @@ async function startServer(): Promise<void> {
     console.log('========================================');
     console.log('SERVER STARTUP - INITIALIZING');
     console.log('========================================');
-    
+
     // Log environment variable presence (sanitized)
     const envKeys = Object.keys(process.env);
-    const relevantKeys = envKeys.filter(k => 
-      k.includes('GEMINI') || 
-      k.includes('JWT') || 
-      k.includes('GOOGLE') || 
+    const relevantKeys = envKeys.filter(k =>
+      k.includes('GEMINI') ||
+      k.includes('JWT') ||
+      k.includes('GOOGLE') ||
       k.includes('DATABASE') ||
       k.includes('FRONTEND') ||
       k.includes('VIDEO') ||
@@ -299,7 +300,7 @@ async function startServer(): Promise<void> {
       k.includes('PORT') ||
       k.includes('DEBUG')
     );
-    
+
     console.log('Environment variables detected:', relevantKeys.length);
     console.log('Environment variable keys:', relevantKeys);
     console.log('NODE_ENV:', process.env.NODE_ENV);
@@ -318,11 +319,11 @@ async function startServer(): Promise<void> {
     const db = initDatabase(config.databasePath);
     console.log('✓ Database initialized');
     console.log('  - Database path:', config.databasePath);
-    
+
     console.log('  - Connecting to database...');
     await db.connect();
     console.log('✓ Database connected');
-    
+
     console.log('  - Running database migrations...');
     await db.initialize();
     console.log('✓ Database migrations completed');
@@ -401,7 +402,7 @@ async function startServer(): Promise<void> {
     console.error('  - Type:', error instanceof Error ? error.name : typeof error);
     console.error('  - Stack trace:', error instanceof Error ? error.stack : 'No stack trace available');
     console.error('========================================');
-    
+
     logger.error('Failed to start server:', error instanceof Error ? error.message : String(error));
     process.exit(1);
   }
@@ -429,7 +430,7 @@ process.on('SIGTERM', () => {
   console.log('Timestamp:', new Date().toISOString());
   console.log('Uptime:', process.uptime(), 'seconds');
   console.log('Memory usage:', JSON.stringify(process.memoryUsage(), null, 2));
-  
+
   // Give logs time to flush before exit
   setTimeout(() => {
     console.log('Exiting gracefully...');
@@ -444,7 +445,7 @@ process.on('SIGINT', () => {
   console.log('========================================');
   console.log('Timestamp:', new Date().toISOString());
   console.log('Uptime:', process.uptime(), 'seconds');
-  
+
   // Give logs time to flush before exit
   setTimeout(() => {
     console.log('Exiting gracefully...');
