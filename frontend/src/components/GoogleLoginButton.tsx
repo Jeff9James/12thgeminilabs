@@ -1,7 +1,16 @@
-import React from 'react';
-import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
+import React, { useState } from 'react';
+import { useGoogleLogin, CodeResponse } from '@react-oauth/google';
 import { useAuth } from '../hooks/useAuth';
 import './GoogleLoginButton.css';
+
+// Scopes to request - includes Drive read-only access
+const GOOGLE_SCOPES = [
+  'openid',
+  'email',
+  'profile',
+  'https://www.googleapis.com/auth/drive.readonly',
+  'https://www.googleapis.com/auth/drive.metadata.readonly',
+].join(' ');
 
 interface GoogleLoginButtonProps {
   onSuccess?: () => void;
@@ -9,23 +18,23 @@ interface GoogleLoginButtonProps {
 }
 
 export function GoogleLoginButton({ onSuccess, onError }: GoogleLoginButtonProps) {
-  const { login } = useAuth();
+  const { loginWithCode } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSuccess = async (response: CredentialResponse) => {
+  const handleSuccess = async (codeResponse: CodeResponse) => {
     try {
-      if (!response.credential) {
-        throw new Error('No credential received from Google');
-      }
-
-      const idToken = response.credential;
-      console.log('[Google Auth] Received idToken from Google (length:', idToken.length, ')');
-      console.log('[Google Auth] Calling backend with idToken...');
-      await login(idToken);
+      setIsLoading(true);
+      console.log('[Google Auth] Received authorization code from Google');
+      
+      // Send the authorization code to our backend for token exchange
+      await loginWithCode(codeResponse.code);
       console.log('[Google Auth] Login successful, calling onSuccess callback');
       onSuccess?.();
     } catch (error) {
       console.error('[Google Auth] Backend login failed:', error);
       onError?.(error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -34,18 +43,46 @@ export function GoogleLoginButton({ onSuccess, onError }: GoogleLoginButtonProps
     onError?.(new Error('Google login failed'));
   };
 
+  const login = useGoogleLogin({
+    onSuccess: handleSuccess,
+    onError: handleError,
+    flow: 'auth-code',
+    scope: GOOGLE_SCOPES,
+    ux_mode: 'popup',
+    // Required to receive refresh tokens for long-lived Drive access
+    // @ts-expect-error - access_type is valid but not in types
+    access_type: 'offline',
+    prompt: 'consent',
+  });
+
   return (
     <div className="google-login-container">
-      <GoogleLogin
-        onSuccess={handleSuccess}
-        onError={handleError}
-        use_fedcm_for_prompt={true}
-        theme="outline"
-        size="large"
-        shape="rectangular"
-        width="350"
-        text="continue_with"
-      />
+      <button 
+        className="google-login-button"
+        onClick={() => login()}
+        disabled={isLoading}
+        type="button"
+      >
+        <svg className="google-icon" viewBox="0 0 24 24" width="24" height="24">
+          <path
+            fill="#4285F4"
+            d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+          />
+          <path
+            fill="#34A853"
+            d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+          />
+          <path
+            fill="#FBBC05"
+            d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+          />
+          <path
+            fill="#EA4335"
+            d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+          />
+        </svg>
+        <span>{isLoading ? 'Signing in...' : 'Continue with Google'}</span>
+      </button>
     </div>
   );
 }

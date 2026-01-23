@@ -7,6 +7,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (idToken: string, accessToken?: string) => Promise<void>;
+  loginWithCode: (code: string) => Promise<void>;
   logout: () => void;
   refreshToken: () => Promise<void>;
 }
@@ -180,6 +181,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Login with authorization code (for OAuth flow with Drive scopes)
+  const loginWithCode = async (code: string) => {
+    try {
+      console.log('[Auth] loginWithCode called with authorization code');
+
+      console.log('[Auth] Sending request to /auth/google-code');
+      const response = await apiClient.post<{
+        user: User;
+        token: string;
+        refreshToken: string;
+      }>('/auth/google-code', { code });
+
+      console.log('[Auth] Backend response received');
+      console.log('[Auth] Response success:', response.success);
+
+      if (response.success && response.data) {
+        console.log('[Auth] Setting user in state:', response.data.user.email || response.data.user.id);
+        setUser(response.data.user);
+
+        // Store tokens in localStorage
+        localStorage.setItem('token', response.data.token);
+        localStorage.setItem('refreshToken', response.data.refreshToken);
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+
+        console.log('[Auth] Login with code completed successfully (Drive access included)');
+      } else {
+        console.error('[Auth] Backend response indicates failure');
+        throw new Error('Backend login failed');
+      }
+    } catch (error) {
+      console.error('[Auth] loginWithCode request failed:', error);
+      throw error;
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -187,6 +223,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isAuthenticated: !!user,
         isLoading,
         login,
+        loginWithCode,
         logout,
         refreshToken,
       }}

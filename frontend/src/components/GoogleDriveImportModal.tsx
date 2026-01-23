@@ -21,12 +21,22 @@ export function GoogleDriveImportModal({
 
   useEffect(() => {
     if (isOpen) {
+      setNeedsAuth(false); // Reset on modal open
       listFiles().catch((err) => {
-        // Check if it's an auth error
-        if (err.message?.includes('not authorized') || err.message?.includes('expired')) {
+        // Check if it's an auth error - check for common patterns
+        const errorMessage = err.message?.toLowerCase() || '';
+        const isAuthError = 
+          errorMessage.includes('not authorized') || 
+          errorMessage.includes('expired') ||
+          errorMessage.includes('401') ||
+          errorMessage.includes('unauthorized') ||
+          errorMessage.includes('access not authorized') ||
+          err.response?.status === 401;
+        
+        if (isAuthError) {
           setNeedsAuth(true);
         }
-        console.error(err);
+        console.error('Google Drive list files error:', err);
       });
     }
   }, [isOpen, listFiles]);
@@ -113,10 +123,7 @@ export function GoogleDriveImportModal({
     const apiBase = import.meta.env.VITE_API_URL || '/api';
     // Remove trailing slash if present to avoid double slashes when joining
     const baseUrl = apiBase.endsWith('/') ? apiBase.slice(0, -1) : apiBase;
-    // API_ENDPOINTS.GOOGLE_DRIVE.AUTH_START now starts with /google-drive/... (no /api prefix)
-    // But since apiBase might include /api (e.g. localhost:3000/api), we just need to append the path.
-    // However, we updated constants to NOT have /api.
-    // If apiBase is '/api', and we append '/google-drive/auth/start', we get '/api/google-drive/auth/start'. Correct.
+    // Navigate to the Drive OAuth start endpoint
     window.location.href = `${baseUrl}/google-drive/auth/start`;
   };
 

@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
+import { google } from 'googleapis';
 import { getDatabase } from '../db/connection';
 import { authenticate, generateToken, generateRefreshToken } from '../middleware/auth';
 import { ApiResponse, AuthResponse, User } from '@gemini-video-platform/shared';
@@ -250,11 +251,116 @@ router.post('/logout', (req: Request, res: Response): void => {
   // Clear cookies
   res.clearCookie('oauth_access_token');
   res.clearCookie('refresh_token');
+  res.clearCookie('google_refresh_token');
 
   res.json({
     success: true,
     message: 'Logged out successfully',
   });
+});
+
+// POST /api/auth/google-code
+// Exchanges Google authorization code for tokens (for login with Drive scopes)
+// This is used when the frontend uses useGoogleLogin with flow: 'auth-code'
+router.post('/google-code', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { code } = req.body;
+
+    if (!code) {
+      res.status(400).json({
+        success: false,
+        error: 'Authorization code is required',
+      });
+      return;
+    }
+
+    // Create OAuth2 client with redirect URI set to 'postmessage' for popup flow
+    const oauth2ClientWithSecret = new google.auth.OAuth2(
+      config.googleClientId,
+      config.googleClientSecret,
+      'postmessage' // Required for popup-based auth code flow
+    );
+
+    // Exchange authorization code for tokens
+    const { tokens } = await oauth2ClientWithSecret.getToken(code);
+    
+    if (!tokens.id_token) {
+      res.status(400).json({
+        success: false,
+        error: 'No ID token received from Google',
+      });
+      return;
+    }
+
+    // Verify the ID token
+    const payload = await verifyGoogleIdToken(tokens.id_token);
+
+    if (!payload || !payload.sub || !payload.email) {
+      res.status(400).json({
+        success: false,
+        error: 'Invalid Google ID token',
+      });
+      return;
+    }
+
+    // Get or create user
+    const user = await getOrCreateUser(payload);
+
+    // Generate JWT token valid for 1 hour
+    const token = generateToken(user.id, user.email);
+
+    // Generate refresh token
+    const refreshToken = generateRefreshToken(user.id, user.email);
+
+    // Set HTTP-only cookie for OAuth access token (for Google Drive integration)
+    if (tokens.access_token) {
+      res.cookie('oauth_access_token', tokens.access_token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 60 * 60 * 1000, // 1 hour
+      });
+      logger.info('Set oauth_access_token cookie for Drive access');
+    }
+
+    // Set HTTP-only cookie for Google refresh token (for token renewal)
+    if (tokens.refresh_token) {
+      res.cookie('google_refresh_token', tokens.refresh_token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      });
+      logger.info('Set google_refresh_token cookie for Drive token refresh');
+    }
+
+    // Set HTTP-only cookie for app refresh token
+    res.cookie('refresh_token', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+
+    const response: ApiResponse<AuthResponse> = {
+      success: true,
+      data: {
+        user,
+        token,
+        refreshToken,
+      },
+      message: 'Authentication successful with Drive access',
+    };
+
+    logger.info(`User ${user.email} authenticated with Drive scopes`);
+    res.json(response);
+  } catch (error) {
+    logger.error('Google code exchange error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to exchange authorization code',
+    });
+  }
 });
 
 export default router;
