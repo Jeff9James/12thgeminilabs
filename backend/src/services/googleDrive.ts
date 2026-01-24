@@ -43,18 +43,12 @@ export class GoogleDriveService {
    * Get Drive API client
    */
   private getDriveClient(): drive_v3.Drive {
-    // If API key is available, use it along with OAuth
-    const driveConfig: any = { 
+    return google.drive({ 
       version: 'v3', 
-      auth: this.oauth2Client as any 
-    };
-    
-    // Add API key as fallback authentication
-    if (process.env.GOOGLE_API_KEY) {
-      driveConfig.key = process.env.GOOGLE_API_KEY;
-    }
-    
-    return google.drive(driveConfig);
+      auth: this.oauth2Client as any,
+      // @ts-ignore - key is not in types but is valid
+      key: process.env.GOOGLE_API_KEY,
+    });
   }
 
   /**
