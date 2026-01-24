@@ -331,6 +331,11 @@ async function startServer(): Promise<void> {
     await db.initialize();
     console.log('✓ Database migrations completed');
 
+    console.log('  - Initializing demo user...');
+    const { initDemoUser } = await import('./db/init-demo-user');
+    await initDemoUser();
+    console.log('✓ Demo user initialized');
+
     // Phase 3: Creating Express app
     console.log('');
     console.log('Phase 3: Creating Express application...');

@@ -17,49 +17,21 @@ declare global {
   }
 }
 
+// SIMPLIFIED: Demo mode - no authentication required
+// All users share a single demo user account
+const DEMO_USER = {
+  id: 'demo-user-id',
+  email: 'demo@example.com',
+};
+
 export function authenticate(
   req: Request,
   res: Response,
   next: NextFunction
 ): void {
-  try {
-    // Check for token in Authorization header first
-    const authHeader = req.headers.authorization;
-    let token: string | undefined;
-
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      token = authHeader.substring(7);
-    } else if (req.query.token && typeof req.query.token === 'string') {
-      // Allow token in query parameter for OAuth redirects (where headers can't be sent)
-      token = req.query.token;
-    }
-
-    if (!token) {
-      res.status(401).json({
-        success: false,
-        error: ERROR_MESSAGES.UNAUTHORIZED,
-      });
-      return;
-    }
-
-    const decoded = jwt.verify(token, config.jwtSecret) as {
-      userId: string;
-      email: string;
-    };
-
-    req.user = {
-      id: decoded.userId,
-      email: decoded.email,
-    };
-
-    next();
-  } catch (error) {
-    logger.error('Authentication error:', error);
-    res.status(401).json({
-      success: false,
-      error: ERROR_MESSAGES.INVALID_TOKEN,
-    });
-  }
+  // In demo mode, just set the demo user
+  req.user = DEMO_USER;
+  next();
 }
 
 export function generateToken(userId: string, email: string): string {
