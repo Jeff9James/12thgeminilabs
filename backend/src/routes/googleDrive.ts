@@ -75,18 +75,26 @@ async function withDriveService(req: AuthenticatedRequest, res: Response): Promi
   const userId = req.user!.id;
   const db = getDatabase();
 
-  // Get tokens from database
-  const user = await db.get<{
-    google_drive_access_token?: string;
-    google_drive_refresh_token?: string;
-    google_drive_token_expiry?: string;
-  }>('SELECT google_drive_access_token, google_drive_refresh_token, google_drive_token_expiry FROM users WHERE id = ?', [userId]);
+  try {
+    // Get tokens from database
+    const user = await db.get<{
+      google_drive_access_token?: string;
+      google_drive_refresh_token?: string;
+      google_drive_token_expiry?: string;
+    }>('SELECT google_drive_access_token, google_drive_refresh_token, google_drive_token_expiry FROM users WHERE id = ?', [userId]);
 
-  if (!user || !user.google_drive_access_token) {
-    const err = new Error('Google Drive access not authorized');
-    (err as any).statusCode = 401;
-    throw err;
-  }
+    logger.info(`Fetched user Drive tokens for userId: ${userId}`, {
+      hasUser: !!user,
+      hasAccessToken: !!user?.google_drive_access_token,
+      hasRefreshToken: !!user?.google_drive_refresh_token,
+      tokenExpiry: user?.google_drive_token_expiry,
+    });
+
+    if (!user || !user.google_drive_access_token) {
+      const err = new Error('Google Drive access not authorized');
+      (err as any).statusCode = 401;
+      throw err;
+    }
 
   const accessToken = user.google_drive_access_token;
   const refreshToken = user.google_drive_refresh_token;
@@ -123,6 +131,10 @@ async function withDriveService(req: AuthenticatedRequest, res: Response): Promi
   );
 
   return { service: new GoogleDriveService(newAccessToken, refreshToken), accessToken: newAccessToken, refreshToken };
+  } catch (error) {
+    logger.error('Error in withDriveService:', error);
+    throw error;
+  }
 }
 
 /**
@@ -215,15 +227,27 @@ router.get('/auth/callback', async (req: Request, res: Response): Promise<void> 
       ? new Date(tokens.expiry_date).toISOString() 
       : new Date(Date.now() + 3600 * 1000).toISOString();
 
-    await db.run(
-      `UPDATE users SET 
-        google_drive_access_token = ?,
-        google_drive_refresh_token = COALESCE(?, google_drive_refresh_token),
-        google_drive_token_expiry = ?,
-        updated_at = ?
-      WHERE id = ?`,
-      [tokens.access_token, tokens.refresh_token, tokenExpiry, new Date().toISOString(), userId]
-    );
+    logger.info(`Storing Google Drive tokens for userId: ${userId}`, {
+      hasAccessToken: !!tokens.access_token,
+      hasRefreshToken: !!tokens.refresh_token,
+      tokenExpiry,
+    });
+
+    try {
+      await db.run(
+        `UPDATE users SET 
+          google_drive_access_token = ?,
+          google_drive_refresh_token = COALESCE(?, google_drive_refresh_token),
+          google_drive_token_expiry = ?,
+          updated_at = ?
+        WHERE id = ?`,
+        [tokens.access_token, tokens.refresh_token, tokenExpiry, new Date().toISOString(), userId]
+      );
+      logger.info(`Successfully stored Google Drive tokens for userId: ${userId}`);
+    } catch (dbError) {
+      logger.error(`Failed to store Google Drive tokens for userId: ${userId}`, dbError);
+      throw dbError;
+    }
 
     res.redirect(`${config.frontendUrl}/videos?drive=connected`);
   } catch (error) {
