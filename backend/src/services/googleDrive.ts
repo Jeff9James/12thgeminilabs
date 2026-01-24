@@ -11,11 +11,18 @@ export class GoogleDriveService {
   private oauth2Client: OAuth2Client;
 
   constructor(accessToken: string, refreshToken?: string) {
-    // Create OAuth2 client
+    // Create OAuth2 client with quota project
     this.oauth2Client = new OAuth2Client(
       config.googleClientId,
       config.googleClientSecret
     );
+
+    // Set quota project ID from client ID (extract project)
+    const projectId = config.googleClientId?.split('-')[0] || config.googleClientId?.split('.')[0];
+    if (projectId) {
+      (this.oauth2Client as any).projectId = projectId;
+      console.log('Set OAuth client project ID:', projectId);
+    }
 
     console.log('GoogleDriveService: Setting credentials', {
       hasAccessToken: !!accessToken,
@@ -24,19 +31,11 @@ export class GoogleDriveService {
       clientId: config.googleClientId?.substring(0, 20) + '...',
     });
 
-    // Set credentials - include API key if available
-    const credentials: any = {
+    // Set credentials
+    this.oauth2Client.setCredentials({
       access_token: accessToken,
       refresh_token: refreshToken,
-    };
-
-    // Add API key if available (helps with "unregistered callers" error)
-    if (process.env.GOOGLE_API_KEY) {
-      credentials.api_key = process.env.GOOGLE_API_KEY;
-      console.log('GoogleDriveService: Using API key for additional authentication');
-    }
-
-    this.oauth2Client.setCredentials(credentials);
+    });
   }
 
   /**
@@ -46,8 +45,6 @@ export class GoogleDriveService {
     return google.drive({ 
       version: 'v3', 
       auth: this.oauth2Client as any,
-      // @ts-ignore - key is not in types but is valid
-      key: process.env.GOOGLE_API_KEY,
     });
   }
 
