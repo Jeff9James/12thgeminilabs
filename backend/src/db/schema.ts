@@ -7,6 +7,9 @@ export const CREATE_USERS_TABLE = `
     google_id TEXT UNIQUE NOT NULL,
     picture_url TEXT,
     quota_used INTEGER DEFAULT 0,
+    google_drive_access_token TEXT,
+    google_drive_refresh_token TEXT,
+    google_drive_token_expiry DATETIME,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
@@ -202,4 +205,11 @@ export const ADD_BOOKMARKS_INDEXES = `
 export const ADD_RATE_LIMITS_INDEXES = `
   CREATE INDEX IF NOT EXISTS idx_rate_limits_user_video ON rate_limits(user_id, video_id, action);
   CREATE INDEX IF NOT EXISTS idx_rate_limits_reset_time ON rate_limits(reset_time);
+`;
+
+// Migration: Add Google Drive token columns to users table
+export const ADD_GOOGLE_DRIVE_TOKENS_TO_USERS = `
+  ALTER TABLE users ADD COLUMN google_drive_access_token TEXT;
+  ALTER TABLE users ADD COLUMN google_drive_refresh_token TEXT;
+  ALTER TABLE users ADD COLUMN google_drive_token_expiry DATETIME;
 `;

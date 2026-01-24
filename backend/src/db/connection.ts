@@ -68,6 +68,7 @@ class Database {
     await this.ensureVideosGoogleDriveColumns();
     await this.ensureBookmarksTable();
     await this.ensureRateLimitsTable();
+    await this.ensureGoogleDriveTokenColumns();
   }
 
   private async ensureVideosGoogleDriveColumns(): Promise<void> {
@@ -158,6 +159,31 @@ class Database {
 
     // Create rate limits indexes
     await this.run(ADD_RATE_LIMITS_INDEXES);
+  }
+
+  private async ensureGoogleDriveTokenColumns(): Promise<void> {
+    if (!this.db) return;
+
+    const columns: Array<{ name: string }> = await new Promise((resolve, reject) => {
+      this.db!.all('PRAGMA table_info(users)', (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows as Array<{ name: string }>);
+      });
+    });
+
+    const existing = new Set(columns.map((c) => c.name));
+
+    if (!existing.has('google_drive_access_token')) {
+      await this.run('ALTER TABLE users ADD COLUMN google_drive_access_token TEXT');
+    }
+
+    if (!existing.has('google_drive_refresh_token')) {
+      await this.run('ALTER TABLE users ADD COLUMN google_drive_refresh_token TEXT');
+    }
+
+    if (!existing.has('google_drive_token_expiry')) {
+      await this.run('ALTER TABLE users ADD COLUMN google_drive_token_expiry DATETIME');
+    }
   }
 
   getDb(): sqlite3.Database {

@@ -72,31 +72,55 @@ async function withDriveService(req: AuthenticatedRequest, res: Response): Promi
   accessToken: string;
   refreshToken?: string;
 }> {
-  const accessToken = req.cookies[GOOGLE_ACCESS_COOKIE] as string | undefined;
-  const refreshToken = req.cookies[GOOGLE_REFRESH_COOKIE] as string | undefined;
+  const userId = req.user!.id;
+  const db = getDatabase();
 
-  if (!accessToken) {
+  // Get tokens from database
+  const user = await db.get<{
+    google_drive_access_token?: string;
+    google_drive_refresh_token?: string;
+    google_drive_token_expiry?: string;
+  }>('SELECT google_drive_access_token, google_drive_refresh_token, google_drive_token_expiry FROM users WHERE id = ?', [userId]);
+
+  if (!user || !user.google_drive_access_token) {
     const err = new Error('Google Drive access not authorized');
     (err as any).statusCode = 401;
     throw err;
   }
 
-  const service = new GoogleDriveService(accessToken, refreshToken);
+  const accessToken = user.google_drive_access_token;
+  const refreshToken = user.google_drive_refresh_token;
+  const tokenExpiry = user.google_drive_token_expiry ? new Date(user.google_drive_token_expiry) : null;
 
-  const ok = await service.verifyAccess();
-  if (ok) return { service, accessToken, refreshToken };
+  // Check if token is expired
+  const isExpired = tokenExpiry && tokenExpiry.getTime() < Date.now();
 
+  if (!isExpired) {
+    const service = new GoogleDriveService(accessToken, refreshToken);
+    const ok = await service.verifyAccess();
+    if (ok) return { service, accessToken, refreshToken };
+  }
+
+  // Token expired or verification failed, try to refresh
   if (!refreshToken) {
     const err = new Error('Google Drive access expired. Please re-authenticate.');
     (err as any).statusCode = 401;
     throw err;
   }
 
+  const service = new GoogleDriveService(accessToken, refreshToken);
   const newAccessToken = await service.refreshAccessToken();
-  res.cookie(GOOGLE_ACCESS_COOKIE, newAccessToken, {
-    ...accessCookieOptions,
-    maxAge: 60 * 60 * 1000,
-  });
+
+  // Update tokens in database
+  const newTokenExpiry = new Date(Date.now() + 3600 * 1000).toISOString();
+  await db.run(
+    `UPDATE users SET 
+      google_drive_access_token = ?,
+      google_drive_token_expiry = ?,
+      updated_at = ?
+    WHERE id = ?`,
+    [newAccessToken, newTokenExpiry, new Date().toISOString(), userId]
+  );
 
   return { service: new GoogleDriveService(newAccessToken, refreshToken), accessToken: newAccessToken, refreshToken };
 }
@@ -106,9 +130,14 @@ async function withDriveService(req: AuthenticatedRequest, res: Response): Promi
  */
 router.get('/auth/start', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
+    const userId = req.user!.id;
     const state = uuidv4();
+    
+    // Store state with userId mapping to retrieve user during callback
+    const stateData = JSON.stringify({ state, userId });
+    const stateToken = Buffer.from(stateData).toString('base64');
 
-    res.cookie(GOOGLE_STATE_COOKIE, state, {
+    res.cookie(GOOGLE_STATE_COOKIE, stateToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
@@ -145,9 +174,26 @@ router.get('/auth/callback', async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    const expectedState = req.cookies[GOOGLE_STATE_COOKIE] as string | undefined;
-    if (!expectedState || expectedState !== state) {
+    const stateToken = req.cookies[GOOGLE_STATE_COOKIE] as string | undefined;
+    if (!stateToken) {
+      res.status(400).send('Missing OAuth state cookie');
+      return;
+    }
+
+    // Decode state to get userId
+    let userId: string;
+    let expectedState: string;
+    try {
+      const stateData = JSON.parse(Buffer.from(stateToken, 'base64').toString('utf8'));
+      userId = stateData.userId;
+      expectedState = stateData.state;
+    } catch (e) {
       res.status(400).send('Invalid OAuth state');
+      return;
+    }
+
+    if (expectedState !== state) {
+      res.status(400).send('OAuth state mismatch');
       return;
     }
 
@@ -163,20 +209,21 @@ router.get('/auth/callback', async (req: Request, res: Response): Promise<void> 
 
     res.clearCookie(GOOGLE_STATE_COOKIE);
 
-    res.cookie(GOOGLE_ACCESS_COOKIE, tokens.access_token, {
-      ...accessCookieOptions,
-      maxAge: 60 * 60 * 1000,
-    });
+    // Store tokens in database instead of cookies
+    const db = getDatabase();
+    const tokenExpiry = tokens.expiry_date 
+      ? new Date(tokens.expiry_date).toISOString() 
+      : new Date(Date.now() + 3600 * 1000).toISOString();
 
-    const existingRefresh = req.cookies[GOOGLE_REFRESH_COOKIE] as string | undefined;
-    const refreshTokenToStore = tokens.refresh_token || existingRefresh;
-
-    if (refreshTokenToStore) {
-      res.cookie(GOOGLE_REFRESH_COOKIE, refreshTokenToStore, {
-        ...refreshCookieOptions,
-        maxAge: 30 * 24 * 60 * 60 * 1000,
-      });
-    }
+    await db.run(
+      `UPDATE users SET 
+        google_drive_access_token = ?,
+        google_drive_refresh_token = COALESCE(?, google_drive_refresh_token),
+        google_drive_token_expiry = ?,
+        updated_at = ?
+      WHERE id = ?`,
+      [tokens.access_token, tokens.refresh_token, tokenExpiry, new Date().toISOString(), userId]
+    );
 
     res.redirect(`${config.frontendUrl}/videos?drive=connected`);
   } catch (error) {
@@ -188,9 +235,20 @@ router.get('/auth/callback', async (req: Request, res: Response): Promise<void> 
 /**
  * POST /api/google-drive/revoke
  */
-router.post('/revoke', authenticate, async (_req: AuthenticatedRequest, res: Response): Promise<void> => {
-  res.clearCookie(GOOGLE_ACCESS_COOKIE);
-  res.clearCookie(GOOGLE_REFRESH_COOKIE);
+router.post('/revoke', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  const userId = req.user!.id;
+  const db = getDatabase();
+
+  await db.run(
+    `UPDATE users SET 
+      google_drive_access_token = NULL,
+      google_drive_refresh_token = NULL,
+      google_drive_token_expiry = NULL,
+      updated_at = ?
+    WHERE id = ?`,
+    [new Date().toISOString(), userId]
+  );
+
   res.json({ success: true, message: 'Google Drive permission revoked' });
 });
 
