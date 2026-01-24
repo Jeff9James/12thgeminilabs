@@ -377,6 +377,13 @@ router.get(
 router.get(
   '/:id/stream',
   authenticate,
+  (req: Request, res: Response, next) => {
+    // Add CORS headers for video streaming
+    res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length, Content-Type');
+    next();
+  },
   async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const { id } = req.params;
