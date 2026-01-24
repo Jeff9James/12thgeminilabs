@@ -11,18 +11,11 @@ export class GoogleDriveService {
   private oauth2Client: OAuth2Client;
 
   constructor(accessToken: string, refreshToken?: string) {
-    // Create OAuth2 client with quota project
+    // Create OAuth2 client
     this.oauth2Client = new OAuth2Client(
       config.googleClientId,
       config.googleClientSecret
     );
-
-    // Set quota project ID from client ID (extract project)
-    const projectId = config.googleClientId?.split('-')[0] || config.googleClientId?.split('.')[0];
-    if (projectId) {
-      (this.oauth2Client as any).projectId = projectId;
-      console.log('Set OAuth client project ID:', projectId);
-    }
 
     console.log('GoogleDriveService: Setting credentials', {
       hasAccessToken: !!accessToken,
@@ -31,20 +24,37 @@ export class GoogleDriveService {
       clientId: config.googleClientId?.substring(0, 20) + '...',
     });
 
-    // Set credentials
+    // Set credentials with quota_project_id to identify the calling project
     this.oauth2Client.setCredentials({
       access_token: accessToken,
       refresh_token: refreshToken,
     });
+
+    // Set quota project from environment or extract from client ID
+    const quotaProject = process.env.GOOGLE_CLOUD_PROJECT || 
+                        config.googleClientId?.split('.')[0]?.split('-')[0];
+    if (quotaProject) {
+      (this.oauth2Client as any)._quotaProjectId = quotaProject;
+      console.log('Using quota project:', quotaProject);
+    }
   }
 
   /**
    * Get Drive API client
    */
   private getDriveClient(): drive_v3.Drive {
+    // Add x-goog-user-project header to identify the calling project
+    const headers: any = {};
+    const quotaProject = process.env.GOOGLE_CLOUD_PROJECT || 
+                        config.googleClientId?.split('.')[0]?.split('-')[0];
+    if (quotaProject) {
+      headers['x-goog-user-project'] = quotaProject;
+    }
+
     return google.drive({ 
       version: 'v3', 
       auth: this.oauth2Client as any,
+      headers,
     });
   }
 
