@@ -27,6 +27,9 @@ function createApp(): Application {
   // (Placed early so that preflight/OPTIONS requests also get an ID and can be correlated in logs)
   app.use(requestIdMiddleware);
 
+  // Trust proxy - Required for Railway and other proxy environments
+  app.set('trust proxy', 1);
+
   // Security middleware
   app.use(helmet({
     contentSecurityPolicy: {
