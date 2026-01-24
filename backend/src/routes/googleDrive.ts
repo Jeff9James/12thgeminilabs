@@ -76,12 +76,21 @@ async function withDriveService(req: AuthenticatedRequest, res: Response): Promi
   const db = getDatabase();
 
   try {
+    console.log('withDriveService: Getting tokens for userId:', userId);
+    
     // Get tokens from database
     const user = await db.get<{
       google_drive_access_token?: string;
       google_drive_refresh_token?: string;
       google_drive_token_expiry?: string;
     }>('SELECT google_drive_access_token, google_drive_refresh_token, google_drive_token_expiry FROM users WHERE id = ?', [userId]);
+
+    console.log('withDriveService: Query result:', {
+      hasUser: !!user,
+      hasAccessToken: !!user?.google_drive_access_token,
+      hasRefreshToken: !!user?.google_drive_refresh_token,
+      tokenExpiry: user?.google_drive_token_expiry,
+    });
 
     logger.info(`Fetched user Drive tokens for userId: ${userId}`, {
       hasUser: !!user,
@@ -280,9 +289,19 @@ router.post('/revoke', authenticate, async (req: AuthenticatedRequest, res: Resp
  * GET /api/google-drive/files
  */
 router.get('/files', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  console.log('========================================');
+  console.log('GET /api/google-drive/files - Request received');
+  console.log('User ID:', req.user?.id);
+  console.log('========================================');
+  
   try {
+    console.log('Calling withDriveService...');
     const { service } = await withDriveService(req, res);
+    
+    console.log('Calling listVideoFiles...');
     const files = await service.listVideoFiles();
+    
+    console.log('Successfully listed files, count:', files.length);
 
     const response: ApiResponse<GoogleDriveFile[]> = {
       success: true,
@@ -291,6 +310,14 @@ router.get('/files', authenticate, async (req: AuthenticatedRequest, res: Respon
 
     res.json(response);
   } catch (error: any) {
+    console.log('========================================');
+    console.log('ERROR in /api/google-drive/files');
+    console.log('Error type:', error.constructor.name);
+    console.log('Error message:', error.message);
+    console.log('Error stack:', error.stack);
+    console.log('Error statusCode:', error.statusCode);
+    console.log('========================================');
+    
     const statusCode = error.statusCode || 500;
     res.status(statusCode).json({
       success: false,
