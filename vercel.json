@@ -3,7 +3,9 @@
   "outputDirectory": "/dist",
   "framework": "vite",
   "installCommand": "npm install --ignore-scripts",
-  "devCommand": "cd frontend && npm run dev",
+   "env": {
+    "VITE_API_URL": "https://web-production-cc201.up.railway.app/api"
+  },
   "rewrites": [
     {
       "source": "/(.*)",
