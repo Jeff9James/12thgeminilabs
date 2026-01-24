@@ -9,14 +9,13 @@ import { Readable } from 'stream';
 
 export class GoogleDriveService {
   private oauth2Client: OAuth2Client;
-  private drive: drive_v3.Drive;
 
   constructor(accessToken: string, refreshToken?: string) {
-    // Create OAuth2 client with proper configuration
-    this.oauth2Client = new OAuth2Client({
-      clientId: config.googleClientId,
-      clientSecret: config.googleClientSecret,
-    });
+    // Create OAuth2 client
+    this.oauth2Client = new OAuth2Client(
+      config.googleClientId,
+      config.googleClientSecret
+    );
 
     console.log('GoogleDriveService: Setting credentials', {
       hasAccessToken: !!accessToken,
@@ -30,19 +29,13 @@ export class GoogleDriveService {
       access_token: accessToken,
       refresh_token: refreshToken,
     });
-
-    // Initialize Drive client with auth
-    this.drive = google.drive({
-      version: 'v3',
-      auth: this.oauth2Client,
-    });
   }
 
   /**
    * Get Drive API client
    */
   private getDriveClient(): drive_v3.Drive {
-    return this.drive;
+    return google.drive({ version: 'v3', auth: this.oauth2Client });
   }
 
   /**
