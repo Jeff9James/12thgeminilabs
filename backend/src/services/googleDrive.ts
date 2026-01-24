@@ -9,23 +9,32 @@ import { Readable } from 'stream';
 
 export class GoogleDriveService {
   private oauth2Client: OAuth2Client;
+  private drive: drive_v3.Drive;
 
   constructor(accessToken: string, refreshToken?: string) {
-    this.oauth2Client = new OAuth2Client(
-      config.googleClientId,
-      config.googleClientSecret,
-      'https://oauth2.googleapis.com/token' // Token endpoint
-    );
+    // Create OAuth2 client with proper configuration
+    this.oauth2Client = new OAuth2Client({
+      clientId: config.googleClientId,
+      clientSecret: config.googleClientSecret,
+    });
 
     console.log('GoogleDriveService: Setting credentials', {
       hasAccessToken: !!accessToken,
       hasRefreshToken: !!refreshToken,
       accessTokenLength: accessToken?.length,
+      clientId: config.googleClientId?.substring(0, 20) + '...',
     });
 
+    // Set credentials
     this.oauth2Client.setCredentials({
       access_token: accessToken,
       refresh_token: refreshToken,
+    });
+
+    // Initialize Drive client with auth
+    this.drive = google.drive({
+      version: 'v3',
+      auth: this.oauth2Client,
     });
   }
 
@@ -33,7 +42,7 @@ export class GoogleDriveService {
    * Get Drive API client
    */
   private getDriveClient(): drive_v3.Drive {
-    return google.drive({ version: 'v3', auth: this.oauth2Client as any });
+    return this.drive;
   }
 
   /**
@@ -43,6 +52,12 @@ export class GoogleDriveService {
     try {
       const drive = this.getDriveClient();
       
+      console.log('listVideoFiles: Making API call to Google Drive...');
+      console.log('listVideoFiles: OAuth client credentials:', {
+        hasAccessToken: !!this.oauth2Client.credentials.access_token,
+        hasRefreshToken: !!this.oauth2Client.credentials.refresh_token,
+      });
+      
       // Query for video files only
       const response = await drive.files.list({
         q: "mimeType contains 'video/' and trashed = false",
@@ -50,6 +65,8 @@ export class GoogleDriveService {
         orderBy: 'createdTime desc',
         pageSize: 100,
       });
+
+      console.log('listVideoFiles: Successfully retrieved files, count:', response.data.files?.length || 0);
 
       const files = response.data.files || [];
       
@@ -63,6 +80,15 @@ export class GoogleDriveService {
         thumbnailLink: file.thumbnailLink || undefined,
       }));
     } catch (error: any) {
+      console.log('listVideoFiles: Error details:', {
+        message: error.message,
+        code: error.code,
+        status: error.status,
+        statusText: error.statusText,
+        errors: error.errors,
+        response: error.response?.data,
+      });
+      
       logger.error('Error listing Drive files:', error);
       
       // Handle token refresh if needed
