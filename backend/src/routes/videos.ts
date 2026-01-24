@@ -55,6 +55,15 @@ const upload = multer({
 router.post(
   '/upload',
   authenticate,
+  (req: Request, res: Response, next) => {
+    console.log('========================================');
+    console.log('POST /api/videos/upload - Request received');
+    console.log('Origin:', req.header('Origin'));
+    console.log('Content-Type:', req.header('Content-Type'));
+    console.log('Authorization:', req.header('Authorization') ? 'Present' : 'Missing');
+    console.log('========================================');
+    next();
+  },
   upload.single('chunk'),
   async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
