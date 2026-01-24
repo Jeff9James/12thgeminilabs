@@ -31,8 +31,15 @@ class ApiClient {
     this.client.interceptors.response.use(
       (response) => response,
       async (error: AxiosError<ApiResponse<unknown>>) => {
+        const requestUrl = error.config?.url || '';
+        
         if (error.response?.status === 401) {
-          // Try to refresh token
+          // Don't redirect for Google Drive endpoints - let the component handle it
+          if (requestUrl.includes('/google-drive/')) {
+            return Promise.reject(error);
+          }
+          
+          // Try to refresh token for other 401 errors
           const refreshToken = localStorage.getItem('refreshToken');
           if (refreshToken) {
             try {
@@ -50,14 +57,18 @@ class ApiClient {
                 }
               }
             } catch (refreshError) {
-              // Refresh failed, redirect to login
+              // Refresh failed, only redirect to login if not already there
               this.clearAuth();
-              window.location.href = '/login';
+              if (!window.location.pathname.includes('/login')) {
+                window.location.href = '/login';
+              }
             }
           } else {
-            // No refresh token, redirect to login
+            // No refresh token, only redirect to login if not already there
             this.clearAuth();
-            window.location.href = '/login';
+            if (!window.location.pathname.includes('/login')) {
+              window.location.href = '/login';
+            }
           }
         }
         return Promise.reject(error);
