@@ -272,6 +272,8 @@ router.post('/revoke', authenticate, async (req: AuthenticatedRequest, res: Resp
   const userId = req.user!.id;
   const db = getDatabase();
 
+  console.log('Revoking Google Drive access for userId:', userId);
+
   await db.run(
     `UPDATE users SET 
       google_drive_access_token = NULL,
@@ -281,6 +283,8 @@ router.post('/revoke', authenticate, async (req: AuthenticatedRequest, res: Resp
     WHERE id = ?`,
     [new Date().toISOString(), userId]
   );
+
+  console.log('Successfully revoked Google Drive access');
 
   res.json({ success: true, message: 'Google Drive permission revoked' });
 });
@@ -629,5 +633,35 @@ async function runImportJob(params: {
     }
   }
 }
+
+/**
+ * DELETE /api/google-drive/tokens
+ * Development endpoint to clear Drive tokens for current user
+ */
+router.delete('/tokens', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  const userId = req.user!.id;
+  const db = getDatabase();
+
+  console.log('========================================');
+  console.log('CLEARING Google Drive tokens for userId:', userId);
+  console.log('========================================');
+
+  await db.run(
+    `UPDATE users SET 
+      google_drive_access_token = NULL,
+      google_drive_refresh_token = NULL,
+      google_drive_token_expiry = NULL,
+      updated_at = ?
+    WHERE id = ?`,
+    [new Date().toISOString(), userId]
+  );
+
+  console.log('Successfully cleared all Google Drive tokens');
+
+  res.json({ 
+    success: true, 
+    message: 'Google Drive tokens cleared. Please re-authorize.',
+  });
+});
 
 export default router;
