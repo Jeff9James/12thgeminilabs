@@ -76,7 +76,16 @@ class VideoApiService implements VideoApi {
     formData.append('totalChunks', totalChunks.toString());
     formData.append('filename', filename);
 
-    const response = await fetch(`${import.meta.env.VITE_API_URL || '/api'}${this.uploadUrl}`, {
+    const apiUrl = import.meta.env.VITE_API_URL || '/api';
+    const uploadEndpoint = `${apiUrl}${this.uploadUrl}`;
+
+    console.log('=== Video Upload Debug ===');
+    console.log('VITE_API_URL:', import.meta.env.VITE_API_URL);
+    console.log('Upload endpoint:', uploadEndpoint);
+    console.log('Chunk:', chunkNumber, '/', totalChunks);
+    console.log('=========================');
+
+    const response = await fetch(uploadEndpoint, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${localStorage.getItem('token')}`,
@@ -84,8 +93,12 @@ class VideoApiService implements VideoApi {
       body: formData,
     });
 
+    console.log('Upload response status:', response.status);
+
     if (!response.ok) {
-      throw new Error('Failed to upload chunk');
+      const errorText = await response.text();
+      console.error('Upload error response:', errorText);
+      throw new Error(`Failed to upload chunk: ${response.status} ${errorText}`);
     }
 
     return response.json();
