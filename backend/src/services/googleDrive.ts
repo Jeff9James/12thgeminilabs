@@ -13,8 +13,15 @@ export class GoogleDriveService {
   constructor(accessToken: string, refreshToken?: string) {
     this.oauth2Client = new OAuth2Client(
       config.googleClientId,
-      config.googleClientSecret
+      config.googleClientSecret,
+      'https://oauth2.googleapis.com/token' // Token endpoint
     );
+
+    console.log('GoogleDriveService: Setting credentials', {
+      hasAccessToken: !!accessToken,
+      hasRefreshToken: !!refreshToken,
+      accessTokenLength: accessToken?.length,
+    });
 
     this.oauth2Client.setCredentials({
       access_token: accessToken,
