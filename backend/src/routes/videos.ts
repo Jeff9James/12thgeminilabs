@@ -164,6 +164,11 @@ router.post(
   '/finalize',
   authenticate,
   async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    console.log('========================================');
+    console.log('POST /api/videos/finalize - Request received');
+    console.log('Body:', req.body);
+    console.log('========================================');
+    
     try {
       const { videoId, filename, totalChunks, title, mimeType, fileSize } = req.body;
       const userId = req.user!.id;
@@ -280,7 +285,15 @@ router.post(
         [videoIdDb]
       );
 
-      logger.info(`Video finalized: ${videoId}`);
+      logger.info(`Video finalized: ${videoIdDb}`);
+
+      console.log('========================================');
+      console.log('Video finalized successfully!');
+      console.log('Video ID:', videoIdDb);
+      console.log('Storage path:', storagePath);
+      console.log('Status:', VIDEO_STATUS.UPLOADED);
+      console.log('Queued for processing:', true);
+      console.log('========================================');
 
       const response: VideoFinalizeResponse = {
         video: video!,
@@ -292,6 +305,13 @@ router.post(
         data: response,
       });
     } catch (error) {
+      console.log('========================================');
+      console.log('ERROR in finalize:');
+      console.log('Error:', error);
+      console.log('Error message:', error instanceof Error ? error.message : String(error));
+      console.log('Error stack:', error instanceof Error ? error.stack : 'No stack');
+      console.log('========================================');
+      
       logger.error('Finalize error:', error);
       res.status(500).json({
         success: false,
