@@ -30,16 +30,18 @@ if (!fs.existsSync(uploadDir)) {
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const { videoId } = req.body;
-    const chunkDir = path.join(uploadDir, videoId);
-    if (!fs.existsSync(chunkDir)) {
-      fs.mkdirSync(chunkDir, { recursive: true });
+    // Create temp directory for all uploads
+    // We'll organize by videoId after parsing the body
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
     }
-    cb(null, chunkDir);
+    cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
-    const { chunkNumber } = req.body;
-    cb(null, `chunk_${chunkNumber}`);
+    // Generate a temporary unique filename
+    // We'll move it to the proper location after parsing the body
+    const tempFilename = `temp_${uuidv4()}`;
+    cb(null, tempFilename);
   },
 });
 
@@ -70,6 +72,9 @@ router.post(
       const { videoId, chunkNumber, totalChunks, filename } = req.body;
       const file = req.file;
 
+      console.log('Upload body:', { videoId, chunkNumber, totalChunks, filename });
+      console.log('File:', file ? { filename: file.filename, size: file.size } : 'No file');
+
       if (!file) {
         res.status(400).json({
           success: false,
@@ -96,6 +101,17 @@ router.post(
         });
         return;
       }
+
+      // Move the temp file to the proper location
+      const chunkDir = path.join(uploadDir, videoId);
+      if (!fs.existsSync(chunkDir)) {
+        fs.mkdirSync(chunkDir, { recursive: true });
+      }
+
+      const targetPath = path.join(chunkDir, `chunk_${chunkNum}`);
+      fs.renameSync(file.path, targetPath);
+
+      console.log(`Chunk ${chunkNum}/${totalChunksNum} saved for video ${videoId}`);
 
       logger.info(`Received chunk ${chunkNum}/${totalChunksNum} for video ${videoId}`);
 
