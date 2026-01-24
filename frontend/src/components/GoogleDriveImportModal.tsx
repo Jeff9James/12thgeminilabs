@@ -121,10 +121,15 @@ export function GoogleDriveImportModal({
   const handleConnectGoogleDrive = () => {
     // Redirect to backend OAuth start endpoint
     const apiBase = import.meta.env.VITE_API_URL || '/api';
-    // Remove trailing slash if present to avoid double slashes when joining
+    
+    // Remove trailing slash if present
     const baseUrl = apiBase.endsWith('/') ? apiBase.slice(0, -1) : apiBase;
-    // Navigate to the Drive OAuth start endpoint
-    window.location.href = `${baseUrl}/google-drive/auth/start`;
+    
+    // Construct the auth URL
+    const authUrl = `${baseUrl}/google-drive/auth/start`;
+    
+    console.log('Redirecting to Google Drive OAuth:', authUrl);
+    window.location.href = authUrl;
   };
 
   if (!isOpen) return null;
