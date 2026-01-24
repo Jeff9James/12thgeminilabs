@@ -35,7 +35,7 @@ export class GoogleDriveService {
    * Get Drive API client
    */
   private getDriveClient(): drive_v3.Drive {
-    return google.drive({ version: 'v3', auth: this.oauth2Client });
+    return google.drive({ version: 'v3', auth: this.oauth2Client as any });
   }
 
   /**
