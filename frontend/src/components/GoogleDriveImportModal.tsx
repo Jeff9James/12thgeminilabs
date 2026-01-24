@@ -21,8 +21,20 @@ export function GoogleDriveImportModal({
 
   useEffect(() => {
     if (isOpen) {
+      console.log('=== Google Drive Modal Opened ===');
+      console.log('VITE_API_URL:', import.meta.env.VITE_API_URL);
+      console.log('Attempting to list files...');
+      
       setNeedsAuth(false); // Reset on modal open
       listFiles().catch((err) => {
+        console.log('=== List Files Error ===');
+        console.log('Error:', err);
+        console.log('Error message:', err.message);
+        console.log('Error response:', err.response);
+        console.log('Error response status:', err.response?.status);
+        console.log('Error response data:', err.response?.data);
+        console.log('=======================');
+        
         // Check if it's an auth error - check for common patterns
         const errorMessage = err.message?.toLowerCase() || '';
         const isAuthError = 
@@ -131,7 +143,13 @@ export function GoogleDriveImportModal({
     // Construct the auth URL with token
     const authUrl = `${baseUrl}/google-drive/auth/start?token=${encodeURIComponent(token || '')}`;
     
-    console.log('Redirecting to Google Drive OAuth:', authUrl);
+    console.log('=== Google Drive Connection Debug ===');
+    console.log('VITE_API_URL:', import.meta.env.VITE_API_URL);
+    console.log('Computed baseUrl:', baseUrl);
+    console.log('Full auth URL:', authUrl);
+    console.log('Has token:', !!token);
+    console.log('=====================================');
+    
     window.location.href = authUrl;
   };
 
