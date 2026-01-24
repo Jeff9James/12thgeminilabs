@@ -1,10 +1,14 @@
-# IMMEDIATE ACTION REQUIRED - Vercel Environment Variable
+# IMMEDIATE ACTION REQUIRED - Vercel Configuration Fix
 
 ## The Problem
 
-When you click "Import from Drive" → "Connect Google Drive", the website goes blank with a 404 error because the `VITE_API_URL` environment variable is not properly set in Vercel.
+The website shows a 404 error when navigating to any route (like `/login` or when opening modals). This happens because:
+1. Vercel's `vercel.json` was missing SPA (Single Page Application) routing configuration
+2. The `VITE_API_URL` environment variable is not properly set in Vercel
 
-## The Solution (Takes 2 minutes)
+## The Solution (Takes 3 minutes)
+
+The code fix has already been pushed to GitHub. You just need to set the environment variable and redeploy.
 
 ### Step 1: Set Environment Variable in Vercel
 
@@ -54,9 +58,19 @@ git push origin main
 7. Click "Connect Google Drive"
 8. You should be redirected to Google OAuth (not 404)
 
+## What Was Fixed (Already Pushed)
+
+1. **Added SPA routing to `vercel.json`:**
+   - Added `rewrites` configuration to serve `index.html` for all routes
+   - This fixes the 404 errors when navigating to different pages
+
+2. **Fixed OAuth redirect URL handling:**
+   - Updated `GoogleDriveImportModal.tsx` to properly construct redirect URLs
+
 ## Why This Happened
 
-The previous `vercel.json` had the environment variable hardcoded, but Vercel doesn't read that for build-time environment variables. Environment variables must be set in the Vercel Dashboard to be available during the build process.
+1. The `vercel.json` was missing the `rewrites` configuration needed for React Router to work properly
+2. Environment variables must be set in Vercel Dashboard to be available during the build process
 
 ## If It Still Doesn't Work
 
