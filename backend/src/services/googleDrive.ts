@@ -24,18 +24,37 @@ export class GoogleDriveService {
       clientId: config.googleClientId?.substring(0, 20) + '...',
     });
 
-    // Set credentials
-    this.oauth2Client.setCredentials({
+    // Set credentials - include API key if available
+    const credentials: any = {
       access_token: accessToken,
       refresh_token: refreshToken,
-    });
+    };
+
+    // Add API key if available (helps with "unregistered callers" error)
+    if (process.env.GOOGLE_API_KEY) {
+      credentials.api_key = process.env.GOOGLE_API_KEY;
+      console.log('GoogleDriveService: Using API key for additional authentication');
+    }
+
+    this.oauth2Client.setCredentials(credentials);
   }
 
   /**
    * Get Drive API client
    */
   private getDriveClient(): drive_v3.Drive {
-    return google.drive({ version: 'v3', auth: this.oauth2Client as any });
+    // If API key is available, use it along with OAuth
+    const driveConfig: any = { 
+      version: 'v3', 
+      auth: this.oauth2Client as any 
+    };
+    
+    // Add API key as fallback authentication
+    if (process.env.GOOGLE_API_KEY) {
+      driveConfig.key = process.env.GOOGLE_API_KEY;
+    }
+    
+    return google.drive(driveConfig);
   }
 
   /**
