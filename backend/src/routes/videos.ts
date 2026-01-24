@@ -48,7 +48,7 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage,
   limits: {
-    fileSize: UPLOAD_CONSTANTS.CHUNK_SIZE,
+    fileSize: UPLOAD_CONSTANTS.CHUNK_SIZE * 2, // Allow slightly larger than chunk size for overhead
   },
 });
 
