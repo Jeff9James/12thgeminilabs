@@ -66,7 +66,22 @@ router.post(
     console.log('========================================');
     next();
   },
-  upload.single('chunk'),
+  (req: Request, res: Response, next) => {
+    upload.single('chunk')(req, res, (err) => {
+      if (err) {
+        console.log('========================================');
+        console.log('MULTER ERROR:');
+        console.log('Error:', err);
+        console.log('Error message:', err.message);
+        console.log('========================================');
+        return res.status(500).json({
+          success: false,
+          error: `File upload error: ${err.message}`,
+        });
+      }
+      next();
+    });
+  },
   async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const { videoId, chunkNumber, totalChunks, filename } = req.body;
@@ -127,6 +142,13 @@ router.post(
         message: `Chunk ${chunkNum} received successfully`,
       });
     } catch (error) {
+      console.log('========================================');
+      console.log('ERROR in chunk upload:');
+      console.log('Error:', error);
+      console.log('Error message:', error instanceof Error ? error.message : String(error));
+      console.log('Error stack:', error instanceof Error ? error.stack : 'No stack');
+      console.log('========================================');
+      
       logger.error('Chunk upload error:', error);
       res.status(500).json({
         success: false,
