@@ -327,6 +327,12 @@ router.get(
   '/:id',
   authenticate,
   async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    console.log('========================================');
+    console.log('GET /api/videos/:id - Request received');
+    console.log('Video ID:', req.params.id);
+    console.log('User ID:', req.user?.id);
+    console.log('========================================');
+    
     try {
       const { id } = req.params;
       const userId = req.user!.id;
@@ -336,6 +342,12 @@ router.get(
         'SELECT * FROM videos WHERE id = ? AND user_id = ?',
         [id, userId]
       );
+
+      console.log('Video found:', !!video);
+      if (video) {
+        console.log('Video status:', video.status);
+        console.log('Video path:', video.path);
+      }
 
       if (!video) {
         res.status(404).json({
@@ -350,6 +362,7 @@ router.get(
         data: video,
       });
     } catch (error) {
+      console.log('ERROR in GET video:', error);
       logger.error('Get video error:', error);
       res.status(500).json({
         success: false,
