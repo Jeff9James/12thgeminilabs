@@ -372,6 +372,16 @@ router.get(
   }
 );
 
+// OPTIONS handler for stream endpoint
+router.options('/:id/stream', (req: Request, res: Response) => {
+  res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'authorization, range');
+  res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length, Content-Type');
+  res.status(204).send();
+});
+
 // GET /api/videos/:id/stream
 // Stream video with range support
 router.get(
@@ -382,6 +392,12 @@ router.get(
     res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length, Content-Type');
+    
+    console.log('========================================');
+    console.log('Stream CORS headers set');
+    console.log('Origin:', req.headers.origin);
+    console.log('========================================');
+    
     next();
   },
   async (req: AuthenticatedRequest, res: Response): Promise<void> => {
