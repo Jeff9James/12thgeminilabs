@@ -23,17 +23,24 @@ export function authenticate(
   next: NextFunction
 ): void {
   try {
+    // Check for token in Authorization header first
     const authHeader = req.headers.authorization;
+    let token: string | undefined;
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+    } else if (req.query.token && typeof req.query.token === 'string') {
+      // Allow token in query parameter for OAuth redirects (where headers can't be sent)
+      token = req.query.token;
+    }
+
+    if (!token) {
       res.status(401).json({
         success: false,
         error: ERROR_MESSAGES.UNAUTHORIZED,
       });
       return;
     }
-
-    const token = authHeader.substring(7);
 
     const decoded = jwt.verify(token, config.jwtSecret) as {
       userId: string;

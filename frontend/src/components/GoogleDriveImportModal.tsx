@@ -125,8 +125,11 @@ export function GoogleDriveImportModal({
     // Remove trailing slash if present
     const baseUrl = apiBase.endsWith('/') ? apiBase.slice(0, -1) : apiBase;
     
-    // Construct the auth URL
-    const authUrl = `${baseUrl}/google-drive/auth/start`;
+    // Get the auth token to pass as query parameter (for browser redirect)
+    const token = localStorage.getItem('token');
+    
+    // Construct the auth URL with token
+    const authUrl = `${baseUrl}/google-drive/auth/start?token=${encodeURIComponent(token || '')}`;
     
     console.log('Redirecting to Google Drive OAuth:', authUrl);
     window.location.href = authUrl;
