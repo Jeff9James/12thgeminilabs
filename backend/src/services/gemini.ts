@@ -15,9 +15,9 @@ export class GeminiVideoService {
 
   constructor() {
     this.genAI = new GoogleGenerativeAI(config.geminiApiKey);
-    // Use Gemini 3 Flash - fastest and cheapest option
-    // Note: Using 1.5-flash as 2.0-flash-exp may not be available yet
-    this.model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    // Use Gemini 1.5 Pro - available in SDK v0.21
+    // This is the model that supports video analysis with v1beta API
+    this.model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-pro-latest' });
   }
 
   /**
