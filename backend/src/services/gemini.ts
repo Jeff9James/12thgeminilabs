@@ -26,14 +26,28 @@ export class GeminiVideoService {
    */
   async uploadVideoFile(filePath: string): Promise<{ uri: string; mimeType: string }> {
     try {
+      console.log('========================================');
+      console.log('📤 STARTING FILE UPLOAD TO GEMINI');
+      console.log('File path:', filePath);
+      console.log('========================================');
+      
       logger.info(`Uploading video to Gemini File API: ${filePath}`);
+
+      if (!fs.existsSync(filePath)) {
+        throw new Error(`File does not exist: ${filePath}`);
+      }
 
       const fileStats = fs.statSync(filePath);
       const fileSize = fileStats.size;
       const mimeType = this.getMimeType(filePath);
       const displayName = path.basename(filePath);
 
+      console.log(`File size: ${fileSize} bytes (${(fileSize / 1024 / 1024).toFixed(2)} MB)`);
+      console.log(`MIME type: ${mimeType}`);
+      console.log(`Display name: ${displayName}`);
+
       // Step 1: Initial resumable request
+      console.log('Step 1: Requesting upload URL...');
       const initResponse = await axios.post(
         this.uploadUrl,
         {
@@ -54,14 +68,20 @@ export class GeminiVideoService {
       );
 
       const uploadUrl = initResponse.headers['x-goog-upload-url'];
+      console.log('Upload URL received:', uploadUrl ? 'YES' : 'NO');
+      
       if (!uploadUrl) {
+        console.error('Init response headers:', initResponse.headers);
         throw new Error('No upload URL returned from Gemini File API');
       }
 
       logger.info(`Got upload URL, uploading ${fileSize} bytes...`);
 
       // Step 2: Upload the actual file bytes
+      console.log('Step 2: Reading file and uploading bytes...');
       const fileData = fs.readFileSync(filePath);
+      console.log(`Read ${fileData.length} bytes from file`);
+      
       const uploadResponse = await axios.post(uploadUrl, fileData, {
         headers: {
           'Content-Length': fileSize.toString(),
