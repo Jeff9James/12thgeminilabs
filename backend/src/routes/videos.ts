@@ -495,51 +495,79 @@ router.get(
         return;
       }
 
-      const storageAdapter = getStorageAdapter();
+      console.log('========================================');
+      console.log('Video found:', !!video);
+      console.log('Video status:', video.status);
+      console.log('Video path:', video.path);
+      console.log('========================================');
+
+      // Check if file exists
+      if (!fs.existsSync(video.path)) {
+        logger.error(`Video file not found at path: ${video.path}`);
+        res.status(404).json({
+          success: false,
+          error: 'Video file not found on server',
+        });
+        return;
+      }
+
       const stat = await fs.promises.stat(video.path);
       const fileSize = stat.size;
       const range = req.headers.range;
 
       if (range) {
+        // Handle range request (for seeking)
         const parts = range.replace(/bytes=/, '').split('-');
         const start = parseInt(parts[0], 10);
         const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
         const chunksize = end - start + 1;
 
-        const head = {
+        res.writeHead(206, {
           'Content-Range': `bytes ${start}-${end}/${fileSize}`,
           'Accept-Ranges': 'bytes',
           'Content-Length': chunksize,
-          'Content-Type': video.mimeType,
-        };
-
-        res.writeHead(206, head);
-        
-        const stream = storageAdapter.getStream(video.path);
-        stream.on('data', (chunk) => {
-          // Handle data
+          'Content-Type': video.mimeType || 'video/mp4',
         });
         
-        // Create limited read stream for the range
-        const limitedStream = fs.createReadStream(video.path, { start, end });
-        limitedStream.pipe(res);
-      } else {
-        const head = {
-          'Content-Length': fileSize,
-          'Content-Type': video.mimeType,
-        };
-
-        res.writeHead(200, head);
-        
-        const stream = storageAdapter.getStream(video.path);
+        // Stream the requested range
+        const stream = fs.createReadStream(video.path, { start, end });
         stream.pipe(res);
+        
+        stream.on('error', (streamError) => {
+          logger.error('Stream error:', streamError);
+          if (!res.headersSent) {
+            res.status(500).end();
+          }
+        });
+      } else {
+        // Stream entire file
+        res.writeHead(200, {
+          'Content-Length': fileSize,
+          'Content-Type': video.mimeType || 'video/mp4',
+          'Accept-Ranges': 'bytes',
+        });
+        
+        const stream = fs.createReadStream(video.path);
+        stream.pipe(res);
+        
+        stream.on('error', (streamError) => {
+          logger.error('Stream error:', streamError);
+          if (!res.headersSent) {
+            res.status(500).end();
+          }
+        });
       }
     } catch (error) {
       logger.error('Stream video error:', error);
-      res.status(500).json({
-        success: false,
-        error: ERROR_MESSAGES.INTERNAL_ERROR,
-      });
+      // Don't send JSON if headers already sent
+      if (!res.headersSent) {
+        res.status(500).json({
+          success: false,
+          error: ERROR_MESSAGES.INTERNAL_ERROR,
+        });
+      } else {
+        res.end();
+      }
     }
   }
 );
