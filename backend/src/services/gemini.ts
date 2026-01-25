@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI, GoogleAIFileManager } from '@google/generative-ai';
+import { GoogleGenerativeAI, FileState } from '@google/generative-ai';
 import * as fs from 'fs';
 import * as path from 'path';
 import { config } from '../utils/env';
@@ -10,15 +10,14 @@ import { Scene, SearchMatch, SummaryResult, ConversationMessage } from '@gemini-
 
 export class GeminiVideoService {
   private genAI: GoogleGenerativeAI;
-  private fileManager: GoogleAIFileManager;
   private model: any;
   private maxRetries: number = 3;
 
   constructor() {
     this.genAI = new GoogleGenerativeAI(config.geminiApiKey);
-    this.fileManager = new GoogleAIFileManager(config.geminiApiKey);
     // Use Gemini 3 Flash - fastest and cheapest option
-    this.model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+    // Note: Using 1.5-flash as 2.0-flash-exp may not be available yet
+    this.model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
   }
 
   /**
@@ -27,19 +26,25 @@ export class GeminiVideoService {
    */
   async uploadVideoFile(filePath: string): Promise<any> {
     try {
-      logger.info(`Uploading video to Gemini File API: ${filePath}`);
+      logger.info(`Preparing video for Gemini File API: ${filePath}`);
       
-      // Upload file to Gemini's storage
-      const uploadResult = await this.fileManager.uploadFile(filePath, {
-        mimeType: this.getMimeType(filePath),
-        displayName: path.basename(filePath),
-      });
-
-      logger.info(`Video uploaded successfully: ${uploadResult.file.uri}`);
+      // Read file and convert to base64 for inline data
+      // Note: For production, consider using the Files API with GoogleAIFileManager
+      // which requires a newer SDK version or direct REST API calls
       
-      return uploadResult.file;
+      const fileData = fs.readFileSync(filePath);
+      const base64Data = fileData.toString('base64');
+      
+      logger.info(`Video prepared for analysis: ${filePath} (${fileData.length} bytes)`);
+      
+      return {
+        inlineData: {
+          data: base64Data,
+          mimeType: this.getMimeType(filePath),
+        },
+      };
     } catch (error) {
-      logger.error('Error uploading video to Gemini:', error);
+      logger.error('Error preparing video for Gemini:', error);
       throw error;
     }
   }
@@ -71,12 +76,7 @@ export class GeminiVideoService {
 
     try {
       const result = await this.model.generateContent([
-        {
-          fileData: {
-            mimeType: file.mimeType,
-            fileUri: file.uri,
-          },
-        },
+        file,
         { text: prompt },
       ]);
 
@@ -151,12 +151,7 @@ export class GeminiVideoService {
 
     try {
       const result = await this.model.generateContent([
-        {
-          fileData: {
-            mimeType: file.mimeType,
-            fileUri: file.uri,
-          },
-        },
+        file,
         { text: prompt },
       ]);
 
@@ -187,8 +182,9 @@ export class GeminiVideoService {
         title: 'Full Video',
         description: text,
       }];
-    } finally {
-      await this.deleteFile(file.name);
+    } catch (error) {
+      logger.error('Error detecting scenes:', error);
+      throw error;
     }
   }
 
@@ -237,12 +233,7 @@ export class GeminiVideoService {
 
     try {
       const result = await this.model.generateContent([
-        {
-          fileData: {
-            mimeType: file.mimeType,
-            fileUri: file.uri,
-          },
-        },
+        file,
         { text: prompt },
       ]);
 
@@ -267,8 +258,9 @@ export class GeminiVideoService {
 
       // Fallback: no matches found
       return [];
-    } finally {
-      await this.deleteFile(file.name);
+    } catch (error) {
+      logger.error('Error searching video:', error);
+      throw error;
     }
   }
 
@@ -303,12 +295,7 @@ Response:`;
 
     try {
       const result = await this.model.generateContent([
-        {
-          fileData: {
-            mimeType: file.mimeType,
-            fileUri: file.uri,
-          },
-        },
+        file,
         { text: enhancedPrompt },
       ]);
 
@@ -322,8 +309,9 @@ Response:`;
         response: text,
         referencedTimestamps,
       };
-    } finally {
-      await this.deleteFile(file.name);
+    } catch (error) {
+      logger.error('Error in chat:', error);
+      throw error;
     }
   }
 
@@ -396,12 +384,7 @@ When referencing specific moments in your analysis, use timestamps in the format
     
     try {
       const result = await this.model.generateContent([
-        {
-          fileData: {
-            mimeType: file.mimeType,
-            fileUri: file.uri,
-          },
-        },
+        file,
         { text: enhancedPrompt },
       ]);
 
@@ -415,8 +398,9 @@ When referencing specific moments in your analysis, use timestamps in the format
         analysis: text,
         referencedTimestamps,
       };
-    } finally {
-      await this.deleteFile(file.name);
+    } catch (error) {
+      logger.error('Error in custom analysis:', error);
+      throw error;
     }
   }
 
@@ -455,32 +439,15 @@ When referencing specific moments in your analysis, use timestamps in the format
     
     try {
       const result = await this.model.generateContent([
-        {
-          fileData: {
-            mimeType: file.mimeType,
-            fileUri: file.uri,
-          },
-        },
+        file,
         { text: extendedPrompt },
       ]);
 
       const response = result.response;
       return response.text();
-    } finally {
-      await this.deleteFile(file.name);
-    }
-  }
-
-  /**
-   * Delete file from Gemini File API
-   * Files are auto-deleted after 48 hours, but we can clean up early
-   */
-  private async deleteFile(fileName: string): Promise<void> {
-    try {
-      await this.fileManager.deleteFile(fileName);
-      logger.info(`File deleted from Gemini: ${fileName}`);
     } catch (error) {
-      logger.warn('Error deleting Gemini file (may already be expired):', error);
+      logger.error('Error analyzing video segment:', error);
+      throw error;
     }
   }
 
