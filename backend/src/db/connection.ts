@@ -2,8 +2,19 @@ import sqlite3 from 'sqlite3';
 import path from 'path';
 import fs from 'fs';
 import { ALL_TABLES, ADD_BOOKMARKS_INDEXES, ADD_RATE_LIMITS_INDEXES } from './schema';
+import PostgresDatabase from './postgres-adapter';
 
-class Database {
+// Universal database interface
+interface IDatabase {
+  connect(): Promise<void>;
+  initialize(): Promise<void>;
+  run(sql: string, params?: any[]): Promise<any>;
+  get<T>(sql: string, params?: any[]): Promise<T | undefined>;
+  all<T>(sql: string, params?: any[]): Promise<T[]>;
+  close(): Promise<void>;
+}
+
+class Database implements IDatabase {
   private db: sqlite3.Database | null = null;
   private dbPath: string;
 
@@ -248,16 +259,25 @@ class Database {
   }
 }
 
-let databaseInstance: Database | null = null;
+let databaseInstance: IDatabase | null = null;
 
-export function initDatabase(dbPath: string): Database {
+export function initDatabase(dbPath: string): IDatabase {
   if (!databaseInstance) {
-    databaseInstance = new Database(dbPath);
+    // Check if DATABASE_URL is set (PostgreSQL on Railway)
+    const databaseUrl = process.env.DATABASE_URL;
+    
+    if (databaseUrl) {
+      console.log('💾 Using PostgreSQL database (Railway)');
+      databaseInstance = new PostgresDatabase(databaseUrl) as IDatabase;
+    } else {
+      console.log('💾 Using SQLite database (local)');
+      databaseInstance = new Database(dbPath);
+    }
   }
   return databaseInstance;
 }
 
-export function getDatabase(): Database {
+export function getDatabase(): IDatabase {
   if (!databaseInstance) {
     throw new Error('Database not initialized');
   }
