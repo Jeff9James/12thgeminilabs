@@ -90,13 +90,21 @@ export class GeminiVideoService {
         },
       });
 
-      logger.info(`Upload response:`, JSON.stringify(uploadResponse.data, null, 2));
+      console.log('Upload response status:', uploadResponse.status);
+      console.log('Upload response data:', JSON.stringify(uploadResponse.data, null, 2));
+      
+      if (!uploadResponse.data || !uploadResponse.data.file) {
+        throw new Error('Upload response missing file data');
+      }
       
       const fileInfo = uploadResponse.data.file;
+      console.log(`✅ File uploaded - Name: ${fileInfo.name}, URI: ${fileInfo.uri}, State: ${fileInfo.state}`);
+      
       logger.info(`✅ Video uploaded to Gemini: ${fileInfo.uri}`);
       logger.info(`File name: ${fileInfo.name}, state: ${fileInfo.state}`);
 
       // Wait for file to become ACTIVE
+      console.log('Waiting for file to become ACTIVE...');
       await this.waitForFileActive(fileInfo.name);
 
       return {
