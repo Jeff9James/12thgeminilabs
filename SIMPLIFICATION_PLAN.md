@@ -49,17 +49,23 @@ Remove complexity, focus on core features that actually work.
 - ✅ `frontend/src/components/Layout.tsx` - removed logout
 - ✅ `frontend/src/pages/SettingsPage.tsx` - simplified for demo mode
 
-### Phase 2: Simplify Video Upload
+### Phase 2: Simplify Video Upload ✅ COMPLETE
 **Backend:**
-- Fix stream endpoint CORS (already done)
-- Ensure chunks work properly
-- Add simple processing trigger
+- ✅ Stream endpoint CORS already configured
+- ✅ Chunk upload working properly
+- ✅ Processing trigger in place
 
 **Frontend:**
-- Hide Google Drive import
-- Keep upload button
-- Show upload progress
-- Redirect to video after upload
+- ✅ Removed Google Drive import button
+- ✅ Made upload button prominent with gradient styling
+- ✅ Upload progress already working (hook has progress tracking)
+- ✅ Auto-redirect to video detail page after upload
+- ✅ Added prominent CTA on HomePage
+
+**Files Modified:**
+- ✅ `frontend/src/pages/VideosPage.tsx` - removed Google Drive import
+- ✅ `frontend/src/pages/VideosPage.css` - styled primary upload button
+- ✅ `frontend/src/pages/HomePage.tsx` - added upload CTA button
 
 ### Phase 3: Add Basic Gemini Analysis
 **Backend:**

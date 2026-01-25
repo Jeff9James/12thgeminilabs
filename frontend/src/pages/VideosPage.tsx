@@ -3,14 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { videoApi } from '../services/videoApi';
 import { useVideos } from '../hooks/useVideos';
 import { VideoGrid } from '../components/VideoGrid';
-import { GoogleDriveImportModal } from '../components/GoogleDriveImportModal';
 import { VideoUpload } from '../components/VideoUpload';
 import './VideosPage.css';
+
+// SIMPLIFIED: Removed Google Drive import for demo
 
 function VideosPage() {
   const navigate = useNavigate();
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [showDriveImportModal, setShowDriveImportModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'createdAt' | 'title' | 'duration' | 'status'>('createdAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -24,6 +24,7 @@ function VideosPage() {
   const handleUploadComplete = (videoId: string) => {
     setShowUploadModal(false);
     refetch();
+    // Auto-redirect to video detail page
     navigate(`/videos/${videoId}`);
   };
 
@@ -48,22 +49,13 @@ function VideosPage() {
           <p className="page-subtitle">{videos.length} videos</p>
         </div>
         <div className="header-actions">
+          {/* SIMPLIFIED: Removed Google Drive import button for demo */}
           <button
-            className="drive-import-button"
-            onClick={() => setShowDriveImportModal(true)}
-          >
-            <svg className="drive-icon" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12.01 2L6.5 11h3.27v9h4.5v-9H17.5z"/>
-              <path d="M4.51 12.51l-2 3.5L8.5 22l2-3.5H4.51zM15.5 15.5l2 3.5 6-6-2-3.5h-6z"/>
-            </svg>
-            Import from Drive
-          </button>
-          <button
-            className="upload-button"
+            className="upload-button primary"
             onClick={() => setShowUploadModal(true)}
           >
             <svg className="upload-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
             Upload Video
           </button>
@@ -140,11 +132,7 @@ function VideosPage() {
         </div>
       )}
 
-      <GoogleDriveImportModal
-        isOpen={showDriveImportModal}
-        onClose={() => setShowDriveImportModal(false)}
-        onImportComplete={() => refetch()}
-      />
+      {/* SIMPLIFIED: Removed Google Drive import modal */}
 
       <VideoGrid
         videos={videos}
