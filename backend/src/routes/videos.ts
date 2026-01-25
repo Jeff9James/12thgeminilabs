@@ -290,6 +290,12 @@ router.post(
       // PHASE 3: Auto-trigger Gemini 3 Flash analysis
       // Uses REST API with File API for video analysis
       const triggerAutoAnalysis = async () => {
+        console.log('========================================');
+        console.log('🔥 TRIGGER AUTO ANALYSIS FUNCTION CALLED');
+        console.log('Video ID:', videoIdDb);
+        console.log('Storage path:', storagePath);
+        console.log('========================================');
+        
         logger.info(`Starting Gemini 3 Flash analysis for video ${videoIdDb}`);
         logger.info(`Storage path: ${storagePath}`);
         
@@ -353,8 +359,13 @@ router.post(
       };
 
       // Trigger Gemini 3 Flash analysis in background
+      console.log('========================================');
+      console.log('🚀 TRIGGERING AUTO-ANALYSIS');
+      console.log('========================================');
+      
       triggerAutoAnalysis().catch(err => {
-        logger.error('Background analysis trigger failed:', err);
+        logger.error('❌ Background analysis trigger failed:', err);
+        console.error('❌ Background analysis trigger failed:', err);
       });
 
       console.log('========================================');
