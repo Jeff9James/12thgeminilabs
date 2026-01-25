@@ -123,6 +123,7 @@ export const VideoPlayerWithAdvancedSearch: React.FC<VideoPlayerWithAdvancedSear
           onPause={handlePause}
           controls={false}
           preload="metadata"
+          crossOrigin="use-credentials"
         />
 
         {/* Custom Controls */}

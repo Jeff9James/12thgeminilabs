@@ -120,8 +120,8 @@ class VideoApiService implements VideoApi {
   }
 
   getStreamUrl(id: string): string {
-    const token = localStorage.getItem('token');
-    return `${import.meta.env.VITE_API_URL || '/api'}/videos/${id}/stream?token=${token}`;
+    // Don't include token in URL - use credentials (cookies) instead
+    return `${import.meta.env.VITE_API_URL || '/api'}/videos/${id}/stream`;
   }
 }
 
