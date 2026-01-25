@@ -306,6 +306,16 @@ router.post(
       console.log('  Video ID:', videoId);
       console.log('  User ID:', userId);
       
+      // Debug: Check what's actually in the analyses table
+      const db = getDatabase();
+      const allAnalyses = await db.all('SELECT id, video_id, user_id, analysis_type, status, created_at FROM analyses LIMIT 10');
+      console.log('  📊 Recent analyses in DB:', allAnalyses.length);
+      if (allAnalyses.length > 0) {
+        console.log('  Recent entries:', JSON.stringify(allAnalyses, null, 2));
+      } else {
+        console.log('  ⚠️  WARNING: analyses table is EMPTY!');
+      }
+      
       const cached = await getCachedAnalysis(videoId, userId, 'summary');
       
       if (cached) {
