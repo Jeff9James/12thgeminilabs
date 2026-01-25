@@ -72,6 +72,10 @@ export class GeminiVideoService {
 
       const fileInfo = uploadResponse.data.file;
       logger.info(`✅ Video uploaded to Gemini: ${fileInfo.uri}`);
+      logger.info(`File name: ${fileInfo.name}, state: ${fileInfo.state}`);
+
+      // Wait for file to become ACTIVE
+      await this.waitForFileActive(fileInfo.name);
 
       return {
         uri: fileInfo.uri,
@@ -85,6 +89,49 @@ export class GeminiVideoService {
       logger.error('Full error:', JSON.stringify(error, null, 2));
       throw new Error(`Gemini File Upload Failed: ${error.message}`);
     }
+  }
+
+  /**
+   * Wait for uploaded file to become ACTIVE
+   * Files must be in ACTIVE state before they can be used
+   */
+  async waitForFileActive(fileName: string, maxAttempts: number = 30): Promise<void> {
+    logger.info(`Waiting for file to become ACTIVE: ${fileName}`);
+    
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const response = await axios.get(
+          `${this.baseUrl}/files/${fileName}`,
+          {
+            headers: {
+              'x-goog-api-key': this.apiKey,
+            },
+          }
+        );
+
+        const state = response.data.state;
+        logger.info(`File state check ${attempt}/${maxAttempts}: ${state}`);
+
+        if (state === 'ACTIVE') {
+          logger.info(`✅ File is now ACTIVE and ready to use`);
+          return;
+        }
+
+        if (state === 'FAILED') {
+          throw new Error('File processing failed on Gemini servers');
+        }
+
+        // Wait 2 seconds before next check
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      } catch (error: any) {
+        logger.error(`Error checking file status:`, error.message);
+        if (attempt === maxAttempts) {
+          throw new Error(`File did not become ACTIVE after ${maxAttempts} attempts`);
+        }
+      }
+    }
+
+    throw new Error('File did not become ACTIVE within timeout period');
   }
 
   /**
