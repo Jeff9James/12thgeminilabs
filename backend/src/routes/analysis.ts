@@ -306,40 +306,11 @@ router.post(
       console.log('  Video ID:', videoId);
       console.log('  User ID:', userId);
       
-      // Debug: Check what's actually in the analyses table
-      const db = getDatabase();
-      const allAnalyses = await db.all('SELECT id, video_id, user_id, analysis_type, status, created_at FROM analyses ORDER BY created_at DESC LIMIT 20');
-      console.log('  📊 Recent analyses in DB:', allAnalyses.length);
-      
-      // Count by status
-      const completeCount = allAnalyses.filter((a: any) => a.status === 'complete').length;
-      const pendingCount = allAnalyses.filter((a: any) => a.status === 'pending').length;
-      console.log(`  Status breakdown: ${completeCount} complete, ${pendingCount} pending`);
-      
-      if (allAnalyses.length > 0) {
-        console.log('  Recent entries:', JSON.stringify(allAnalyses, null, 2));
-      } else {
-        console.log('  ⚠️  WARNING: analyses table is EMPTY!');
-      }
-      
-      // Check specifically for complete analyses for this video
-      const completeForVideo = await db.all(
-        'SELECT id, analysis_type, status, created_at FROM analyses WHERE video_id = ? AND status = ? ORDER BY created_at DESC LIMIT 5',
-        [videoId, 'complete']
-      );
-      console.log(`  📊 Complete analyses for video ${videoId}:`, completeForVideo.length);
-      if (completeForVideo.length > 0) {
-        console.log('  Complete entries:', JSON.stringify(completeForVideo, null, 2));
-      }
-      
       const cached = await getCachedAnalysis(videoId, userId, 'summary');
       
       if (cached) {
         console.log('✅ Cache hit! Returning cached summary');
-        console.log('  Analysis ID:', cached.id);
-        console.log('  Created at:', cached.createdAt);
         const parsedResult = JSON.parse(cached.result!);
-        console.log('  Result preview:', JSON.stringify(parsedResult).substring(0, 200));
         
         res.json({
           success: true,
@@ -350,49 +321,17 @@ router.post(
       }
       
       console.log('❌ Cache miss - no cached summary found');
-
-      // Check if should process sync or async
-      const fileSize = video.fileSize || 0;
       
-      if (fileSize > ANALYSIS_CONSTANTS.SYNC_SIZE_THRESHOLD) {
-        // Large video - process async
-        const job = await createAnalysisJob(videoId, userId, 'summary');
-        
-        const response: AnalysisJobResponse = {
-          jobId: job.id,
-          status: 'pending',
-          message: 'Video is large, processing asynchronously',
-        };
+      // Return empty response instead of creating a job
+      // User must explicitly click "Analyze Video" button
+      res.json({
+        success: false,
+        error: 'No analysis available. Click "Analyze Video" to start analysis.',
+        message: 'not_analyzed'
+      });
+      return;
 
-        res.json({
-          success: true,
-          data: response,
-        });
-
-        // Process in background
-        processAnalysisJob(job.id, video.path, 'summary').catch(error => {
-          logger.error(`Error processing summary job ${job.id}:`, error);
-        });
-      } else {
-        // Small video - process synchronously
-        const job = await createAnalysisJob(videoId, userId, 'summary');
-        await updateAnalysisStatus(job.id, 'processing');
-
-        try {
-          const result = await geminiService.summarizeVideo(video.path);
-          result.duration = video.duration || 0;
-          
-          await updateAnalysisStatus(job.id, 'complete', result);
-          
-          res.json({
-            success: true,
-            data: result,
-          });
-        } catch (error: any) {
-          await updateAnalysisStatus(job.id, 'error', undefined, error.message);
-          throw error;
-        }
-      }
+      /* DISABLED: Don't auto-analyze on page load to save API quota */
     } catch (error) {
       logger.error('Summarize video error:', error);
       res.status(500).json({
@@ -446,43 +385,16 @@ router.post(
       
       console.log('❌ Cache miss - no cached scenes found');
 
-      // Check if should process sync or async
-      const fileSize = video.fileSize || 0;
-      
-      if (fileSize > ANALYSIS_CONSTANTS.SYNC_SIZE_THRESHOLD) {
-        const job = await createAnalysisJob(videoId, userId, 'scenes');
-        
-        const response: AnalysisJobResponse = {
-          jobId: job.id,
-          status: 'pending',
-          message: 'Video is large, processing asynchronously',
-        };
+      // Return empty response instead of creating a job
+      // User must explicitly click "Analyze Video" button
+      res.json({
+        success: false,
+        error: 'No scenes available. Click "Analyze Video" to start analysis.',
+        message: 'not_analyzed'
+      });
+      return;
 
-        res.json({
-          success: true,
-          data: response,
-        });
-
-        processAnalysisJob(job.id, video.path, 'scenes').catch(error => {
-          logger.error(`Error processing scenes job ${job.id}:`, error);
-        });
-      } else {
-        const job = await createAnalysisJob(videoId, userId, 'scenes');
-        await updateAnalysisStatus(job.id, 'processing');
-
-        try {
-          const scenes = await geminiService.detectScenes(video.path);
-          await updateAnalysisStatus(job.id, 'complete', scenes);
-          
-          res.json({
-            success: true,
-            data: scenes,
-          });
-        } catch (error: any) {
-          await updateAnalysisStatus(job.id, 'error', undefined, error.message);
-          throw error;
-        }
-      }
+      /* DISABLED: Don't auto-analyze on page load to save API quota */
     } catch (error) {
       logger.error('Detect scenes error:', error);
       res.status(500).json({
