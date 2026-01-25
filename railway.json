@@ -48,8 +48,15 @@
   },
   "build": {
     "builder": "NIXPACKS",
-    "buildCommand": "npm install && npm run build:shared && npm run build:backend",
-    "watchPatterns": ["backend/**", "shared/**"]
+    "buildCommand": "npm install --legacy-peer-deps && npm run build:shared && npm run build:backend",
+    "watchPatterns": ["backend/**", "shared/**"],
+    "nixpacksPlan": {
+      "phases": {
+        "install": {
+          "cmds": ["npm install --legacy-peer-deps"]
+        }
+      }
+    }
   },
   "deploy": {
     "startCommand": "cd backend && npm start",
