@@ -66,11 +66,25 @@ export interface TemporalSegment {
 class AnalysisService {
   /**
    * Get video analysis results (summary, scenes, etc.)
+   * PHASE 3: Fetches auto-generated summary from backend
    */
   async getVideoAnalysis(videoId: string): Promise<AnalysisResponse> {
     try {
-      const response = await apiClient.get<VideoAnalysisResult>(`/videos/${videoId}/analysis`);
-      return { success: true, data: response.data };
+      // Try to get summary analysis
+      const response = await apiClient.post<any>(`/videos/${videoId}/summarize`);
+      if (response.success && response.data) {
+        return { 
+          success: true, 
+          data: {
+            summary: response.data.summary || '',
+            scenes: [],
+            tags: response.data.keyPoints || [],
+            entities: [],
+            actions: [],
+          }
+        };
+      }
+      return { success: false, error: 'No analysis data available' };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to get analysis';
       return { success: false, error: message };
@@ -92,11 +106,15 @@ class AnalysisService {
 
   /**
    * Get scenes/chapters from video
+   * PHASE 3: Fetches auto-generated scenes with temporal reasoning
    */
   async getScenes(videoId: string): Promise<SceneResponse> {
     try {
-      const response = await apiClient.get<Scene[]>(`/videos/${videoId}/scenes`);
-      return { success: true, data: response.data };
+      const response = await apiClient.post<Scene[]>(`/videos/${videoId}/scenes`);
+      if (response.success && response.data) {
+        return { success: true, data: response.data };
+      }
+      return { success: false, error: 'No scenes data available' };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to get scenes';
       return { success: false, error: message };

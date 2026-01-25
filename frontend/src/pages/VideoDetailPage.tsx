@@ -28,17 +28,26 @@ function VideoDetailPage() {
 
   const videoUrl = id ? videoApi.getStreamUrl(id) : '';
 
+  // PHASE 3: Load auto-generated analysis
   const loadAnalysis = async (videoId: string) => {
-    const result = await analysisService.getVideoAnalysis(videoId);
-    if (result.success && result.data) {
-      setAnalysis(result.data);
+    try {
+      const result = await analysisService.getVideoAnalysis(videoId);
+      if (result.success && result.data) {
+        setAnalysis(result.data);
+      }
+    } catch (error) {
+      console.error('Failed to load analysis:', error);
     }
   };
 
   const loadScenes = async (videoId: string) => {
-    const result = await analysisService.getScenes(videoId);
-    if (result.success && result.data) {
-      setScenes(result.data);
+    try {
+      const result = await analysisService.getScenes(videoId);
+      if (result.success && result.data) {
+        setScenes(result.data);
+      }
+    } catch (error) {
+      console.error('Failed to load scenes:', error);
     }
   };
 
@@ -61,10 +70,27 @@ function VideoDetailPage() {
     }
   };
 
+  // PHASE 3: Auto-load analysis and poll for updates
   useEffect(() => {
     if (id) {
       loadVideo(id);
       loadScenes(id);
+      
+      // Poll for analysis updates every 5 seconds for the first minute
+      let pollCount = 0;
+      const maxPolls = 12; // 12 * 5s = 60s
+      
+      const pollInterval = setInterval(() => {
+        pollCount++;
+        if (pollCount >= maxPolls) {
+          clearInterval(pollInterval);
+          return;
+        }
+        loadAnalysis(id);
+        loadScenes(id);
+      }, 5000);
+      
+      return () => clearInterval(pollInterval);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);

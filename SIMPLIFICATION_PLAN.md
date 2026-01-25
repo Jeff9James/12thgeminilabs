@@ -67,7 +67,7 @@ Remove complexity, focus on core features that actually work.
 - ✅ `frontend/src/pages/VideosPage.css` - styled primary upload button
 - ✅ `frontend/src/pages/HomePage.tsx` - added upload CTA button
 
-### Phase 3: Add Basic Gemini Analysis ⏳ (Current)
+### Phase 3: Add Basic Gemini Analysis ✅ COMPLETE
 
 **IMPORTANT: Optimal Architecture for Zero-Cost Deployment**
 
@@ -117,6 +117,14 @@ Remove complexity, focus on core features that actually work.
 - ✅ Display temporal events with timestamps
 - ✅ Simple search interface
 - ✅ Display scenes with start/end times
+- ✅ Auto-poll for analysis results
+- ✅ Load auto-generated summary and scenes
+
+**Files Modified:**
+- ✅ `backend/src/services/gemini.ts` - Updated to Gemini 3 Flash, File API upload, structured prompts
+- ✅ `backend/src/routes/videos.ts` - Auto-trigger analysis on video upload
+- ✅ `frontend/src/services/analysisService.ts` - Updated to fetch auto-generated analysis
+- ✅ `frontend/src/pages/VideoDetailPage.tsx` - Added polling for analysis results
 
 ### Phase 4: Clean UI
 - Remove unused components
