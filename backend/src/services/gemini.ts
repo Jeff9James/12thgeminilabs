@@ -77,9 +77,13 @@ export class GeminiVideoService {
         uri: fileInfo.uri,
         mimeType: fileInfo.mimeType,
       };
-    } catch (error) {
-      logger.error('Error uploading video to Gemini File API:', error);
-      throw error;
+    } catch (error: any) {
+      logger.error('❌ Error uploading video to Gemini File API');
+      logger.error('Error message:', error.message);
+      logger.error('Error response:', error.response?.data);
+      logger.error('Error status:', error.response?.status);
+      logger.error('Full error:', JSON.stringify(error, null, 2));
+      throw new Error(`Gemini File Upload Failed: ${error.message}`);
     }
   }
 
@@ -129,8 +133,12 @@ export class GeminiVideoService {
 
       return text;
     } catch (error: any) {
-      logger.error('Error generating content:', error.response?.data || error.message);
-      throw error;
+      logger.error('❌ Error generating content');
+      logger.error('Error message:', error.message);
+      logger.error('Error response:', error.response?.data);
+      logger.error('Error status:', error.response?.status);
+      logger.error('Request URL:', `${this.baseUrl}/models/gemini-3-flash-preview:generateContent`);
+      throw new Error(`Gemini API Failed: ${error.response?.data?.error?.message || error.message}`);
     }
   }
 
