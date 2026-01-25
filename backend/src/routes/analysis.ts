@@ -308,12 +308,28 @@ router.post(
       
       // Debug: Check what's actually in the analyses table
       const db = getDatabase();
-      const allAnalyses = await db.all('SELECT id, video_id, user_id, analysis_type, status, created_at FROM analyses LIMIT 10');
+      const allAnalyses = await db.all('SELECT id, video_id, user_id, analysis_type, status, created_at FROM analyses ORDER BY created_at DESC LIMIT 20');
       console.log('  📊 Recent analyses in DB:', allAnalyses.length);
+      
+      // Count by status
+      const completeCount = allAnalyses.filter((a: any) => a.status === 'complete').length;
+      const pendingCount = allAnalyses.filter((a: any) => a.status === 'pending').length;
+      console.log(`  Status breakdown: ${completeCount} complete, ${pendingCount} pending`);
+      
       if (allAnalyses.length > 0) {
         console.log('  Recent entries:', JSON.stringify(allAnalyses, null, 2));
       } else {
         console.log('  ⚠️  WARNING: analyses table is EMPTY!');
+      }
+      
+      // Check specifically for complete analyses for this video
+      const completeForVideo = await db.all(
+        'SELECT id, analysis_type, status, created_at FROM analyses WHERE video_id = ? AND status = ? ORDER BY created_at DESC LIMIT 5',
+        [videoId, 'complete']
+      );
+      console.log(`  📊 Complete analyses for video ${videoId}:`, completeForVideo.length);
+      if (completeForVideo.length > 0) {
+        console.log('  Complete entries:', JSON.stringify(completeForVideo, null, 2));
       }
       
       const cached = await getCachedAnalysis(videoId, userId, 'summary');
