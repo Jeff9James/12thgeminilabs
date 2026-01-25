@@ -31,23 +31,33 @@ function VideoDetailPage() {
   // PHASE 3: Load auto-generated analysis
   const loadAnalysis = async (videoId: string) => {
     try {
+      console.log('[VideoDetailPage] Loading analysis for video:', videoId);
       const result = await analysisService.getVideoAnalysis(videoId);
+      console.log('[VideoDetailPage] Analysis result:', result);
       if (result.success && result.data) {
+        console.log('[VideoDetailPage] Setting analysis:', result.data);
         setAnalysis(result.data);
+      } else {
+        console.log('[VideoDetailPage] No analysis data:', result.error);
       }
     } catch (error) {
-      console.error('Failed to load analysis:', error);
+      console.error('[VideoDetailPage] Failed to load analysis:', error);
     }
   };
 
   const loadScenes = async (videoId: string) => {
     try {
+      console.log('[VideoDetailPage] Loading scenes for video:', videoId);
       const result = await analysisService.getScenes(videoId);
+      console.log('[VideoDetailPage] Scenes result:', result);
       if (result.success && result.data) {
+        console.log('[VideoDetailPage] Setting scenes:', result.data.length, 'scenes');
         setScenes(result.data);
+      } else {
+        console.log('[VideoDetailPage] No scenes data:', result.error);
       }
     } catch (error) {
-      console.error('Failed to load scenes:', error);
+      console.error('[VideoDetailPage] Failed to load scenes:', error);
     }
   };
 
@@ -57,9 +67,8 @@ function VideoDetailPage() {
       const response = await videoApi.getVideo(videoId);
       if (response.success && response.data) {
         setVideo(response.data);
-        if (response.data.status === 'ready') {
-          loadAnalysis(videoId);
-        }
+        // Always attempt to load analysis - it will be cached if available
+        loadAnalysis(videoId);
       } else {
         setError('Failed to load video');
       }

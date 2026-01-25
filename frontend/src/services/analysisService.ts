@@ -70,22 +70,28 @@ class AnalysisService {
    */
   async getVideoAnalysis(videoId: string): Promise<AnalysisResponse> {
     try {
+      console.log('[AnalysisService] Fetching summary for video:', videoId);
       // Try to get summary analysis
       const response = await apiClient.post<any>(`/videos/${videoId}/summarize`);
+      console.log('[AnalysisService] Summary response:', response);
       if (response.success && response.data) {
+        const analysisData = {
+          summary: response.data.summary || '',
+          scenes: [],
+          tags: response.data.keyPoints || [],
+          entities: [],
+          actions: [],
+        };
+        console.log('[AnalysisService] Mapped analysis data:', analysisData);
         return { 
           success: true, 
-          data: {
-            summary: response.data.summary || '',
-            scenes: [],
-            tags: response.data.keyPoints || [],
-            entities: [],
-            actions: [],
-          }
+          data: analysisData
         };
       }
+      console.log('[AnalysisService] No analysis data in response');
       return { success: false, error: 'No analysis data available' };
     } catch (error) {
+      console.error('[AnalysisService] Error fetching summary:', error);
       const message = error instanceof Error ? error.message : 'Failed to get analysis';
       return { success: false, error: message };
     }
@@ -110,12 +116,17 @@ class AnalysisService {
    */
   async getScenes(videoId: string): Promise<SceneResponse> {
     try {
+      console.log('[AnalysisService] Fetching scenes for video:', videoId);
       const response = await apiClient.post<Scene[]>(`/videos/${videoId}/scenes`);
+      console.log('[AnalysisService] Scenes response:', response);
       if (response.success && response.data) {
+        console.log('[AnalysisService] Scenes data:', response.data);
         return { success: true, data: response.data };
       }
+      console.log('[AnalysisService] No scenes data in response');
       return { success: false, error: 'No scenes data available' };
     } catch (error) {
+      console.error('[AnalysisService] Error fetching scenes:', error);
       const message = error instanceof Error ? error.message : 'Failed to get scenes';
       return { success: false, error: message };
     }
