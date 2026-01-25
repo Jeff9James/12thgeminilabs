@@ -127,12 +127,16 @@ export class GeminiVideoService {
    */
   async waitForFileActive(fileName: string, maxAttempts: number = 30): Promise<void> {
     logger.info(`Waiting for file to become ACTIVE: ${fileName}`);
-    logger.info(`File check URL: ${this.baseUrl}/files/${fileName}`);
+    
+    // fileName already includes 'files/' prefix (e.g., 'files/abc123')
+    // So we need to use it directly with baseUrl, not append 'files/' again
+    const fileCheckUrl = `${this.baseUrl}/${fileName}`;
+    logger.info(`File check URL: ${fileCheckUrl}`);
     
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         const response = await axios.get(
-          `${this.baseUrl}/files/${fileName}`,
+          fileCheckUrl,
           {
             headers: {
               'x-goog-api-key': this.apiKey,
