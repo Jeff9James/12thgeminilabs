@@ -3,7 +3,10 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 export async function analyzeVideoStreaming(videoFileUri: string) {
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+  // Use Gemini 3 Flash as per official docs
+  const model = genAI.getGenerativeModel({ 
+    model: 'gemini-3-flash-preview'
+  });
   
   const prompt = `Analyze this video and provide:
 1. A comprehensive summary
@@ -17,6 +20,7 @@ Format as JSON:
   ]
 }`;
 
+  // According to Gemini File API docs, use this structure
   const result = await model.generateContentStream([
     {
       fileData: {
@@ -30,27 +34,49 @@ Format as JSON:
   return result.stream;
 }
 
-export async function uploadVideoToGemini(videoBuffer: Buffer, mimeType: string) {
-  const fileManager = genAI.fileManager;
+// This function is only used in upload route (Node runtime, not Edge)
+export async function uploadVideoToGemini(videoBuffer: Buffer, mimeType: string): Promise<string> {
+  // Use dynamic import for Node.js modules (only available in Node runtime)
+  const { GoogleAIFileManager } = await import('@google/generative-ai/server');
+  const { writeFile, unlink } = await import('fs/promises');
+  const path = await import('path');
+  const os = await import('os');
   
-  // Convert buffer to Blob for upload
-  const blob = new Blob([videoBuffer], { type: mimeType });
+  const fileManager = new GoogleAIFileManager(process.env.GEMINI_API_KEY!);
+  const tempFilePath = path.join(os.tmpdir(), `upload-${Date.now()}.mp4`);
   
-  const uploadResult = await fileManager.uploadFile(blob as any, {
-    mimeType,
-    displayName: `video-${Date.now()}.mp4`
-  });
+  try {
+    // Write buffer to temporary file
+    await writeFile(tempFilePath, videoBuffer);
+    
+    // Upload using the File API as per docs
+    const uploadResult = await fileManager.uploadFile(tempFilePath, {
+      mimeType,
+      displayName: `video-${Date.now()}.mp4`
+    });
 
-  // Wait for processing
-  let file = await fileManager.getFile(uploadResult.file.name);
-  while (file.state === 'PROCESSING') {
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    file = await fileManager.getFile(uploadResult.file.name);
+    // Wait for processing (as per official docs pattern)
+    let file = await fileManager.getFile(uploadResult.file.name);
+    
+    while (file.state === 'PROCESSING') {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      file = await fileManager.getFile(uploadResult.file.name);
+    }
+
+    if (file.state === 'FAILED') {
+      throw new Error('Video processing failed');
+    }
+
+    // Clean up temp file
+    await unlink(tempFilePath).catch(() => {}); // Ignore errors
+
+    return file.uri;
+  } catch (error) {
+    // Clean up on error
+    try {
+      const { unlink: unlinkFn } = await import('fs/promises');
+      await unlinkFn(tempFilePath).catch(() => {});
+    } catch {}
+    throw error;
   }
-
-  if (file.state === 'FAILED') {
-    throw new Error('Video processing failed');
-  }
-
-  return file.uri;
 }
