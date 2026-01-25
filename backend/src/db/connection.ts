@@ -265,12 +265,19 @@ export function initDatabase(dbPath: string): IDatabase {
   if (!databaseInstance) {
     // Check if DATABASE_URL is set (PostgreSQL on Railway)
     const databaseUrl = process.env.DATABASE_URL;
+    const forcePostgres = process.env.FORCE_POSTGRES === 'true';
+    const useSqlite = process.env.USE_SQLITE === 'true';
     
-    if (databaseUrl) {
+    if (databaseUrl && !useSqlite) {
       console.log('💾 Using PostgreSQL database (Railway)');
+      console.log('   Connection string length:', databaseUrl.length);
+      console.log('   Database host:', databaseUrl.split('@')[1]?.split(':')[0] || 'unknown');
       databaseInstance = new PostgresDatabase(databaseUrl) as IDatabase;
     } else {
-      console.log('💾 Using SQLite database (local)');
+      console.log('💾 Using SQLite database (local/fallback)');
+      if (useSqlite) {
+        console.log('   ⚠️  USE_SQLITE override enabled');
+      }
       databaseInstance = new Database(dbPath);
     }
   }

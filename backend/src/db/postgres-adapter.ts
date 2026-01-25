@@ -8,33 +8,57 @@ class PostgresDatabase {
     this.pool = new Pool({
       connectionString,
       ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+      max: 10, // maximum connections
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 10000, // 10 second timeout
     });
   }
 
   async connect(): Promise<void> {
     try {
-      await this.pool.query('SELECT NOW()');
-      console.log('Connected to PostgreSQL database');
+      console.log('Attempting PostgreSQL connection...');
+      const result = await Promise.race([
+        this.pool.query('SELECT NOW()'),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Connection timeout after 10s')), 10000)
+        )
+      ]);
+      console.log('✅ Connected to PostgreSQL database');
     } catch (error) {
-      console.error('PostgreSQL connection error:', error);
+      console.error('❌ PostgreSQL connection error:', error);
       throw error;
     }
   }
 
   async initialize(): Promise<void> {
     try {
-      // Create all tables
-      for (const tableSql of ALL_TABLES_POSTGRES) {
-        await this.pool.query(tableSql);
+      console.log('Initializing PostgreSQL schema...');
+      
+      // Create all tables with timeout
+      for (let i = 0; i < ALL_TABLES_POSTGRES.length; i++) {
+        console.log(`Creating table ${i + 1}/${ALL_TABLES_POSTGRES.length}...`);
+        await Promise.race([
+          this.pool.query(ALL_TABLES_POSTGRES[i]),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error(`Table creation ${i + 1} timeout`)), 5000)
+          )
+        ]);
       }
 
-      // Run schema upgrades
-      await this.ensureSchemaUpgrades();
+      // Run schema upgrades with timeout
+      console.log('Running schema upgrades...');
+      await Promise.race([
+        this.ensureSchemaUpgrades(),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Schema upgrade timeout')), 10000)
+        )
+      ]);
       
-      console.log('PostgreSQL database schema initialized');
+      console.log('✅ PostgreSQL database schema initialized');
     } catch (error) {
-      console.error('PostgreSQL initialization error:', error);
-      throw error;
+      console.error('❌ PostgreSQL initialization error:', error);
+      // Don't throw - allow server to start even if some migrations fail
+      console.warn('⚠️  Continuing despite initialization errors...');
     }
   }
 
