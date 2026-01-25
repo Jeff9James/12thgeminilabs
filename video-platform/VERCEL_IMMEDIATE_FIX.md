@@ -14,7 +14,7 @@ Your Vercel project is configured with **incorrect build settings** for Next.js.
 ---
 
 ## ✅ Solution - Two Options
-
+                  
 ### Option 1: Fix via Vercel Dashboard (Recommended - 2 minutes)
 
 1. **Go to Vercel Dashboard**: https://vercel.com/dashboard
