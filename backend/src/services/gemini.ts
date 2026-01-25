@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI, FileState } from '@google/generative-ai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import * as fs from 'fs';
 import * as path from 'path';
 import { config } from '../utils/env';
@@ -103,8 +103,9 @@ export class GeminiVideoService {
         keyPoints: [],
         duration: 0,
       };
-    } finally {
-      await this.deleteFile(file.name);
+    } catch (error) {
+      logger.error('Error generating summary:', error);
+      throw error;
     }
   }
 
