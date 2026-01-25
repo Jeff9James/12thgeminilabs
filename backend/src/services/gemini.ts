@@ -32,21 +32,29 @@ export class GeminiVideoService {
     }
   }
 
+  /**
+   * Generate video summary using structured prompt
+   * Returns comprehensive summary with key points
+   */
   async summarizeVideo(filePath: string): Promise<SummaryResult> {
     const file = await this.uploadVideoFile(filePath);
     
+    // OPTIMIZED: Structured prompt for better results
     const prompt = `
-      Provide a comprehensive summary of this video. Include:
-      1. A concise overall summary (2-3 paragraphs)
-      2. Key points and highlights (bullet points)
-      3. Main themes or topics covered
+      Analyze this video and provide a comprehensive summary.
       
-      Format your response as JSON with this structure:
+      Format your response as JSON with this exact structure:
       {
-        "summary": "overall summary text",
-        "keyPoints": ["point 1", "point 2", ...],
-        "themes": ["theme 1", "theme 2", ...]
+        "summary": "A detailed 2-3 paragraph summary of the video content, including main topics, key moments, and overall narrative",
+        "keyPoints": [
+          "Key point 1 with specific details",
+          "Key point 2 with specific details",
+          "Key point 3 with specific details"
+        ],
+        "themes": ["theme1", "theme2", "theme3"]
       }
+      
+      Be comprehensive and specific. Include important details and context.
     `;
 
     try {
@@ -88,29 +96,45 @@ export class GeminiVideoService {
     }
   }
 
+  /**
+   * TWELVE LABS CLONE: Detect scenes with temporal reasoning
+   * Uses structured prompt to get precise timestamps and spatial changes
+   */
   async detectScenes(filePath: string): Promise<Scene[]> {
     const file = await this.uploadVideoFile(filePath);
     
+    // OPTIMIZED: Structured prompt for temporal reasoning (Twelve Labs style)
     const prompt = `
-      Analyze this video and break it down into distinct scenes or chapters.
-      For each scene, provide:
-      1. The timestamp when it starts (in seconds)
-      2. Approximate duration (in seconds)
-      3. A descriptive title
-      4. A brief description of what happens
+      Analyze this video and provide a detailed temporal breakdown of all significant events and scene changes.
       
-      Format your response as JSON array:
+      Provide a JSON list of ALL significant events with precise timestamps. Format your response EXACTLY as:
       [
         {
-          "timestamp": 0,
-          "duration": 30,
-          "title": "Scene title",
-          "description": "What happens in this scene"
+          "start": "0:05",
+          "end": "0:12",
+          "label": "Person enters room from left",
+          "description": "A person wearing a blue shirt walks into frame from the left side and approaches the center",
+          "reasoning": "Detected significant spatial movement and new object (person) entering the scene",
+          "confidence": 0.95
         },
-        ...
+        {
+          "start": "0:15",
+          "end": "0:23",
+          "label": "Camera pans to show window",
+          "description": "Camera movement reveals a window with natural lighting on the right wall",
+          "reasoning": "Camera motion creates new perspective and reveals previously hidden spatial elements",
+          "confidence": 0.88
+        }
       ]
       
-      Be precise with timestamps and make sure they're in chronological order.
+      REQUIREMENTS:
+      - Include ALL scene changes, movements, and significant events
+      - Provide precise start and end timestamps in M:SS or MM:SS format
+      - Describe spatial changes and movements in detail
+      - Explain your reasoning for each event detection
+      - Include confidence score (0-1)
+      - Order chronologically by timestamp
+      - Minimum 5 events (unless video is very short)
     `;
 
     try {
@@ -132,15 +156,16 @@ export class GeminiVideoService {
         const jsonMatch = text.match(/\[[\s\S]*\]/);
         if (jsonMatch) {
           const parsed = JSON.parse(jsonMatch[0]);
-          return parsed.map((scene: any) => ({
-            timestamp: scene.timestamp || 0,
-            duration: scene.duration,
-            title: scene.title || 'Untitled Scene',
+          return parsed.map((scene: any, index: number) => ({
+            id: `scene-${index + 1}`,
+            timestamp: this.parseTimestampToSeconds(scene.start),
+            duration: this.parseTimestampToSeconds(scene.end) - this.parseTimestampToSeconds(scene.start),
+            title: scene.label || 'Untitled Scene',
             description: scene.description || '',
           }));
         }
       } catch (parseError) {
-        logger.warn('Could not parse JSON response');
+        logger.warn('Could not parse JSON response for scene detection');
       }
 
       // Fallback: create single scene
@@ -152,6 +177,23 @@ export class GeminiVideoService {
       }];
     } finally {
       await this.deleteFile(file.name);
+    }
+  }
+
+  /**
+   * Parse timestamp string (M:SS or MM:SS) to seconds
+   */
+  private parseTimestampToSeconds(timestamp: string): number {
+    try {
+      const parts = timestamp.split(':');
+      if (parts.length === 2) {
+        const minutes = parseInt(parts[0]);
+        const seconds = parseInt(parts[1]);
+        return minutes * 60 + seconds;
+      }
+      return 0;
+    } catch {
+      return 0;
     }
   }
 
@@ -417,12 +459,16 @@ When referencing specific moments in your analysis, use timestamps in the format
     }
   }
 
+  /**
+   * Delete file from Gemini File API
+   * Files are auto-deleted after 48 hours, but we can clean up early
+   */
   private async deleteFile(fileName: string): Promise<void> {
     try {
-      // Note: Delete functionality would need to be implemented based on the specific Gemini API version
-      logger.info(`File deleted: ${fileName}`);
+      await this.fileManager.deleteFile(fileName);
+      logger.info(`File deleted from Gemini: ${fileName}`);
     } catch (error) {
-      logger.warn('Error deleting Gemini file:', error);
+      logger.warn('Error deleting Gemini file (may already be expired):', error);
     }
   }
 

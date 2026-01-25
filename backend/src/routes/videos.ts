@@ -287,17 +287,76 @@ router.post(
 
       logger.info(`Video finalized: ${videoIdDb}`);
 
+      // SIMPLIFIED PHASE 3: Auto-trigger Gemini analysis
+      // Start summary and scene detection in background
+      // Use dynamic import to avoid circular dependency
+      const triggerAutoAnalysis = async () => {
+        try {
+          logger.info(`Starting auto-analysis for video ${videoIdDb}`);
+          
+          // Import geminiService
+          const { geminiService } = await import('../services/gemini');
+          
+          // Run summary and scenes in parallel
+          const [summaryResult, scenesResult] = await Promise.allSettled([
+            geminiService.summarizeVideo(storagePath),
+            geminiService.detectScenes(storagePath),
+          ]);
+
+          // Save summary if successful
+          if (summaryResult.status === 'fulfilled') {
+            const summaryId = uuidv4();
+            await db.run(
+              `INSERT INTO analyses (id, video_id, user_id, analysis_type, status, result, created_at, completed_at)
+               VALUES (?, ?, ?, 'summary', 'complete', ?, ?, ?)`,
+              [summaryId, videoIdDb, userId, JSON.stringify(summaryResult.value), new Date().toISOString(), new Date().toISOString()]
+            );
+            logger.info(`Auto-generated summary for video ${videoIdDb}`);
+          } else {
+            logger.error(`Summary failed for video ${videoIdDb}:`, summaryResult.reason);
+          }
+
+          // Save scenes if successful
+          if (scenesResult.status === 'fulfilled') {
+            const scenesId = uuidv4();
+            await db.run(
+              `INSERT INTO analyses (id, video_id, user_id, analysis_type, status, result, created_at, completed_at)
+               VALUES (?, ?, ?, 'scenes', 'complete', ?, ?, ?)`,
+              [scenesId, videoIdDb, userId, JSON.stringify(scenesResult.value), new Date().toISOString(), new Date().toISOString()]
+            );
+            logger.info(`Auto-generated scenes for video ${videoIdDb}`);
+          } else {
+            logger.error(`Scenes detection failed for video ${videoIdDb}:`, scenesResult.reason);
+          }
+
+          // Update video status to ready
+          await db.run(
+            'UPDATE videos SET status = ? WHERE id = ?',
+            [VIDEO_STATUS.READY, videoIdDb]
+          );
+          logger.info(`Video ${videoIdDb} marked as ready`);
+        } catch (error) {
+          logger.error(`Auto-analysis error for video ${videoIdDb}:`, error);
+        }
+      };
+
+      // Trigger analysis in background (don't await)
+      triggerAutoAnalysis().catch(err => {
+        logger.error('Background analysis trigger failed:', err);
+      });
+
       console.log('========================================');
       console.log('Video finalized successfully!');
       console.log('Video ID:', videoIdDb);
       console.log('Storage path:', storagePath);
       console.log('Status:', VIDEO_STATUS.UPLOADED);
       console.log('Queued for processing:', true);
+      console.log('Auto-analysis: Started in background');
       console.log('========================================');
 
       const response: VideoFinalizeResponse = {
         video: video!,
-        message: 'Video uploaded and finalized successfully',
+        message: 'Video uploaded and analysis started',
       };
 
       res.json({

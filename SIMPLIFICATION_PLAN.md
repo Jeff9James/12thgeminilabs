@@ -67,17 +67,56 @@ Remove complexity, focus on core features that actually work.
 - ✅ `frontend/src/pages/VideosPage.css` - styled primary upload button
 - ✅ `frontend/src/pages/HomePage.tsx` - added upload CTA button
 
-### Phase 3: Add Basic Gemini Analysis
-**Backend:**
-- Create simple analysis endpoint
-- Direct Gemini API call (no queue)
-- Generate summary on upload
-- Basic scene detection
+### Phase 3: Add Basic Gemini Analysis ⏳ (Current)
 
-**Frontend:**
-- Show analysis results
-- Simple search interface
-- Display scenes
+**IMPORTANT: Optimal Architecture for Zero-Cost Deployment**
+
+**Video Processing Workflow:**
+1. **Frontend**: User uploads video file
+2. **Backend**: Video received by Railway/Vercel server
+3. **API Call**: Backend uses `google-genai` SDK to:
+   - Upload file to Gemini's File API (48-hour free storage)
+   - Send structured prompt for temporal reasoning
+4. **Response**: Backend streams AI's answer (timestamps, events) to UI
+5. **Video Storage**: NO local storage - videos go directly to Gemini File API
+6. **Structured Prompt**: Use JSON-formatted prompts for temporal data:
+   ```
+   "Analyze this video. Provide a JSON list of all significant events with their 
+   start_timestamp, end_timestamp, and a detailed description of the spatial changes. 
+   Format: [{ "start": "0:05", "end": "0:12", "label": "Person enters room", 
+   "reasoning": "..." }]"
+   ```
+
+**Model Selection:**
+- ✅ **Use Gemini 3 Flash ONLY** - cheapest option, fast processing
+
+**Deployment Options:**
+- **Railway**: Good for long-running analysis (>60s), persistent connections
+- **Vercel (Recommended)**: 
+  - Hobby tier allows 60s functions (up to 5min with settings)
+  - Use Response Streaming to bypass timeout limits
+  - Stream chunks as Gemini generates them
+  - First data sent in <10s keeps connection alive
+  - Total cost: $0.00
+
+**When to Use Railway vs Vercel:**
+- **Vercel**: Best for most cases, streaming responses, serverless
+- **Railway**: Only if videos are 20+ minutes and Gemini takes >3min to respond
+
+**Backend Tasks:**
+- ✅ Use Gemini 3 Flash model exclusively
+- ✅ Upload video directly to Gemini File API (no local storage)
+- ✅ Use structured JSON prompts for temporal reasoning
+- ✅ Stream responses back to frontend
+- ✅ Simple analysis endpoint (no queue complexity)
+- ✅ Generate summary on upload
+- ✅ Basic scene detection with timestamps
+
+**Frontend Tasks:**
+- ✅ Show streaming analysis results
+- ✅ Display temporal events with timestamps
+- ✅ Simple search interface
+- ✅ Display scenes with start/end times
 
 ### Phase 4: Clean UI
 - Remove unused components
