@@ -61,13 +61,31 @@ async function getCachedAnalysis(
   
   sql += ' ORDER BY created_at DESC LIMIT 1';
   
+  console.log('[getCachedAnalysis] Executing query:', sql);
+  console.log('[getCachedAnalysis] Params:', params);
+  
   const cached = await db.get<Analysis>(sql, params);
+  
+  console.log('[getCachedAnalysis] Query result:', cached ? 'Found' : 'Not found');
+  if (cached) {
+    console.log('[getCachedAnalysis] Analysis details:', {
+      id: cached.id,
+      type: cached.analysisType,
+      status: cached.status,
+      createdAt: cached.createdAt,
+    });
+  }
   
   if (cached) {
     const age = Date.now() - new Date(cached.createdAt).getTime();
+    console.log('[getCachedAnalysis] Cache age:', Math.round(age / 1000), 'seconds');
+    console.log('[getCachedAnalysis] Cache duration limit:', ANALYSIS_CONSTANTS.CACHE_DURATION / 1000, 'seconds');
+    
     if (age < ANALYSIS_CONSTANTS.CACHE_DURATION) {
       logger.info(`Cache hit for ${analysisType} on video ${videoId}`);
       return cached;
+    } else {
+      console.log('[getCachedAnalysis] Cache expired');
     }
   }
   
@@ -284,15 +302,28 @@ router.post(
       }
 
       // Check cache
+      console.log('🔍 Checking cache for summary...');
+      console.log('  Video ID:', videoId);
+      console.log('  User ID:', userId);
+      
       const cached = await getCachedAnalysis(videoId, userId, 'summary');
+      
       if (cached) {
+        console.log('✅ Cache hit! Returning cached summary');
+        console.log('  Analysis ID:', cached.id);
+        console.log('  Created at:', cached.createdAt);
+        const parsedResult = JSON.parse(cached.result!);
+        console.log('  Result preview:', JSON.stringify(parsedResult).substring(0, 200));
+        
         res.json({
           success: true,
-          data: JSON.parse(cached.result!),
+          data: parsedResult,
           message: 'Retrieved from cache',
         });
         return;
       }
+      
+      console.log('❌ Cache miss - no cached summary found');
 
       // Check if should process sync or async
       const fileSize = video.fileSize || 0;
@@ -366,15 +397,28 @@ router.post(
       }
 
       // Check cache
+      console.log('🔍 Checking cache for scenes...');
+      console.log('  Video ID:', videoId);
+      console.log('  User ID:', userId);
+      
       const cached = await getCachedAnalysis(videoId, userId, 'scenes');
+      
       if (cached) {
+        console.log('✅ Cache hit! Returning cached scenes');
+        console.log('  Analysis ID:', cached.id);
+        console.log('  Created at:', cached.createdAt);
+        const parsedResult = JSON.parse(cached.result!);
+        console.log('  Number of scenes:', parsedResult.length);
+        
         res.json({
           success: true,
-          data: JSON.parse(cached.result!),
+          data: parsedResult,
           message: 'Retrieved from cache',
         });
         return;
       }
+      
+      console.log('❌ Cache miss - no cached scenes found');
 
       // Check if should process sync or async
       const fileSize = video.fileSize || 0;
