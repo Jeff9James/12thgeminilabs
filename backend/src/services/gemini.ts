@@ -70,6 +70,8 @@ export class GeminiVideoService {
         },
       });
 
+      logger.info(`Upload response:`, JSON.stringify(uploadResponse.data, null, 2));
+      
       const fileInfo = uploadResponse.data.file;
       logger.info(`✅ Video uploaded to Gemini: ${fileInfo.uri}`);
       logger.info(`File name: ${fileInfo.name}, state: ${fileInfo.state}`);
@@ -97,6 +99,7 @@ export class GeminiVideoService {
    */
   async waitForFileActive(fileName: string, maxAttempts: number = 30): Promise<void> {
     logger.info(`Waiting for file to become ACTIVE: ${fileName}`);
+    logger.info(`File check URL: ${this.baseUrl}/files/${fileName}`);
     
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
@@ -109,8 +112,9 @@ export class GeminiVideoService {
           }
         );
 
+        logger.info(`File state check ${attempt}/${maxAttempts}:`, JSON.stringify(response.data, null, 2));
+        
         const state = response.data.state;
-        logger.info(`File state check ${attempt}/${maxAttempts}: ${state}`);
 
         if (state === 'ACTIVE') {
           logger.info(`✅ File is now ACTIVE and ready to use`);
@@ -118,16 +122,24 @@ export class GeminiVideoService {
         }
 
         if (state === 'FAILED') {
+          logger.error(`File processing FAILED:`, response.data);
           throw new Error('File processing failed on Gemini servers');
         }
 
         // Wait 2 seconds before next check
         await new Promise(resolve => setTimeout(resolve, 2000));
       } catch (error: any) {
-        logger.error(`Error checking file status:`, error.message);
+        logger.error(`❌ Error checking file status (attempt ${attempt}/${maxAttempts})`);
+        logger.error(`Error message:`, error.message);
+        logger.error(`Error response:`, error.response?.data);
+        logger.error(`Error status:`, error.response?.status);
+        
         if (attempt === maxAttempts) {
           throw new Error(`File did not become ACTIVE after ${maxAttempts} attempts`);
         }
+        
+        // Wait before retry even on error
+        await new Promise(resolve => setTimeout(resolve, 2000));
       }
     }
 
