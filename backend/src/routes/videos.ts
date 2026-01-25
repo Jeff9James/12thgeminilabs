@@ -293,7 +293,7 @@ router.post(
         logger.info(`Auto-analysis temporarily disabled for video ${videoIdDb}`);
         return; // Skip analysis for now
         
-        /* DISABLED CODE:
+        /* DISABLED CODE - TODO: Re-enable after SDK upgrade
         try {
           logger.info(`Starting auto-analysis for video ${videoIdDb}`);
           logger.info(`Storage path: ${storagePath}`);
@@ -354,6 +354,7 @@ router.post(
         } catch (error) {
           logger.error(`Auto-analysis error for video ${videoIdDb}:`, error);
         }
+        */
       };
 
       // TEMPORARILY DISABLED: Trigger analysis
