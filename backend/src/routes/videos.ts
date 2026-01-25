@@ -287,17 +287,13 @@ router.post(
 
       logger.info(`Video finalized: ${videoIdDb}`);
 
-      // TEMPORARILY DISABLED: Auto-trigger Gemini analysis
-      // TODO: Re-enable after upgrading SDK to support Gemini 3
+      // PHASE 3: Auto-trigger Gemini 3 Flash analysis
+      // Uses REST API with File API for video analysis
       const triggerAutoAnalysis = async () => {
-        logger.info(`Auto-analysis temporarily disabled for video ${videoIdDb}`);
-        return; // Skip analysis for now
+        logger.info(`Starting Gemini 3 Flash analysis for video ${videoIdDb}`);
+        logger.info(`Storage path: ${storagePath}`);
         
-        /* DISABLED CODE - TODO: Re-enable after SDK upgrade
         try {
-          logger.info(`Starting auto-analysis for video ${videoIdDb}`);
-          logger.info(`Storage path: ${storagePath}`);
-          
           // Import geminiService
           const { geminiService } = await import('../services/gemini');
           
@@ -307,9 +303,9 @@ router.post(
             return;
           }
           
-          logger.info(`File exists, starting analysis...`);
+          logger.info(`File exists, starting Gemini 3 Flash analysis...`);
           
-          // Run summary and scenes in parallel using storage path
+          // Run summary and scenes in parallel using Gemini 3 Flash
           const [summaryResult, scenesResult] = await Promise.allSettled([
             geminiService.summarizeVideo(storagePath),
             geminiService.detectScenes(storagePath),
@@ -354,13 +350,12 @@ router.post(
         } catch (error) {
           logger.error(`Auto-analysis error for video ${videoIdDb}:`, error);
         }
-        */
       };
 
-      // TEMPORARILY DISABLED: Trigger analysis
-      // triggerAutoAnalysis().catch(err => {
-      //   logger.error('Background analysis trigger failed:', err);
-      // });
+      // Trigger Gemini 3 Flash analysis in background
+      triggerAutoAnalysis().catch(err => {
+        logger.error('Background analysis trigger failed:', err);
+      });
 
       console.log('========================================');
       console.log('Video finalized successfully!');

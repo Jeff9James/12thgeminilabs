@@ -23,6 +23,7 @@
     "@gemini-video-platform/shared": "file:../shared",
     "@google-cloud/storage": "^7.7.0",
     "@google/generative-ai": "^0.21.0",
+    "axios": "^1.13.2",
     "compression": "^1.8.1",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
