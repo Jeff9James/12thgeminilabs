@@ -287,10 +287,13 @@ router.post(
 
       logger.info(`Video finalized: ${videoIdDb}`);
 
-      // SIMPLIFIED PHASE 3: Auto-trigger Gemini analysis
-      // Start summary and scene detection in background
-      // Use dynamic import to avoid circular dependency
+      // TEMPORARILY DISABLED: Auto-trigger Gemini analysis
+      // TODO: Re-enable after upgrading SDK to support Gemini 3
       const triggerAutoAnalysis = async () => {
+        logger.info(`Auto-analysis temporarily disabled for video ${videoIdDb}`);
+        return; // Skip analysis for now
+        
+        /* DISABLED CODE:
         try {
           logger.info(`Starting auto-analysis for video ${videoIdDb}`);
           logger.info(`Storage path: ${storagePath}`);
@@ -353,10 +356,10 @@ router.post(
         }
       };
 
-      // Trigger analysis in background (don't await)
-      triggerAutoAnalysis().catch(err => {
-        logger.error('Background analysis trigger failed:', err);
-      });
+      // TEMPORARILY DISABLED: Trigger analysis
+      // triggerAutoAnalysis().catch(err => {
+      //   logger.error('Background analysis trigger failed:', err);
+      // });
 
       console.log('========================================');
       console.log('Video finalized successfully!');
