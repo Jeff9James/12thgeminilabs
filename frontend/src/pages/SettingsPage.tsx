@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { userService } from '../services/userService';
-import { GoogleOAuthStatus } from '../types/video';
 import './SettingsPage.css';
+
+// SIMPLIFIED: Demo mode - removed OAuth management
 
 interface StorageInfo {
   used: number;
@@ -12,12 +12,9 @@ interface StorageInfo {
 }
 
 export function SettingsPage() {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
-  const [oauthStatus, setOauthStatus] = useState<GoogleOAuthStatus | null>(null);
+  const { user } = useAuth();
   const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isRevoking, setIsRevoking] = useState(false);
   const [activeSection, setActiveSection] = useState<'account' | 'storage' | 'preferences'>('account');
 
   useEffect(() => {
@@ -27,14 +24,7 @@ export function SettingsPage() {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [oauthResult, storageResult] = await Promise.all([
-        userService.getGoogleOAuthStatus(),
-        userService.getStorageInfo(),
-      ]);
-
-      if (oauthResult.success && oauthResult.data) {
-        setOauthStatus(oauthResult.data);
-      }
+      const storageResult = await userService.getStorageInfo();
       if (storageResult) {
         setStorageInfo(storageResult);
       }
@@ -42,22 +32,6 @@ export function SettingsPage() {
       console.error('Failed to load settings:', error);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleRevokeAccess = async () => {
-    if (!confirm('Are you sure you want to revoke Google access? This will sign you out.')) {
-      return;
-    }
-
-    setIsRevoking(true);
-    try {
-      await userService.revokeGoogleAccess();
-      logout();
-      navigate('/login');
-    } catch (error) {
-      console.error('Failed to revoke access:', error);
-      setIsRevoking(false);
     }
   };
 
@@ -115,13 +89,9 @@ export function SettingsPage() {
 
               <div className="user-info-card">
                 <div className="user-avatar">
-                  {user?.picture ? (
-                    <img src={user.picture} alt={user.name} />
-                  ) : (
-                    <svg fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-                    </svg>
-                  )}
+                  <svg fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                  </svg>
                 </div>
                 <div className="user-details">
                   <h3>{user?.name}</h3>
@@ -129,37 +99,12 @@ export function SettingsPage() {
                 </div>
               </div>
 
-              <div className="oauth-section">
-                <h3>Google OAuth</h3>
-                <div className="oauth-status">
-                  <div className="oauth-info">
-                    <div className="oauth-badge connected">
-                      <svg fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
-                      </svg>
-                      Connected
-                    </div>
-                    {oauthStatus?.email && (
-                      <p className="oauth-email">{oauthStatus.email}</p>
-                    )}
-                  </div>
-                  <button
-                    className="revoke-button"
-                    onClick={handleRevokeAccess}
-                    disabled={isRevoking}
-                  >
-                    {isRevoking ? 'Revoking...' : 'Revoke Access'}
-                  </button>
+              <div className="demo-mode-notice">
+                <div className="notice-icon">ℹ️</div>
+                <div className="notice-content">
+                  <h3>Demo Mode</h3>
+                  <p>This is a demo account. All users share the same video library for the hackathon demonstration.</p>
                 </div>
-              </div>
-
-              <div className="logout-section">
-                <button className="logout-button" onClick={logout}>
-                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                  </svg>
-                  Sign Out
-                </button>
               </div>
             </div>
           )}

@@ -130,6 +130,36 @@
   margin: 0;
 }
 
+/* Demo mode notice */
+.demo-mode-notice {
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 10px;
+  margin-bottom: 24px;
+}
+
+.notice-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.notice-content h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0c4a6e;
+  margin: 0 0 4px 0;
+}
+
+.notice-content p {
+  font-size: 13px;
+  color: #075985;
+  margin: 0;
+  line-height: 1.5;
+}
+
 /* OAuth section */
 .oauth-section {
   margin-bottom: 24px;
