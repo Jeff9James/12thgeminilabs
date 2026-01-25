@@ -293,11 +293,20 @@ router.post(
       const triggerAutoAnalysis = async () => {
         try {
           logger.info(`Starting auto-analysis for video ${videoIdDb}`);
+          logger.info(`Storage path: ${storagePath}`);
           
           // Import geminiService
           const { geminiService } = await import('../services/gemini');
           
-          // Run summary and scenes in parallel
+          // Check if file exists at storage path
+          if (!fs.existsSync(storagePath)) {
+            logger.error(`File not found at storage path: ${storagePath}`);
+            return;
+          }
+          
+          logger.info(`File exists, starting analysis...`);
+          
+          // Run summary and scenes in parallel using storage path
           const [summaryResult, scenesResult] = await Promise.allSettled([
             geminiService.summarizeVideo(storagePath),
             geminiService.detectScenes(storagePath),
@@ -311,9 +320,11 @@ router.post(
                VALUES (?, ?, ?, 'summary', 'complete', ?, ?, ?)`,
               [summaryId, videoIdDb, userId, JSON.stringify(summaryResult.value), new Date().toISOString(), new Date().toISOString()]
             );
-            logger.info(`Auto-generated summary for video ${videoIdDb}`);
+            logger.info(`✅ Auto-generated summary for video ${videoIdDb}`);
+            console.log(`✅ Summary saved: ${JSON.stringify(summaryResult.value).substring(0, 100)}...`);
           } else {
-            logger.error(`Summary failed for video ${videoIdDb}:`, summaryResult.reason);
+            logger.error(`❌ Summary failed for video ${videoIdDb}:`, summaryResult.reason);
+            console.error(`❌ Summary error:`, summaryResult.reason);
           }
 
           // Save scenes if successful
@@ -324,9 +335,11 @@ router.post(
                VALUES (?, ?, ?, 'scenes', 'complete', ?, ?, ?)`,
               [scenesId, videoIdDb, userId, JSON.stringify(scenesResult.value), new Date().toISOString(), new Date().toISOString()]
             );
-            logger.info(`Auto-generated scenes for video ${videoIdDb}`);
+            logger.info(`✅ Auto-generated scenes for video ${videoIdDb} (${scenesResult.value.length} scenes)`);
+            console.log(`✅ Scenes saved: ${scenesResult.value.length} scenes detected`);
           } else {
-            logger.error(`Scenes detection failed for video ${videoIdDb}:`, scenesResult.reason);
+            logger.error(`❌ Scenes detection failed for video ${videoIdDb}:`, scenesResult.reason);
+            console.error(`❌ Scenes error:`, scenesResult.reason);
           }
 
           // Update video status to ready
