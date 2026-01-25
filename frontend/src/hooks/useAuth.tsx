@@ -22,8 +22,8 @@ const DEMO_USER: User = {
   email: 'demo@example.com',
   name: 'Demo User',
   googleId: 'demo-google-id',
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
+  createdAt: new Date(),
+  updatedAt: new Date(),
 };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
