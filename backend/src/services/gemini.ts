@@ -258,8 +258,39 @@ Format your response as JSON with this exact structure:
         },
       });
 
-      // Parse JSON response
-      const parsed = JSON.parse(response);
+      // Parse JSON response with robust error handling
+      let parsed: any;
+      try {
+        parsed = JSON.parse(response);
+      } catch (parseError) {
+        logger.warn('Summary JSON parse failed, attempting to extract JSON');
+        logger.warn('Raw response preview:', response.substring(0, 500));
+        
+        // Try to extract JSON object from response
+        const jsonMatch = response.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          try {
+            parsed = JSON.parse(jsonMatch[0]);
+            logger.info('Successfully parsed summary JSON after extraction');
+          } catch (extractError) {
+            logger.error('Summary JSON extraction failed, using raw text as summary');
+            // If all parsing fails, use the raw response as the summary
+            return {
+              summary: response,
+              keyPoints: [],
+              duration: 0,
+            };
+          }
+        } else {
+          logger.warn('No JSON object found, using raw text as summary');
+          return {
+            summary: response,
+            keyPoints: [],
+            duration: 0,
+          };
+        }
+      }
+      
       return {
         summary: parsed.summary || response,
         keyPoints: parsed.keyPoints || [],
@@ -307,11 +338,56 @@ REQUIREMENTS:
         },
       });
 
-      // Parse JSON response
-      const parsed = JSON.parse(response);
-      if (!Array.isArray(parsed)) {
-        throw new Error('Invalid response format from Gemini');
+      // Parse JSON response with robust error handling
+      let parsed: any;
+      try {
+        // Try to parse the response as-is
+        parsed = JSON.parse(response);
+      } catch (parseError) {
+        logger.warn('Initial JSON parse failed, attempting to clean response');
+        logger.warn('Raw response length:', response.length);
+        logger.warn('Raw response preview:', response.substring(0, 500));
+        
+        // Try to extract JSON array from response (sometimes Gemini adds extra text)
+        const jsonMatch = response.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          try {
+            parsed = JSON.parse(jsonMatch[0]);
+            logger.info('Successfully parsed JSON after extraction');
+          } catch (extractError) {
+            logger.error('JSON extraction failed:', extractError);
+            // Try one more time with cleanup
+            const cleaned = jsonMatch[0]
+              .replace(/,(\s*[}\]])/g, '$1') // Remove trailing commas
+              .replace(/\n/g, ' ') // Remove newlines
+              .replace(/\s+/g, ' '); // Normalize whitespace
+            
+            try {
+              parsed = JSON.parse(cleaned);
+              logger.info('Successfully parsed JSON after cleanup');
+            } catch (cleanupError) {
+              logger.error('All JSON parsing attempts failed');
+              logger.error('Cleaned JSON preview:', cleaned.substring(0, 500));
+              throw new Error('Failed to parse scene detection response as JSON');
+            }
+          }
+        } else {
+          logger.error('No JSON array found in response');
+          throw new Error('Response does not contain a valid JSON array');
+        }
       }
+      
+      if (!Array.isArray(parsed)) {
+        logger.error('Parsed result is not an array:', typeof parsed);
+        throw new Error('Invalid response format from Gemini - expected array');
+      }
+      
+      if (parsed.length === 0) {
+        logger.warn('No scenes detected in video');
+        return [];
+      }
+
+      logger.info(`Successfully parsed ${parsed.length} scenes from response`);
 
       return parsed.map((scene: any, index: number) => ({
         id: `scene-${index + 1}`,
