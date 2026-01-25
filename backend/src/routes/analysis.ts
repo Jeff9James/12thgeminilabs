@@ -134,32 +134,20 @@ async function updateAnalysisStatus(
 }
 
 // POST /api/videos/:id/analyze
-// Generic analysis endpoint that queues job
+// Generic analysis endpoint - triggers summary and scenes
 router.post(
   '/:id/analyze',
   authenticate,
   async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const { id: videoId } = req.params;
-      const { type, query } = req.body;
       const userId = req.user!.id;
 
-      if (!type) {
-        res.status(400).json({
-          success: false,
-          error: 'Missing required parameter: type',
-        });
-        return;
-      }
-
-      const validTypes = ['summary', 'scenes', 'search', 'custom'];
-      if (!validTypes.includes(type)) {
-        res.status(400).json({
-          success: false,
-          error: `Invalid analysis type. Must be one of: ${validTypes.join(', ')}`,
-        });
-        return;
-      }
+      console.log('========================================');
+      console.log('📊 MANUAL ANALYZE REQUEST');
+      console.log('Video ID:', videoId);
+      console.log('User ID:', userId);
+      console.log('========================================');
 
       const video = await getVideoForUser(videoId, userId);
       if (!video) {
@@ -170,40 +158,57 @@ router.post(
         return;
       }
 
-      // Check cache
-      const cached = await getCachedAnalysis(videoId, userId, type, query);
-      if (cached) {
-        const response: AnalysisStatusResponse = {
-          jobId: cached.id,
-          status: 'complete',
-          result: JSON.parse(cached.result!),
-        };
-        res.json({
-          success: true,
-          data: response,
-          message: 'Analysis retrieved from cache',
-        });
-        return;
-      }
+      // Import geminiService
+      const { geminiService } = await import('../services/gemini');
+      const { v4: uuidv4 } = await import('uuid');
+      const db = getDatabase();
 
-      // Create job
-      const job = await createAnalysisJob(videoId, userId, type, query);
-      
-      const response: AnalysisJobResponse = {
-        jobId: job.id,
-        status: 'pending',
-        message: 'Analysis job created',
-      };
-
+      // Trigger analysis immediately
       res.json({
         success: true,
-        data: response,
+        message: 'Analysis started',
       });
 
-      // Process asynchronously
-      processAnalysisJob(job.id, video.path, type, query).catch(error => {
-        logger.error(`Error processing analysis job ${job.id}:`, error);
-      });
+      // Run analysis in background
+      (async () => {
+        try {
+          console.log('🚀 Starting background analysis for video:', videoId);
+          
+          const [summaryResult, scenesResult] = await Promise.allSettled([
+            geminiService.summarizeVideo(video.path),
+            geminiService.detectScenes(video.path),
+          ]);
+
+          if (summaryResult.status === 'fulfilled') {
+            const summaryId = uuidv4();
+            await db.run(
+              `INSERT INTO analyses (id, video_id, user_id, analysis_type, status, result, created_at, completed_at)
+               VALUES (?, ?, ?, 'summary', 'complete', ?, ?, ?)`,
+              [summaryId, videoId, userId, JSON.stringify(summaryResult.value), new Date().toISOString(), new Date().toISOString()]
+            );
+            console.log('✅ Summary analysis complete');
+          } else {
+            console.error('❌ Summary failed:', summaryResult.reason);
+          }
+
+          if (scenesResult.status === 'fulfilled') {
+            const scenesId = uuidv4();
+            await db.run(
+              `INSERT INTO analyses (id, video_id, user_id, analysis_type, status, result, created_at, completed_at)
+               VALUES (?, ?, ?, 'scenes', 'complete', ?, ?, ?)`,
+              [scenesId, videoId, userId, JSON.stringify(scenesResult.value), new Date().toISOString(), new Date().toISOString()]
+            );
+            console.log(`✅ Scene detection complete (${scenesResult.value.length} scenes)`);
+          } else {
+            console.error('❌ Scenes failed:', scenesResult.reason);
+          }
+
+          await db.run('UPDATE videos SET status = ? WHERE id = ?', ['ready', videoId]);
+          console.log('✅ Video marked as ready');
+        } catch (error) {
+          console.error('❌ Background analysis error:', error);
+        }
+      })();
     } catch (error) {
       logger.error('Create analysis error:', error);
       res.status(500).json({
