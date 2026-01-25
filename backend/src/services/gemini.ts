@@ -1,33 +1,45 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI, GoogleAIFileManager } from '@google/generative-ai';
 import * as fs from 'fs';
 import * as path from 'path';
 import { config } from '../utils/env';
 import logger from '../utils/logger';
 import { Scene, SearchMatch, SummaryResult, ConversationMessage } from '@gemini-video-platform/shared';
 
+// SIMPLIFIED: Use Gemini 3 Flash (cheapest model) with File API
+// Videos are uploaded to Gemini's free 48-hour storage
+
 export class GeminiVideoService {
   private genAI: GoogleGenerativeAI;
+  private fileManager: GoogleAIFileManager;
   private model: any;
   private maxRetries: number = 3;
 
   constructor() {
     this.genAI = new GoogleGenerativeAI(config.geminiApiKey);
-    this.model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
+    this.fileManager = new GoogleAIFileManager(config.geminiApiKey);
+    // Use Gemini 3 Flash - fastest and cheapest option
+    this.model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
   }
 
+  /**
+   * Upload video to Gemini File API (48-hour free storage)
+   * Returns the uploaded file object for use in analysis
+   */
   async uploadVideoFile(filePath: string): Promise<any> {
     try {
-      // Note: File upload functionality would need to be implemented based on the specific Gemini API version
-      logger.info(`Video file ready for analysis: ${filePath}`);
+      logger.info(`Uploading video to Gemini File API: ${filePath}`);
       
-      // For now, return a mock file object
-      return {
+      // Upload file to Gemini's storage
+      const uploadResult = await this.fileManager.uploadFile(filePath, {
         mimeType: this.getMimeType(filePath),
-        uri: filePath,
-        name: path.basename(filePath),
-      };
+        displayName: path.basename(filePath),
+      });
+
+      logger.info(`Video uploaded successfully: ${uploadResult.file.uri}`);
+      
+      return uploadResult.file;
     } catch (error) {
-      logger.error('Error preparing video for Gemini:', error);
+      logger.error('Error uploading video to Gemini:', error);
       throw error;
     }
   }
