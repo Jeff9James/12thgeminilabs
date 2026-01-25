@@ -361,6 +361,134 @@ Provide a detailed response that references specific timestamps when relevant.`;
     return timestamps;
   }
 
+  /**
+   * Generate conversation title based on first message
+   */
+  async generateConversationTitle(firstMessage: string, videoContext?: string): Promise<string> {
+    try {
+      const prompt = videoContext
+        ? `Based on this video context: "${videoContext}" and this first message: "${firstMessage}", generate a concise, descriptive title for this conversation (max 50 characters).`
+        : `Generate a concise, descriptive title for this conversation based on this first message: "${firstMessage}" (max 50 characters).`;
+
+      const response = await axios.post(
+        `${this.baseUrl}/models/gemini-3-flash-preview:generateContent`,
+        {
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            thinkingConfig: { thinkingLevel: 'minimal' },
+          },
+        },
+        {
+          headers: {
+            'x-goog-api-key': this.apiKey,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      let title = response.data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || 'Video Conversation';
+      title = title.replace(/^["']|["']$/g, '');
+      if (title.length > 50) {
+        title = title.substring(0, 47) + '...';
+      }
+      return title;
+    } catch (error) {
+      logger.warn('Error generating conversation title:', error);
+      return 'Video Conversation';
+    }
+  }
+
+  /**
+   * Analyze with custom prompt
+   */
+  async analyzeWithCustomPrompt(
+    filePath: string,
+    prompt: string
+  ): Promise<{ analysis: string; referencedTimestamps?: Array<{ start: number; end: number }> }> {
+    try {
+      const { uri, mimeType } = await this.uploadVideoFile(filePath);
+
+      const enhancedPrompt = `${prompt}
+
+When referencing specific moments in your analysis, use timestamps in the format [MM:SS] or [MM:SS-MM:SS].`;
+
+      const response = await this.generateContent(uri, mimeType, enhancedPrompt, {
+        thinkingConfig: { thinkingLevel: 'medium' },
+      });
+
+      const timestamps = this.parseTimestamps(response);
+
+      return {
+        analysis: response,
+        referencedTimestamps: timestamps,
+      };
+    } catch (error) {
+      logger.error('Error in custom analysis:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Analyze query context (text only, no video)
+   */
+  async analyzeQueryContext(query: string, context?: string): Promise<string> {
+    try {
+      const prompt = context
+        ? `Query: "${query}"\nContext: "${context}"\nProvide analysis based on the query and context.`
+        : `Analyze this search query: "${query}"`;
+
+      const response = await axios.post(
+        `${this.baseUrl}/models/gemini-3-flash-preview:generateContent`,
+        {
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            thinkingConfig: { thinkingLevel: 'minimal' },
+          },
+        },
+        {
+          headers: {
+            'x-goog-api-key': this.apiKey,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      return response.data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    } catch (error) {
+      logger.error('Error analyzing query context:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Analyze specific video segment
+   */
+  async analyzeVideoSegment(
+    videoFile: string,
+    startTime: number,
+    endTime: number,
+    prompt: string
+  ): Promise<string> {
+    try {
+      const { uri, mimeType } = await this.uploadVideoFile(videoFile);
+
+      const extendedPrompt = `Please analyze the specific segment of this video from ${startTime} to ${endTime} seconds.
+
+${prompt}
+
+Focus specifically on what's happening in the time range ${startTime}s to ${endTime}s.`;
+
+      const response = await this.generateContent(uri, mimeType, extendedPrompt, {
+        thinkingConfig: { thinkingLevel: 'medium' },
+      });
+
+      return response;
+    } catch (error) {
+      logger.error('Error analyzing video segment:', error);
+      throw error;
+    }
+  }
+
   private getMimeType(filePath: string): string {
     const ext = path.extname(filePath).toLowerCase();
     const mimeTypes: Record<string, string> = {
