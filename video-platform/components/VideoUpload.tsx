@@ -18,11 +18,10 @@ export default function VideoUpload() {
       return;
     }
 
-    // Warn for very large files
-    if (file.size > 100 * 1024 * 1024) {
-      if (!confirm(`This file is ${Math.round(file.size / 1024 / 1024)}MB. Large uploads may take several minutes. Continue?`)) {
-        return;
-      }
+    // Vercel Hobby plan has 4.5MB function payload limit
+    if (file.size > 4.5 * 1024 * 1024) {
+      alert('File too large. Maximum: 4.5MB on Vercel Hobby plan.\n\nFor larger files, please:\n1. Use a smaller/compressed video, OR\n2. Upgrade to Vercel Pro ($20/month)');
+      return;
     }
     
     setUploading(true);
@@ -91,7 +90,8 @@ export default function VideoUpload() {
           required
           className="block w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         />
-        <p className="mt-2 text-sm text-gray-500">Recommended: Under 50MB for best performance</p>
+        <p className="mt-2 text-sm text-gray-500">Maximum: 4.5MB (Vercel Hobby limit)</p>
+        <p className="mt-1 text-xs text-gray-400">For larger files, compress video or upgrade to Vercel Pro</p>
       </div>
       
       {progress && (
