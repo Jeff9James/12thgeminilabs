@@ -60,11 +60,24 @@ export default function StreamingAnalysis({ videoId }: { videoId: string }) {
                 
                 // Try to parse the accumulated JSON
                 try {
-                  const parsed = JSON.parse(accumulatedText);
+                  // Remove markdown code blocks if present
+                  let cleanText = accumulatedText.trim();
+                  
+                  // Remove ```json and ``` markers
+                  if (cleanText.startsWith('```json')) {
+                    cleanText = cleanText.replace(/^```json\s*/, '').replace(/```\s*$/, '');
+                  } else if (cleanText.startsWith('```')) {
+                    cleanText = cleanText.replace(/^```\s*/, '').replace(/```\s*$/, '');
+                  }
+                  
+                  cleanText = cleanText.trim();
+                  
+                  const parsed = JSON.parse(cleanText);
                   setParsedAnalysis(parsed);
                   setRawAnalysis(''); // Clear raw text once parsed
                 } catch (parseError) {
                   console.error('Failed to parse final JSON:', parseError);
+                  console.log('Raw text:', accumulatedText);
                   // Keep raw text if parsing fails
                 }
               } else if (data.status) {
