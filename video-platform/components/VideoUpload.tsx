@@ -18,105 +18,54 @@ export default function VideoUpload() {
       return;
     }
 
-    // Check file size (warn for very large files)
-    if (file.size > 100 * 1024 * 1024) { // 100MB
-      if (!confirm(`This file is ${Math.round(file.size / 1024 / 1024)}MB. Upload may take several minutes. Continue?`)) {
-        return;
-      }
+    // Warn for files over 10MB due to upload limits
+    if (file.size > 10 * 1024 * 1024) {
+      alert('File size limit: 10MB for Vercel Hobby plan. Please use a smaller video or upgrade to Pro.');
+      return;
     }
     
     setUploading(true);
-    setProgress('Uploading to Gemini...');
+    setProgress('Uploading...');
     
     try {
-      // Use REST API for file upload (client-side)
-      const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-      
-      if (!apiKey) {
-        throw new Error('API key not configured');
-      }
-      
-      // Step 1: Initiate resumable upload
-      setProgress('Initializing upload...');
-      const initResponse = await fetch(`https://generativelanguage.googleapis.com/upload/v1beta/files`, {
+      const res = await fetch('/api/upload-stream', {
         method: 'POST',
-        headers: {
-          'X-Goog-Upload-Protocol': 'resumable',
-          'X-Goog-Upload-Command': 'start',
-          'X-Goog-Upload-Header-Content-Length': file.size.toString(),
-          'X-Goog-Upload-Header-Content-Type': file.type,
-          'Content-Type': 'application/json',
-          'x-goog-api-key': apiKey
-        },
-        body: JSON.stringify({
-          file: {
-            display_name: file.name
+        body: formData
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || `Upload failed: ${res.status}`);
+      }
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+
+      while (true) {
+        const { done, value } = await reader!.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              
+              if (data.error) {
+                throw new Error(data.error);
+              } else if (data.progress) {
+                setProgress(data.progress);
+              } else if (data.success && data.videoId) {
+                router.push(`/videos/${data.videoId}`);
+                return;
+              }
+            } catch (e) {
+              // Ignore JSON parse errors for incomplete chunks
+            }
           }
-        })
-      });
-      
-      const uploadUrl = initResponse.headers.get('X-Goog-Upload-URL');
-      if (!uploadUrl) {
-        throw new Error('Failed to get upload URL');
-      }
-      
-      // Step 2: Upload the actual file
-      setProgress(`Uploading... (${Math.round(file.size / 1024 / 1024)}MB)`);
-      const uploadResponse = await fetch(uploadUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Length': file.size.toString(),
-          'X-Goog-Upload-Offset': '0',
-          'X-Goog-Upload-Command': 'upload, finalize'
-        },
-        body: file
-      });
-      
-      if (!uploadResponse.ok) {
-        throw new Error(`Upload failed: ${uploadResponse.statusText}`);
-      }
-      
-      const uploadResult = await uploadResponse.json();
-      const fileName = uploadResult.file.name;
-      
-      // Step 3: Wait for processing
-      setProgress('Waiting for Gemini to process...');
-      let fileInfo = await fetch(`https://generativelanguage.googleapis.com/v1beta/${fileName}?key=${apiKey}`)
-        .then(r => r.json());
-      
-      while (fileInfo.state === 'PROCESSING') {
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        fileInfo = await fetch(`https://generativelanguage.googleapis.com/v1beta/${fileName}?key=${apiKey}`)
-          .then(r => r.json());
-        setProgress('Processing video...');
-      }
-      
-      if (fileInfo.state === 'FAILED') {
-        throw new Error('Video processing failed');
-      }
-      
-      setProgress('Saving metadata...');
-      
-      // Step 4: Save metadata to your database
-      const res = await fetch('/api/videos', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          title: file.name,
-          geminiFileUri: fileInfo.uri,
-          geminiFileName: fileName,
-          mimeType: file.type,
-          size: file.size
-        })
-      });
-      
-      const data = await res.json();
-      if (data.success) {
-        router.push(`/videos/${data.videoId}`);
-      } else {
-        alert('Failed to save video metadata: ' + (data.error || 'Unknown error'));
+        }
       }
     } catch (error: any) {
       console.error('Upload error:', error);
@@ -141,7 +90,7 @@ export default function VideoUpload() {
           required
           className="block w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         />
-        <p className="mt-2 text-sm text-gray-500">Maximum file size: 2GB</p>
+        <p className="mt-2 text-sm text-gray-500">Maximum: 10MB (Vercel Hobby plan limit)</p>
       </div>
       
       {progress && (
@@ -155,7 +104,7 @@ export default function VideoUpload() {
         disabled={uploading}
         className="mt-4 w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold p-3 rounded-lg disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
       >
-        {uploading ? progress : 'Upload Video'}
+        {uploading ? progress || 'Uploading...' : 'Upload Video'}
       </button>
     </form>
   );
