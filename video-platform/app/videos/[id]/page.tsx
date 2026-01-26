@@ -124,7 +124,7 @@ export default function VideoPage({ params }: { params: Promise<{ id: string }> 
                   <h3 className="text-xl font-semibold mb-4 text-gray-800">Scene Breakdown</h3>
                   <p className="text-sm text-gray-600 mb-4">Click on timestamps to jump to that moment in the video</p>
                   <div className="space-y-4">
-                    {analysis.scenes.map((scene, i) => (
+                    {analysis.scenes.map((scene: any, i: number) => (
                       <div key={i} className="border-l-4 border-blue-500 pl-4 py-2 bg-blue-50 rounded-r hover:bg-blue-100 transition-colors">
                         <div className="flex items-baseline gap-2 mb-1">
                           <button
