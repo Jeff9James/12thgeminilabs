@@ -18,10 +18,11 @@ export default function VideoUpload() {
       return;
     }
 
-    // Warn for files over 10MB due to upload limits
-    if (file.size > 10 * 1024 * 1024) {
-      alert('File size limit: 10MB for Vercel Hobby plan. Please use a smaller video or upgrade to Pro.');
-      return;
+    // Warn for very large files
+    if (file.size > 100 * 1024 * 1024) {
+      if (!confirm(`This file is ${Math.round(file.size / 1024 / 1024)}MB. Large uploads may take several minutes. Continue?`)) {
+        return;
+      }
     }
     
     setUploading(true);
@@ -90,7 +91,7 @@ export default function VideoUpload() {
           required
           className="block w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         />
-        <p className="mt-2 text-sm text-gray-500">Maximum: 10MB (Vercel Hobby plan limit)</p>
+        <p className="mt-2 text-sm text-gray-500">Recommended: Under 50MB for best performance</p>
       </div>
       
       {progress && (

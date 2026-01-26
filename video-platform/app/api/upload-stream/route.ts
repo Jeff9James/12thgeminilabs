@@ -1,10 +1,6 @@
 import { NextRequest } from 'next/server';
 import { saveVideo } from '@/lib/kv';
 import { v4 as uuidv4 } from 'uuid';
-import { GoogleAIFileManager } from '@google/generative-ai/server';
-import { writeFile, unlink } from 'fs/promises';
-import { join } from 'path';
-import { tmpdir } from 'os';
 
 // Use Node.js runtime for file operations
 export const runtime = 'nodejs';
@@ -30,63 +26,92 @@ export async function POST(request: NextRequest) {
         }
 
         const videoId = uuidv4();
-        const buffer = Buffer.from(await file.arrayBuffer());
+        const fileBuffer = await file.arrayBuffer();
+        const fileData = Buffer.from(fileBuffer);
         
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: 'Uploading to Gemini...' })}\n\n`));
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: 'Uploading to Gemini (this may take a while)...' })}\n\n`));
         
-        // Upload to Gemini
-        const fileManager = new GoogleAIFileManager(process.env.GEMINI_API_KEY!);
-        const tempFilePath = join(tmpdir(), `upload-${Date.now()}.mp4`);
+        // Use Gemini REST API for resumable upload
+        const apiKey = process.env.GEMINI_API_KEY!;
         
-        let geminiFileUri: string;
-        
-        try {
-          await writeFile(tempFilePath, buffer);
-          
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: 'Processing...' })}\n\n`));
-          
-          const uploadResult = await fileManager.uploadFile(tempFilePath, {
-            mimeType: file.type,
-            displayName: file.name
-          });
-
-          // Wait for processing
-          let fileInfo = await fileManager.getFile(uploadResult.file.name);
-          
-          let attempts = 0;
-          while (fileInfo.state === 'PROCESSING' && attempts < 60) {
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            fileInfo = await fileManager.getFile(uploadResult.file.name);
-            attempts++;
-            
-            if (attempts % 5 === 0) {
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: `Processing video... (${attempts * 2}s)` })}\n\n`));
+        // Step 1: Initialize resumable upload
+        const initResponse = await fetch('https://generativelanguage.googleapis.com/upload/v1beta/files', {
+          method: 'POST',
+          headers: {
+            'X-Goog-Upload-Protocol': 'resumable',
+            'X-Goog-Upload-Command': 'start',
+            'X-Goog-Upload-Header-Content-Length': fileData.length.toString(),
+            'X-Goog-Upload-Header-Content-Type': file.type,
+            'Content-Type': 'application/json',
+            'x-goog-api-key': apiKey
+          },
+          body: JSON.stringify({
+            file: {
+              display_name: file.name
             }
-          }
-
-          if (fileInfo.state === 'FAILED') {
-            throw new Error('Video processing failed');
-          }
-
-          geminiFileUri = fileInfo.uri;
-          await unlink(tempFilePath).catch(() => {});
-        } catch (uploadError: any) {
-          await unlink(tempFilePath).catch(() => {});
-          throw uploadError;
+          })
+        });
+        
+        const uploadUrl = initResponse.headers.get('X-Goog-Upload-URL');
+        if (!uploadUrl) {
+          throw new Error('Failed to initialize upload');
         }
         
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: 'Saving...' })}\n\n`));
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: `Uploading ${Math.round(fileData.length / 1024 / 1024)}MB...` })}\n\n`));
+        
+        // Step 2: Upload the file
+        const uploadResponse = await fetch(uploadUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Length': fileData.length.toString(),
+            'X-Goog-Upload-Offset': '0',
+            'X-Goog-Upload-Command': 'upload, finalize'
+          },
+          body: fileData
+        });
+        
+        if (!uploadResponse.ok) {
+          throw new Error(`Upload failed: ${uploadResponse.statusText}`);
+        }
+        
+        const uploadResult = await uploadResponse.json();
+        const fileName = uploadResult.file.name;
+        
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: 'Processing video...' })}\n\n`));
+        
+        // Step 3: Wait for processing
+        let fileInfo = await fetch(`https://generativelanguage.googleapis.com/v1beta/${fileName}?key=${apiKey}`)
+          .then(r => r.json());
+        
+        let attempts = 0;
+        while (fileInfo.state === 'PROCESSING' && attempts < 60) {
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          fileInfo = await fetch(`https://generativelanguage.googleapis.com/v1beta/${fileName}?key=${apiKey}`)
+            .then(r => r.json());
+          attempts++;
+          
+          if (attempts % 3 === 0) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: `Processing... (${attempts * 3}s)` })}\n\n`));
+          }
+        }
+        
+        if (fileInfo.state === 'FAILED') {
+          throw new Error('Video processing failed');
+        }
+        
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: 'Saving metadata...' })}\n\n`));
         
         // Save metadata to KV
         await saveVideo(videoId, {
           id: videoId,
           title: file.name,
-          geminiFileUri,
+          geminiFileUri: fileInfo.uri,
+          geminiFileName: fileName,
           createdAt: new Date().toISOString(),
           userId: 'demo-user',
           status: 'ready',
           mimeType: file.type,
-          size: file.size
+          size: fileData.length
         });
 
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ success: true, videoId })}\n\n`));
