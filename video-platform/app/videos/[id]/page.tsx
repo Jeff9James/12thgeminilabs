@@ -126,7 +126,8 @@ export default function VideoPage({ params }: { params: Promise<{ id: string }> 
                   <div className="space-y-4">
                     {analysis.scenes.map((scene: any, i: number) => (
                       <div key={i} className="border-l-4 border-blue-500 pl-4 py-2 bg-blue-50 rounded-r hover:bg-blue-100 transition-colors">
-                        <div className="flex items-baseline gap-2 mb-1">
+                        <div className="flex items-baseline gap-2 mb-1 flex-wrap">
+                          <span className="font-mono text-sm text-gray-500">[</span>
                           <button
                             onClick={() => {
                               const videoEl = document.getElementById('videoPlayer') as HTMLVideoElement;
@@ -137,12 +138,29 @@ export default function VideoPage({ params }: { params: Promise<{ id: string }> 
                                 videoEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
                               }
                             }}
-                            className="font-mono text-sm text-blue-600 font-semibold hover:text-blue-800 hover:underline cursor-pointer transition-colors"
-                            title="Click to jump to this timestamp"
+                            className="font-mono text-sm text-blue-600 font-semibold hover:text-blue-800 hover:underline cursor-pointer transition-colors bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded"
+                            title={`Click to jump to ${scene.start}`}
                           >
-                            [{scene.start} - {scene.end}]
+                            {scene.start}
                           </button>
-                          <span className="font-semibold text-gray-900">{scene.label}</span>
+                          <span className="font-mono text-sm text-gray-500">-</span>
+                          <button
+                            onClick={() => {
+                              const videoEl = document.getElementById('videoPlayer') as HTMLVideoElement;
+                              if (videoEl) {
+                                const time = parseTimeToSeconds(scene.end);
+                                videoEl.currentTime = time;
+                                videoEl.play();
+                                videoEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                              }
+                            }}
+                            className="font-mono text-sm text-blue-600 font-semibold hover:text-blue-800 hover:underline cursor-pointer transition-colors bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded"
+                            title={`Click to jump to ${scene.end}`}
+                          >
+                            {scene.end}
+                          </button>
+                          <span className="font-mono text-sm text-gray-500">]</span>
+                          <span className="font-semibold text-gray-900 ml-2">{scene.label}</span>
                         </div>
                         <p className="text-sm text-gray-600">{scene.description}</p>
                       </div>
