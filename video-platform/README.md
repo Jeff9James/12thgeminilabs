@@ -4,11 +4,14 @@ A modern video analysis platform powered by Gemini 2.0 Flash with streaming resp
 
 ## 🚀 Features
 
+- **Interactive Video Chat**: Ask questions about your video and get AI-powered answers with clickable timestamps
 - **Real-time Streaming Analysis**: Watch AI analyze your video as it processes
 - **Temporal Scene Detection**: Precise scene breakdown with timestamps
+- **Clickable Timestamps**: Jump to any moment in the video instantly
+- **Conversation Context**: Multi-turn conversations that remember previous questions
 - **Persistent Storage**: Results cached using Vercel KV (48-hour retention)
 - **Zero-cost Deployment**: Runs entirely on free tiers (Vercel + Gemini)
-- **Modern Stack**: Next.js 15 + App Router + Edge Runtime
+- **Modern Stack**: Next.js 15 + App Router + Edge Runtime + Gemini 3 Flash
 
 ## 📋 Prerequisites
 
@@ -118,17 +121,20 @@ video-platform/
 │   │   │   └── route.ts
 │   │   └── videos/[id]/
 │   │       ├── route.ts         # Get video metadata
-│   │       └── analyze/         # Streaming analysis endpoint
+│   │       ├── analyze/         # Streaming analysis endpoint
+│   │       │   └── route.ts
+│   │       └── chat/            # ✨ Chat endpoint (NEW)
 │   │           └── route.ts
 │   ├── videos/[id]/
-│   │   └── page.tsx             # Video detail page
+│   │   └── page.tsx             # Video detail page with chat
 │   ├── page.tsx                 # Home page
 │   └── globals.css
 ├── components/
 │   ├── VideoUpload.tsx          # Upload form component
-│   └── StreamingAnalysis.tsx   # Real-time analysis display
+│   ├── StreamingAnalysis.tsx   # Real-time analysis display
+│   └── VideoChat.tsx            # ✨ Chat interface (NEW)
 ├── lib/
-│   ├── gemini.ts                # Gemini API client
+│   ├── gemini.ts                # Gemini API client with chat support
 │   └── kv.ts                    # Vercel KV storage wrapper
 └── .env.local                   # Environment variables
 ```
@@ -137,17 +143,21 @@ video-platform/
 
 1. **Upload**: User uploads video → Saved to Gemini File API
 2. **Processing**: Gemini processes video (usually 10-30 seconds)
-3. **Analysis**: User clicks "Analyze" → Streaming response from Gemini 2.0
-4. **Storage**: Complete analysis cached in Vercel KV for 48 hours
-5. **Display**: Results shown with scene breakdowns and timestamps
+3. **Chat**: Ask questions about the video → AI responds with timestamps like [1:30]
+4. **Navigate**: Click any timestamp → Video jumps to that moment
+5. **Analysis**: User clicks "Analyze" → Streaming response from Gemini 3 Flash
+6. **Storage**: Complete analysis cached in Vercel KV for 48 hours
+7. **Display**: Results shown with scene breakdowns and clickable timestamps
 
 ## 🔑 Key Technologies
 
 - **Next.js 15**: React framework with App Router
-- **Gemini 2.0 Flash**: Latest multimodal AI model
+- **Gemini 3 Flash**: Latest multimodal AI model with advanced reasoning
+- **Gemini File API**: Direct video processing without base64 encoding
 - **Vercel KV**: Redis-compatible key-value storage
 - **Edge Runtime**: Enables streaming responses
 - **Tailwind CSS**: Utility-first styling
+- **TypeScript**: Full type safety
 
 ## 📊 API Endpoints
 
@@ -159,6 +169,11 @@ Upload video to Gemini File API
 ### POST `/api/videos/[id]/analyze`
 Start streaming video analysis
 - **Returns**: Server-Sent Events stream with analysis chunks
+
+### POST `/api/videos/[id]/chat` ✨ NEW
+Chat with the video using AI
+- **Body**: `{ message: string, history: Message[] }`
+- **Returns**: `{ response: string, timestamps: string[], thoughtSignature: string }`
 
 ### GET `/api/videos/[id]`
 Get video metadata and cached analysis
@@ -181,13 +196,34 @@ vercel env pull .env.local
 ### Issue: Cannot find module '@/lib/gemini'
 **Solution**: Check tsconfig.json has correct path mapping for `@/*`
 
+## ✨ Chat Feature Usage
+
+The chat feature allows natural conversations about your video:
+
+**Example Questions:**
+- "What is this video about?"
+- "List the main topics with timestamps"
+- "What happens at 2:30?"
+- "Can you summarize the key moments?"
+
+**Clickable Timestamps:**
+All timestamps in the AI's responses (like `[1:30]` or `[2:45]`) are clickable buttons that jump directly to that moment in the video.
+
+**See Full Documentation:**
+- 📖 `CHAT_FEATURE.md` - Complete feature documentation
+- 🚀 `CHAT_QUICKSTART.md` - Quick start guide
+- 📋 `CHAT_IMPLEMENTATION_SUMMARY.md` - Technical details
+
 ## 🚀 Next Steps
 
+- [x] Interactive video chat with clickable timestamps
+- [x] Conversation context and history
 - [ ] Add user authentication
-- [ ] Implement video player with seek-to-timestamp
-- [ ] Add multiple video format support
-- [ ] Create shareable analysis links
-- [ ] Add export to PDF/JSON
+- [ ] Persistent chat history storage
+- [ ] Export conversations to PDF/JSON
+- [ ] Multi-video comparison chat
+- [ ] Voice input for questions
+- [ ] Suggested questions based on analysis
 
 ## 📝 License
 

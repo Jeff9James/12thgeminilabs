@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import StreamingAnalysis from '@/components/StreamingAnalysis';
+import VideoChat from '@/components/VideoChat';
 import Link from 'next/link';
 
 // Helper function to parse timestamps like "0:05" or "1:23" to seconds
@@ -103,11 +104,16 @@ export default function VideoPage({ params }: { params: Promise<{ id: string }> 
           )}
         </div>
 
+        {/* Chat Section */}
+        <div className="mb-6">
+          <VideoChat videoId={id} />
+        </div>
+
         {/* Analysis Section */}
         {analysis ? (
           <div className="bg-white rounded-lg shadow-lg p-8">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">Analysis Results</h2>
+              <h2 className="text-2xl font-bold text-gray-900">AI Analysis</h2>
               <span className="text-sm text-gray-500">
                 Analyzed: {new Date(analysis.createdAt).toLocaleString()}
               </span>

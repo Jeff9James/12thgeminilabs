@@ -35,3 +35,19 @@ export async function listVideos(userId: string) {
   );
   return videos.filter(v => v && (v as any).userId === userId);
 }
+
+// Chat history management (optional - for future use)
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+  thoughtSignature?: string;
+}
+
+export async function saveChatHistory(videoId: string, messages: ChatMessage[]) {
+  await kv.set(`chat:${videoId}`, messages, { ex: 172800 }); // 48 hours
+}
+
+export async function getChatHistory(videoId: string): Promise<ChatMessage[] | null> {
+  return await kv.get(`chat:${videoId}`);
+}

@@ -105,14 +105,28 @@ vercel --prod
 - [ ] Analysis completes
 - [ ] Results display correctly
 
-### 4. Caching/Persistence
+### 4. Chat Feature (NEW!)
+- [ ] Chat interface appears below video
+- [ ] Send a message: "What is this video about?"
+- [ ] AI responds with timestamps in format [MM:SS]
+- [ ] Timestamps are clickable (blue, underlined)
+- [ ] Click a timestamp - video jumps to that moment
+- [ ] Video plays from clicked timestamp
+- [ ] Send follow-up question
+- [ ] AI maintains conversation context
+- [ ] Timestamps summary shown below AI messages
+- [ ] Keyboard shortcut works (Enter to send)
+
+### 5. Caching/Persistence
 - [ ] Refresh the video detail page
 - [ ] Cached analysis shows immediately
 - [ ] No need to re-analyze
 
-### 5. Error Handling
+### 6. Error Handling
 - [ ] Try uploading non-video file (should show error)
 - [ ] Try accessing non-existent video ID (should show 404)
+- [ ] Try chat with empty message (should be disabled)
+- [ ] Check chat error recovery (if API fails)
 
 ---
 
@@ -178,8 +192,10 @@ vercel logs --prod
 - [ ] `app/api/upload/route.ts` ✅
 - [ ] `app/api/videos/[id]/route.ts` ✅
 - [ ] `app/api/videos/[id]/analyze/route.ts` ✅
+- [ ] `app/api/videos/[id]/chat/route.ts` ✅ **NEW**
 - [ ] `components/VideoUpload.tsx` ✅
 - [ ] `components/StreamingAnalysis.tsx` ✅
+- [ ] `components/VideoChat.tsx` ✅ **NEW**
 - [ ] `app/page.tsx` ✅
 - [ ] `app/videos/[id]/page.tsx` ✅
 
@@ -188,6 +204,9 @@ vercel logs --prod
 - [ ] `DEPLOYMENT_GUIDE.md` ✅
 - [ ] `DEPLOY_COMMANDS.md` ✅
 - [ ] `CHECKLIST.md` ✅
+- [ ] `CHAT_FEATURE.md` ✅ **NEW**
+- [ ] `CHAT_IMPLEMENTATION_SUMMARY.md` ✅ **NEW**
+- [ ] `CHAT_QUICKSTART.md` ✅ **NEW**
 
 ### 3. Configuration
 - [ ] `.env.local` configured ✅
