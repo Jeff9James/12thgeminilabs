@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { saveVideo } from '@/lib/kv';
 import { v4 as uuidv4 } from 'uuid';
+import { put } from '@vercel/blob';
 
 // Use Node.js runtime for file operations
 export const runtime = 'nodejs';
@@ -29,7 +30,17 @@ export async function POST(request: NextRequest) {
         const fileBuffer = await file.arrayBuffer();
         const fileData = Buffer.from(fileBuffer);
         
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: 'Uploading to Gemini (this may take a while)...' })}\n\n`));
+        // Upload to Vercel Blob for playback
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: 'Saving video for playback...' })}\n\n`));
+        
+        const blob = await put(`videos/${videoId}-${file.name}`, fileData, {
+          access: 'public',
+          contentType: file.type
+        });
+        
+        const playbackUrl = blob.url;
+        
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: 'Uploading to Gemini for analysis...' })}\n\n`));
         
         // Use Gemini REST API for resumable upload
         const apiKey = process.env.GEMINI_API_KEY!;
@@ -107,6 +118,7 @@ export async function POST(request: NextRequest) {
           title: file.name,
           geminiFileUri: fileInfo.uri,
           geminiFileName: fileName,
+          playbackUrl: playbackUrl, // Add playback URL
           createdAt: new Date().toISOString(),
           userId: 'demo-user',
           status: 'ready',
