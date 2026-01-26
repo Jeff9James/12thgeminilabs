@@ -45,7 +45,8 @@ export async function POST(
       return NextResponse.json({ error: 'Video not found' }, { status: 404 });
     }
 
-    const videoFileUri = (video as any).fileUri;
+    // Support both 'fileUri' and 'geminiFileUri' for backward compatibility
+    const videoFileUri = (video as any).fileUri || (video as any).geminiFileUri;
     if (!videoFileUri) {
       return NextResponse.json({ error: 'Video file URI not found' }, { status: 400 });
     }

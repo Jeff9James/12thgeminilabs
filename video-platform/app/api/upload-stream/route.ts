@@ -117,6 +117,7 @@ export async function POST(request: NextRequest) {
           id: videoId,
           title: file.name,
           geminiFileUri: fileInfo.uri,
+          fileUri: fileInfo.uri, // Also save as fileUri for backward compatibility
           geminiFileName: fileName,
           playbackUrl: playbackUrl, // Add playback URL
           createdAt: new Date().toISOString(),

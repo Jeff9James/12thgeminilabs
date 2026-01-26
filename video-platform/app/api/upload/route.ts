@@ -65,6 +65,8 @@ export async function POST(request: NextRequest) {
       id: videoId,
       title: file.name,
       geminiFileUri,
+      fileUri: geminiFileUri, // Also save as fileUri for backward compatibility
+      mimeType: file.type,
       createdAt: new Date().toISOString(),
       userId: 'demo-user', // TODO: Get from auth
       status: 'ready'
