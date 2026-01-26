@@ -12,7 +12,12 @@ interface ParsedAnalysis {
   }>;
 }
 
-export default function StreamingAnalysis({ videoId }: { videoId: string }) {
+interface StreamingAnalysisProps {
+  videoId: string;
+  onAnalysisComplete?: (analysis: any) => void;
+}
+
+export default function StreamingAnalysis({ videoId, onAnalysisComplete }: StreamingAnalysisProps) {
   const [analyzing, setAnalyzing] = useState(false);
   const [rawAnalysis, setRawAnalysis] = useState('');
   const [parsedAnalysis, setParsedAnalysis] = useState<ParsedAnalysis | null>(null);
@@ -75,6 +80,15 @@ export default function StreamingAnalysis({ videoId }: { videoId: string }) {
                   const parsed = JSON.parse(cleanText);
                   setParsedAnalysis(parsed);
                   setRawAnalysis(''); // Clear raw text once parsed
+                  
+                  // Call the callback with the completed analysis
+                  if (onAnalysisComplete) {
+                    onAnalysisComplete({
+                      summary: parsed.summary,
+                      scenes: parsed.scenes,
+                      createdAt: new Date().toISOString()
+                    });
+                  }
                 } catch (parseError) {
                   console.error('Failed to parse final JSON:', parseError);
                   console.log('Raw text:', accumulatedText);

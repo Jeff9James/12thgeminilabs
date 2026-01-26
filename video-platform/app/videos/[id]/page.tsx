@@ -21,6 +21,7 @@ export default function VideoPage({ params }: { params: Promise<{ id: string }> 
   const [analysis, setAnalysis] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [id, setId] = useState<string>('');
+  const [activeSection, setActiveSection] = useState<'analysis' | 'chat' | null>(null);
 
   useEffect(() => {
     params.then(p => {
@@ -31,6 +32,10 @@ export default function VideoPage({ params }: { params: Promise<{ id: string }> 
           if (data.success) {
             setVideo(data.data.video);
             setAnalysis(data.data.analysis);
+            // If analysis exists, default to analysis view
+            if (data.data.analysis) {
+              setActiveSection('analysis');
+            }
           }
           setLoading(false);
         })
@@ -104,80 +109,120 @@ export default function VideoPage({ params }: { params: Promise<{ id: string }> 
           )}
         </div>
 
-        {/* Chat Section */}
-        <div className="mb-6">
+        {/* Toggle Buttons */}
+        <div className="flex gap-4 mb-6">
+          <button
+            onClick={() => setActiveSection('analysis')}
+            className={`flex-1 py-4 px-6 rounded-lg font-semibold text-lg transition-all duration-200 flex items-center justify-center gap-2 ${
+              activeSection === 'analysis'
+                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg scale-105'
+                : 'bg-white text-gray-700 hover:bg-gray-50 shadow border border-gray-200'
+            }`}
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            Analyze Video
+          </button>
+          
+          <button
+            onClick={() => setActiveSection('chat')}
+            className={`flex-1 py-4 px-6 rounded-lg font-semibold text-lg transition-all duration-200 flex items-center justify-center gap-2 ${
+              activeSection === 'chat'
+                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg scale-105'
+                : 'bg-white text-gray-700 hover:bg-gray-50 shadow border border-gray-200'
+            }`}
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+            Chat with Video
+          </button>
+        </div>
+
+        {/* Chat Section - Hidden but preserved when not active */}
+        <div className={`mb-6 ${activeSection === 'chat' ? '' : 'hidden'}`}>
           <VideoChat videoId={id} />
         </div>
 
-        {/* Analysis Section */}
-        {analysis ? (
-          <div className="bg-white rounded-lg shadow-lg p-8">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">AI Analysis</h2>
-              <span className="text-sm text-gray-500">
-                Analyzed: {new Date(analysis.createdAt).toLocaleString()}
-              </span>
-            </div>
-            
-            <div className="prose max-w-none">
-              <div className="mb-8">
-                <h3 className="text-xl font-semibold mb-3 text-gray-800">Summary</h3>
-                <p className="text-gray-700 leading-relaxed">{analysis.summary}</p>
-              </div>
-              
-              {analysis.scenes && analysis.scenes.length > 0 && (
-                <div>
-                  <h3 className="text-xl font-semibold mb-4 text-gray-800">Scene Breakdown</h3>
-                  <p className="text-sm text-gray-600 mb-4">Click on timestamps to jump to that moment in the video</p>
-                  <div className="space-y-4">
-                    {analysis.scenes.map((scene: any, i: number) => (
-                      <div key={i} className="border-l-4 border-blue-500 pl-4 py-2 bg-blue-50 rounded-r hover:bg-blue-100 transition-colors">
-                        <div className="flex items-baseline gap-2 mb-1 flex-wrap">
-                          <span className="font-mono text-sm text-gray-500">[</span>
-                          <button
-                            onClick={() => {
-                              const videoEl = document.getElementById('videoPlayer') as HTMLVideoElement;
-                              if (videoEl) {
-                                const time = parseTimeToSeconds(scene.start);
-                                videoEl.currentTime = time;
-                                videoEl.play();
-                                videoEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                              }
-                            }}
-                            className="font-mono text-sm text-blue-600 font-semibold hover:text-blue-800 hover:underline cursor-pointer transition-colors bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded"
-                            title={`Click to jump to ${scene.start}`}
-                          >
-                            {scene.start}
-                          </button>
-                          <span className="font-mono text-sm text-gray-500">-</span>
-                          <button
-                            onClick={() => {
-                              const videoEl = document.getElementById('videoPlayer') as HTMLVideoElement;
-                              if (videoEl) {
-                                const time = parseTimeToSeconds(scene.end);
-                                videoEl.currentTime = time;
-                                videoEl.play();
-                                videoEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                              }
-                            }}
-                            className="font-mono text-sm text-blue-600 font-semibold hover:text-blue-800 hover:underline cursor-pointer transition-colors bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded"
-                            title={`Click to jump to ${scene.end}`}
-                          >
-                            {scene.end}
-                          </button>
-                          <span className="font-mono text-sm text-gray-500">]</span>
-                          <span className="font-semibold text-gray-900 ml-2">{scene.label}</span>
-                        </div>
-                        <p className="text-sm text-gray-600">{scene.description}</p>
-                      </div>
-                    ))}
-                  </div>
+        {/* Analysis Section - Only shown when activeSection is 'analysis' */}
+        {activeSection === 'analysis' && (
+          <>
+            {analysis ? (
+              <div className="bg-white rounded-lg shadow-lg p-8">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900">AI Analysis</h2>
+                  <span className="text-sm text-gray-500">
+                    Analyzed: {new Date(analysis.createdAt).toLocaleString()}
+                  </span>
                 </div>
-              )}
-            </div>
-          </div>
-        ) : (
-          <StreamingAnalysis videoId={id} />
+                
+                <div className="prose max-w-none">
+                  <div className="mb-8">
+                    <h3 className="text-xl font-semibold mb-3 text-gray-800">Summary</h3>
+                    <p className="text-gray-700 leading-relaxed">{analysis.summary}</p>
+                  </div>
+                  
+                  {analysis.scenes && analysis.scenes.length > 0 && (
+                    <div>
+                      <h3 className="text-xl font-semibold mb-4 text-gray-800">Scene Breakdown</h3>
+                      <p className="text-sm text-gray-600 mb-4">Click on timestamps to jump to that moment in the video</p>
+                      <div className="space-y-4">
+                        {analysis.scenes.map((scene: any, i: number) => (
+                          <div key={i} className="border-l-4 border-blue-500 pl-4 py-2 bg-blue-50 rounded-r hover:bg-blue-100 transition-colors">
+                            <div className="flex items-baseline gap-2 mb-1 flex-wrap">
+                              <span className="font-mono text-sm text-gray-500">[</span>
+                              <button
+                                onClick={() => {
+                                  const videoEl = document.getElementById('videoPlayer') as HTMLVideoElement;
+                                  if (videoEl) {
+                                    const time = parseTimeToSeconds(scene.start);
+                                    videoEl.currentTime = time;
+                                    videoEl.play();
+                                    videoEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                  }
+                                }}
+                                className="font-mono text-sm text-blue-600 font-semibold hover:text-blue-800 hover:underline cursor-pointer transition-colors bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded"
+                                title={`Click to jump to ${scene.start}`}
+                              >
+                                {scene.start}
+                              </button>
+                              <span className="font-mono text-sm text-gray-500">-</span>
+                              <button
+                                onClick={() => {
+                                  const videoEl = document.getElementById('videoPlayer') as HTMLVideoElement;
+                                  if (videoEl) {
+                                    const time = parseTimeToSeconds(scene.end);
+                                    videoEl.currentTime = time;
+                                    videoEl.play();
+                                    videoEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                  }
+                                }}
+                                className="font-mono text-sm text-blue-600 font-semibold hover:text-blue-800 hover:underline cursor-pointer transition-colors bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded"
+                                title={`Click to jump to ${scene.end}`}
+                              >
+                                {scene.end}
+                              </button>
+                              <span className="font-mono text-sm text-gray-500">]</span>
+                              <span className="font-semibold text-gray-900 ml-2">{scene.label}</span>
+                            </div>
+                            <p className="text-sm text-gray-600">{scene.description}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <StreamingAnalysis 
+                videoId={id} 
+                onAnalysisComplete={(completedAnalysis) => {
+                  setAnalysis(completedAnalysis);
+                }}
+              />
+            )}
+          </>
         )}
       </div>
     </main>
