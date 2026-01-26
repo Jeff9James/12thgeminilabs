@@ -103,7 +103,7 @@ Now, please answer the user's question about the video.`
       parts: [{ text: message }]
     });
 
-    // Start chat session and get response
+    // Start chat session and get response with retry logic
     const chat = model.startChat({
       history: contents.slice(0, -1),
       generationConfig: {
@@ -111,8 +111,32 @@ Now, please answer the user's question about the video.`
       }
     });
 
-    const result = await chat.sendMessage(message);
-    const response = result.response;
+    let result;
+    let retries = 0;
+    const maxRetries = 3;
+    
+    while (retries < maxRetries) {
+      try {
+        result = await chat.sendMessage(message);
+        break; // Success, exit retry loop
+      } catch (error: any) {
+        if (error.message?.includes('503') || error.message?.includes('overloaded')) {
+          retries++;
+          if (retries < maxRetries) {
+            // Wait with exponential backoff: 2s, 4s, 8s
+            const waitTime = Math.pow(2, retries) * 1000;
+            console.log(`Gemini API overloaded, retrying in ${waitTime/1000}s... (attempt ${retries}/${maxRetries})`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+          } else {
+            throw new Error('Gemini API is currently overloaded. Please try again in a moment.');
+          }
+        } else {
+          throw error; // Re-throw other errors
+        }
+      }
+    }
+
+    const response = result!.response;
     const text = response.text();
 
     // Extract thought signature if present (for future requests)

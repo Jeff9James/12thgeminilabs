@@ -127,10 +127,16 @@ export default function VideoChat({ videoId }: VideoChatProps) {
     } catch (error: any) {
       console.error('Chat error:', error);
       
-      // Add error message
+      // Add error message with specific handling for overload errors
+      let errorContent = `Sorry, I encountered an error: ${error.message}. Please try again.`;
+      
+      if (error.message?.includes('overloaded') || error.message?.includes('503')) {
+        errorContent = `🔄 Gemini AI is currently experiencing high demand and is overloaded. Please wait a moment and try your question again. Your previous messages are preserved.`;
+      }
+      
       const errorMessage: Message = {
         role: 'assistant',
-        content: `Sorry, I encountered an error: ${error.message}. Please try again.`
+        content: errorContent
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
