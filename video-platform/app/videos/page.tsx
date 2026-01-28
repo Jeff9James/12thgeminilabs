@@ -54,13 +54,13 @@ export default function VideosPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6 lg:p-8">
+      <div className="min-h-screen bg-gray-50 p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">My Videos</h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">History</h1>
           <p className="text-gray-600">
-            Manage your uploaded videos and view analysis results
+            Your uploaded videos and analysis results
           </p>
         </div>
 
@@ -127,17 +127,13 @@ export default function VideosPage() {
                       </div>
                     )}
                     
-                    <div className="flex items-center gap-2">
-                      {video.analyzed ? (
+                    {video.analyzed && (
+                      <div className="flex items-center gap-2">
                         <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium">
                           ✓ Analyzed
                         </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-xs font-medium">
-                          ⏳ Pending
-                        </span>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex gap-2">

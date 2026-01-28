@@ -116,7 +116,7 @@ export default function VideoPage({ params }: { params: Promise<{ id: string }> 
             className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 font-medium mb-4"
           >
             <ArrowLeft className="w-4 h-4" />
-            Back to My Videos
+            Back to History
           </Link>
           
           {/* Video Title & Meta */}
