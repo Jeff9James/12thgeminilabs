@@ -173,8 +173,8 @@ export default function VideoUpload() {
           onClick={() => setUploadMode('file')}
           disabled={uploading}
           className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${uploadMode === 'file'
-              ? 'bg-white text-blue-600 shadow-sm'
-              : 'text-gray-600 hover:text-gray-800'
+            ? 'bg-white text-blue-600 shadow-sm'
+            : 'text-gray-600 hover:text-gray-800'
             } disabled:opacity-50`}
         >
           Upload File
@@ -184,8 +184,8 @@ export default function VideoUpload() {
           onClick={() => setUploadMode('url')}
           disabled={uploading}
           className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${uploadMode === 'url'
-              ? 'bg-white text-blue-600 shadow-sm'
-              : 'text-gray-600 hover:text-gray-800'
+            ? 'bg-white text-blue-600 shadow-sm'
+            : 'text-gray-600 hover:text-gray-800'
             } disabled:opacity-50`}
         >
           Import from URL
@@ -242,7 +242,10 @@ export default function VideoUpload() {
               className="block w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
             />
             <p className="mt-2 text-sm text-gray-500">
-              Supported: Direct video URLs (.mp4, .mov, etc.) or from YouTube, Vimeo, Cloudinary, S3, etc.
+              Supported: Direct video URLs (.mp4, .mov, .webm, etc.) from S3, Cloudinary, Google Cloud Storage, Azure Blob, or any public storage.
+            </p>
+            <p className="mt-1 text-xs text-orange-500">
+              <strong>Note:</strong> YouTube, Vimeo, and similar platforms block direct downloads. Use direct video links only.
             </p>
             <p className="mt-1 text-xs text-gray-400">Maximum: 100MB for URL imports</p>
           </div>

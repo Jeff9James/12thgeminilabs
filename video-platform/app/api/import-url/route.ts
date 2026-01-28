@@ -7,6 +7,12 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300; // 5 minutes max
 
+// Helper to send SSE events
+function sendEvent(controller: ReadableStreamDefaultController, data: any) {
+    const encoder = new TextEncoder();
+    controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+}
+
 export async function POST(request: NextRequest) {
     const encoder = new TextEncoder();
 
@@ -16,7 +22,7 @@ export async function POST(request: NextRequest) {
                 const { url, title: customTitle } = await request.json();
 
                 if (!url) {
-                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: 'No URL provided' })}\n\n`));
+                    sendEvent(controller, { error: 'No URL provided' });
                     controller.close();
                     return;
                 }
@@ -26,7 +32,7 @@ export async function POST(request: NextRequest) {
                 try {
                     videoUrl = new URL(url);
                 } catch {
-                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: 'Invalid URL provided' })}\n\n`));
+                    sendEvent(controller, { error: 'Invalid URL provided' });
                     controller.close();
                     return;
                 }
@@ -51,32 +57,95 @@ export async function POST(request: NextRequest) {
                 );
 
                 if (!isDirectVideo && !isSupportedPlatform) {
-                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                    sendEvent(controller, {
                         error: 'URL must be a direct video link (ending in .mp4, .mov, etc.) or from a supported platform (YouTube, Vimeo, Cloudinary, etc.)'
-                    })}\n\n`));
+                    });
                     controller.close();
                     return;
                 }
 
                 const videoId = uuidv4();
 
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: 'Fetching video from URL...' })}\n\n`));
+                sendEvent(controller, { progress: 'Fetching video from URL...' });
 
-                // Fetch the video from the URL
-                const videoResponse = await fetch(url, {
-                    method: 'GET',
-                    // Some platforms require specific headers
-                    headers: {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                // Try multiple fetch strategies
+                let videoResponse: Response | null = null;
+                let lastError: Error | null = null;
+
+                // Strategy 1: Direct fetch with browser-like headers
+                try {
+                    videoResponse = await fetch(url, {
+                        method: 'GET',
+                        headers: {
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                            'Accept': 'video/webm,video/mp4,video/*;q=0.9,*/*;q=0.8',
+                            'Accept-Language': 'en-US,en;q=0.9',
+                            'Accept-Encoding': 'identity', // Don't request compression for binary data
+                            'Referer': videoUrl.origin,
+                            'Origin': videoUrl.origin,
+                        },
+                        redirect: 'follow',
+                    });
+                } catch (err) {
+                    lastError = err as Error;
+                    console.log('Strategy 1 failed:', err);
+                }
+
+                // Strategy 2: Try without certain headers that might cause issues
+                if (!videoResponse || !videoResponse.ok) {
+                    try {
+                        videoResponse = await fetch(url, {
+                            method: 'GET',
+                            headers: {
+                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                            },
+                            redirect: 'follow',
+                        });
+                    } catch (err) {
+                        lastError = err as Error;
+                        console.log('Strategy 2 failed:', err);
                     }
-                });
+                }
 
-                if (!videoResponse.ok) {
-                    throw new Error(`Failed to fetch video: ${videoResponse.status} ${videoResponse.statusText}`);
+                // Strategy 3: Try with Range header for partial content (some servers require this)
+                if (!videoResponse || !videoResponse.ok) {
+                    try {
+                        videoResponse = await fetch(url, {
+                            method: 'GET',
+                            headers: {
+                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                                'Range': 'bytes=0-',
+                            },
+                            redirect: 'follow',
+                        });
+                    } catch (err) {
+                        lastError = err as Error;
+                        console.log('Strategy 3 failed:', err);
+                    }
+                }
+
+                if (!videoResponse || !videoResponse.ok) {
+                    const status = videoResponse?.status || 'unknown';
+                    const statusText = videoResponse?.statusText || 'No response';
+                    throw new Error(
+                        `Failed to fetch video from URL. Server responded with: ${status} ${statusText}. ` +
+                        `This URL may not allow direct downloads. Try using a direct video link (ending in .mp4) ` +
+                        `or a video from a platform with public download support.`
+                    );
                 }
 
                 const contentType = videoResponse.headers.get('content-type') || 'video/mp4';
                 const contentLength = videoResponse.headers.get('content-length');
+
+                // Check if we got HTML instead of video (common with YouTube/Vimeo)
+                if (contentType.includes('text/html')) {
+                    throw new Error(
+                        'The URL returned an HTML page instead of a video file. ' +
+                        'YouTube, Vimeo, and similar platforms block direct video downloads. ' +
+                        'Please use a direct video URL (ending in .mp4, .mov, .webm, etc.) ' +
+                        'from a storage service like S3, Cloudinary, or Google Cloud Storage.'
+                    );
+                }
 
                 // Check file size if header is available
                 if (contentLength) {
@@ -86,18 +155,29 @@ export async function POST(request: NextRequest) {
                     }
                 }
 
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: 'Downloading video...' })}\n\n`));
+                sendEvent(controller, { progress: 'Downloading video...' });
 
                 // Get the video data
-                const videoBuffer = await videoResponse.arrayBuffer();
+                let videoBuffer: ArrayBuffer;
+                try {
+                    videoBuffer = await videoResponse.arrayBuffer();
+                } catch (err) {
+                    throw new Error('Failed to download video data. The server may have closed the connection.');
+                }
+
                 const fileData = Buffer.from(videoBuffer);
 
                 if (fileData.length === 0) {
                     throw new Error('Downloaded video is empty');
                 }
 
+                // Check size after download if Content-Length wasn't provided
                 const sizeInMB = Math.round(fileData.length / (1024 * 1024));
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: `Downloaded ${sizeInMB}MB, uploading to Gemini...` })}\n\n`));
+                if (sizeInMB > 100) {
+                    throw new Error(`Video too large (${sizeInMB}MB). Maximum size for URL import is 100MB.`);
+                }
+
+                sendEvent(controller, { progress: `Downloaded ${sizeInMB}MB, uploading to Gemini...` });
 
                 // Use Gemini REST API for resumable upload
                 const apiKey = process.env.GEMINI_API_KEY!;
@@ -148,7 +228,7 @@ export async function POST(request: NextRequest) {
                 const uploadResult = await uploadResponse.json();
                 const geminiFileName = uploadResult.file.name;
 
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: 'Processing video with Gemini...' })}\n\n`));
+                sendEvent(controller, { progress: 'Processing video with Gemini...' });
 
                 // Step 3: Wait for processing
                 let fileInfo = await fetch(`https://generativelanguage.googleapis.com/v1beta/${geminiFileName}?key=${apiKey}`)
@@ -162,7 +242,7 @@ export async function POST(request: NextRequest) {
                     attempts++;
 
                     if (attempts % 3 === 0) {
-                        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: `Processing... (${attempts * 3}s)` })}\n\n`));
+                        sendEvent(controller, { progress: `Processing... (${attempts * 3}s)` });
                     }
                 }
 
@@ -170,7 +250,7 @@ export async function POST(request: NextRequest) {
                     throw new Error('Video processing failed in Gemini');
                 }
 
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: 'Saving metadata...' })}\n\n`));
+                sendEvent(controller, { progress: 'Saving metadata...' });
 
                 // Save metadata to KV
                 const videoMetadata = {
@@ -190,11 +270,11 @@ export async function POST(request: NextRequest) {
                 };
                 await saveVideo(videoId, videoMetadata);
 
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ success: true, videoId, metadata: videoMetadata })}\n\n`));
+                sendEvent(controller, { success: true, videoId, metadata: videoMetadata });
                 controller.close();
             } catch (error: any) {
                 console.error('URL import error:', error);
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: error.message })}\n\n`));
+                sendEvent(controller, { error: error.message });
                 controller.close();
             }
         }

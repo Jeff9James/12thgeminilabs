@@ -80,34 +80,97 @@ export default function AnalyzePage() {
       let fileSize: number;
 
       if (uploadMode === 'url') {
-        // Fetch video from URL
-        setUploadStatus('Fetching video from URL...');
-        const videoResponse = await fetch(urlInput.trim(), {
+        // Use server-side API to fetch and upload video from URL
+        setUploadStatus('Importing video from URL...');
+
+        const response = await fetch('/api/import-url', {
+          method: 'POST',
           headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-          }
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            url: urlInput.trim(),
+            title: titleInput.trim() || undefined
+          })
         });
 
-        if (!videoResponse.ok) {
-          throw new Error(`Failed to fetch video: ${videoResponse.status} ${videoResponse.statusText}`);
+        if (!response.ok) {
+          throw new Error(`Failed to import video: ${response.status} ${response.statusText}`);
         }
 
-        const contentLength = videoResponse.headers.get('content-length');
-        if (contentLength) {
-          const sizeInMB = parseInt(contentLength) / (1024 * 1024);
-          if (sizeInMB > 100) {
-            throw new Error(`Video too large (${Math.round(sizeInMB)}MB). Maximum size for URL import is 100MB.`);
+        // Handle streaming response
+        const reader = response.body?.getReader();
+        if (!reader) {
+          throw new Error('Failed to read response stream');
+        }
+
+        const decoder = new TextDecoder();
+        let result: any = null;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+
+                if (data.error) {
+                  throw new Error(data.error);
+                }
+
+                if (data.progress) {
+                  setUploadStatus(data.progress);
+                  // Map progress messages to percentage
+                  if (data.progress.includes('Fetching')) setUploadProgress(10);
+                  else if (data.progress.includes('Downloading')) setUploadProgress(20);
+                  else if (data.progress.includes('uploading')) setUploadProgress(40);
+                  else if (data.progress.includes('Processing')) setUploadProgress(60 + Math.min(30, (data.progress.match(/\d+/)?.[0] || 0) as number));
+                  else if (data.progress.includes('Saving')) setUploadProgress(95);
+                }
+
+                if (data.success) {
+                  result = data;
+                }
+              } catch (e) {
+                // Ignore parse errors for incomplete chunks
+              }
+            }
           }
         }
 
-        fileData = await videoResponse.blob();
-        fileSize = fileData.size;
+        if (!result || !result.success) {
+          throw new Error('Import failed: No success response from server');
+        }
 
-        const urlPath = new URL(urlInput.trim()).pathname;
-        fileName = titleInput.trim() || urlPath.split('/').pop() || 'video.mp4';
-        fileType = videoResponse.headers.get('content-type') || 'video/mp4';
+        // Use the metadata from the server
+        const { metadata } = result;
 
-        setUploadProgress(20);
+        // Update localStorage with the imported video
+        const existingVideos = JSON.parse(localStorage.getItem('uploadedVideos') || '[]');
+        const videoData = {
+          id: metadata.id,
+          filename: metadata.title,
+          uploadedAt: metadata.createdAt,
+          analyzed: false,
+          geminiFileUri: metadata.geminiFileUri,
+          geminiFileName: metadata.geminiFileName,
+          hasLocalFile: false,
+          sourceUrl: metadata.sourceUrl,
+          sourceType: metadata.sourceType,
+        };
+        existingVideos.push(videoData);
+        localStorage.setItem('uploadedVideos', JSON.stringify(existingVideos));
+
+        setUploadProgress(100);
+
+        // Redirect to video detail page
+        router.push(`/videos/${metadata.id}`);
+        return; // Exit early since we've handled everything
       } else {
         fileData = file!;
         fileName = file!.name;
@@ -241,9 +304,9 @@ export default function AnalyzePage() {
             geminiFileName: geminiFileName,
             mimeType: fileType,
             size: fileSize,
-            playbackUrl: uploadMode === 'url' ? urlInput : undefined,
-            sourceUrl: uploadMode === 'url' ? urlInput : undefined,
-            sourceType: uploadMode === 'url' ? 'url-import' : 'file-upload',
+            playbackUrl: undefined,
+            sourceUrl: undefined,
+            sourceType: 'file-upload',
           })
         });
       } catch (err) {
@@ -261,9 +324,9 @@ export default function AnalyzePage() {
         analyzed: false,
         geminiFileUri: fileInfo.uri,
         geminiFileName: geminiFileName,
-        hasLocalFile: uploadMode === 'file',
-        sourceUrl: uploadMode === 'url' ? urlInput : undefined,
-        sourceType: uploadMode === 'url' ? 'url-import' : 'file-upload',
+        hasLocalFile: true,
+        sourceUrl: undefined,
+        sourceType: 'file-upload',
       };
 
       if (videoIndex !== -1) {
@@ -308,8 +371,8 @@ export default function AnalyzePage() {
                 setUrlInput('');
               }}
               className={`flex-1 py-3 px-4 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 ${uploadMode === 'file'
-                  ? 'bg-blue-50 text-blue-600'
-                  : 'text-gray-600 hover:text-gray-800'
+                ? 'bg-blue-50 text-blue-600'
+                : 'text-gray-600 hover:text-gray-800'
                 }`}
             >
               <Upload className="w-4 h-4" />
@@ -323,8 +386,8 @@ export default function AnalyzePage() {
                 setFile(null);
               }}
               className={`flex-1 py-3 px-4 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 ${uploadMode === 'url'
-                  ? 'bg-blue-50 text-blue-600'
-                  : 'text-gray-600 hover:text-gray-800'
+                ? 'bg-blue-50 text-blue-600'
+                : 'text-gray-600 hover:text-gray-800'
                 }`}
             >
               <LinkIcon className="w-4 h-4" />
@@ -384,7 +447,10 @@ export default function AnalyzePage() {
                   Import from URL
                 </h3>
                 <p className="text-gray-600 mb-6">
-                  Paste a video URL from YouTube, Vimeo, Cloudinary, S3, or direct link
+                  Paste a direct video URL from S3, Cloudinary, Google Cloud Storage, Azure Blob, or any public storage
+                </p>
+                <p className="text-xs text-orange-500 mb-4">
+                  <strong>Note:</strong> YouTube, Vimeo, and similar platforms block direct downloads. Use direct video links only (ending in .mp4, .mov, .webm, etc.)
                 </p>
 
                 <div className="max-w-md mx-auto space-y-4">
