@@ -51,40 +51,94 @@ export default function AnalyzePage() {
     setUploadProgress(0);
 
     try {
-      // Create FormData
       const formData = new FormData();
       formData.append('video', file);
 
-      // Upload to API
-      const response = await fetch('/api/upload', {
+      // Use streaming upload endpoint
+      const response = await fetch('/api/upload-stream', {
         method: 'POST',
         body: formData,
       });
 
-      if (!response.ok) throw new Error('Upload failed');
-
-      const data = await response.json();
-      
-      if (data.success) {
-        // Update localStorage with API data
-        const existingVideos = JSON.parse(localStorage.getItem('uploadedVideos') || '[]');
-        const videoIndex = existingVideos.findIndex((v: any) => v.filename === file.name);
-        
-        if (videoIndex !== -1) {
-          existingVideos[videoIndex] = {
-            ...existingVideos[videoIndex],
-            id: data.videoId,
-            geminiFileUri: data.geminiFileUri,
-          };
-          localStorage.setItem('uploadedVideos', JSON.stringify(existingVideos));
-        }
-        
-        // Redirect to video detail page
-        router.push(`/videos/${data.videoId}`);
+      if (!response.ok || !response.body) {
+        throw new Error('Upload failed');
       }
+
+      // Read the event stream
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+
+      let videoId = '';
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = JSON.parse(line.slice(6));
+            
+            if (data.error) {
+              throw new Error(data.error);
+            }
+            
+            if (data.progress) {
+              // Update progress text (you can add a state for this if needed)
+              console.log(data.progress);
+              
+              // Estimate progress
+              if (data.progress.includes('Starting')) setUploadProgress(5);
+              else if (data.progress.includes('Saving video')) setUploadProgress(15);
+              else if (data.progress.includes('Uploading to Gemini')) setUploadProgress(30);
+              else if (data.progress.includes('Uploading')) setUploadProgress(50);
+              else if (data.progress.includes('Processing')) setUploadProgress(70);
+              else if (data.progress.includes('Saving metadata')) setUploadProgress(90);
+            }
+            
+            if (data.success && data.videoId) {
+              videoId = data.videoId;
+              setUploadProgress(100);
+            }
+          }
+        }
+      }
+
+      if (!videoId) {
+        throw new Error('Upload completed but no video ID received');
+      }
+
+      // Update localStorage
+      const existingVideos = JSON.parse(localStorage.getItem('uploadedVideos') || '[]');
+      const videoIndex = existingVideos.findIndex((v: any) => v.filename === file.name);
+      
+      if (videoIndex !== -1) {
+        existingVideos[videoIndex] = {
+          ...existingVideos[videoIndex],
+          id: videoId,
+          analyzed: false,
+        };
+      } else {
+        existingVideos.push({
+          id: videoId,
+          filename: file.name,
+          uploadedAt: new Date().toISOString(),
+          analyzed: false,
+          localUrl: videoUrl,
+        });
+      }
+      localStorage.setItem('uploadedVideos', JSON.stringify(existingVideos));
+
+      // Redirect to video detail page
+      router.push(`/videos/${videoId}`);
     } catch (error) {
       console.error('Upload error:', error);
-      alert('Upload failed. Please try again.');
+      alert(`Upload failed: ${(error as Error).message}. Please try again.`);
     } finally {
       setIsUploading(false);
     }

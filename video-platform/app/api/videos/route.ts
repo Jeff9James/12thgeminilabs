@@ -5,19 +5,20 @@ import { v4 as uuidv4 } from 'uuid';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { title, geminiFileUri, geminiFileName, mimeType, size } = body;
+    const { id, title, geminiFileUri, geminiFileName, mimeType, size } = body;
     
     if (!geminiFileUri) {
       return NextResponse.json({ error: 'Missing geminiFileUri' }, { status: 400 });
     }
 
-    const videoId = uuidv4();
+    const videoId = id || uuidv4();
     
     // Save metadata to KV
     await saveVideo(videoId, {
       id: videoId,
       title,
       geminiFileUri,
+      fileUri: geminiFileUri, // For backward compatibility
       geminiFileName,
       mimeType,
       size,
