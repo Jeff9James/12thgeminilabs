@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search as SearchIcon, Sparkles, Clock, Video as VideoIcon } from 'lucide-react';
 
@@ -15,6 +16,7 @@ interface SearchResult {
 }
 
 export default function SearchPage() {
+  const router = useRouter();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -205,7 +207,7 @@ export default function SearchPage() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.1 }}
                     className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg transition-all cursor-pointer group"
-                    onClick={() => window.location.href = `/videos/${result.videoId}#t=${result.timestamp}`}
+                    onClick={() => router.push(`/videos/${result.videoId}#t=${result.timestamp}`)}
                   >
                     {/* Thumbnail */}
                     <div className="relative aspect-video bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center">

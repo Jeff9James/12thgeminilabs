@@ -83,6 +83,47 @@ export default function VideoPage({ params }: { params: Promise<{ id: string }> 
     });
   }, [params]);
 
+  // Handle timestamp from URL hash (e.g., #t=123)
+  useEffect(() => {
+    if (!video || !video.playbackUrl) return;
+
+    const handleTimestamp = () => {
+      const hash = window.location.hash;
+      if (hash.startsWith('#t=')) {
+        const timestamp = parseFloat(hash.substring(3));
+        if (!isNaN(timestamp)) {
+          const videoEl = document.getElementById('videoPlayer') as HTMLVideoElement;
+          if (videoEl) {
+            // Wait for video metadata to load before seeking
+            if (videoEl.readyState >= 1) {
+              videoEl.currentTime = timestamp;
+              videoEl.play().catch(e => console.error('Autoplay prevented:', e));
+              // Scroll to video
+              videoEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } else {
+              videoEl.addEventListener('loadedmetadata', () => {
+                videoEl.currentTime = timestamp;
+                videoEl.play().catch(e => console.error('Autoplay prevented:', e));
+                videoEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }, { once: true });
+            }
+          }
+        }
+      }
+    };
+
+    // Run after a short delay to ensure video element is rendered
+    const timer = setTimeout(handleTimestamp, 100);
+    
+    // Also listen for hash changes
+    window.addEventListener('hashchange', handleTimestamp);
+    
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('hashchange', handleTimestamp);
+    };
+  }, [video]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8 flex items-center justify-center">
