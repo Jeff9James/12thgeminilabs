@@ -3,44 +3,58 @@
 import { useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, Sparkles, Video as VideoIcon, X, Link as LinkIcon } from 'lucide-react';
+import { Upload, Sparkles, Video as VideoIcon, X, Link as LinkIcon, FileText, Image as ImageIcon, Music, FileSpreadsheet } from 'lucide-react';
 import { saveVideoFile } from '@/lib/indexeddb';
+import { validateFile, getFileCategory, formatFileSize, FILE_INPUT_ACCEPT, FileCategory, getFileIcon, getCategoryDisplayName } from '@/lib/fileTypes';
 
 type UploadMode = 'file' | 'url';
 
 export default function AnalyzePage() {
   const [uploadMode, setUploadMode] = useState<UploadMode>('file');
   const [file, setFile] = useState<File | null>(null);
-  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [fileCategory, setFileCategory] = useState<FileCategory | null>(null);
   const [urlInput, setUrlInput] = useState('');
   const [titleInput, setTitleInput] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState('');
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
   const handleFileSelect = async (selectedFile: File) => {
-    if (selectedFile && selectedFile.type.startsWith('video/')) {
-      setFile(selectedFile);
-      const url = URL.createObjectURL(selectedFile);
-      setVideoUrl(url);
-
-      // Save to localStorage immediately
-      const videoId = Date.now().toString();
-      const videoMetadata = {
-        id: videoId,
-        filename: selectedFile.name,
-        uploadedAt: new Date().toISOString(),
-        analyzed: false,
-        localUrl: url,
-      };
-
-      const existingVideos = JSON.parse(localStorage.getItem('uploadedVideos') || '[]');
-      existingVideos.push(videoMetadata);
-      localStorage.setItem('uploadedVideos', JSON.stringify(existingVideos));
+    // Validate file
+    const validation = validateFile(selectedFile);
+    if (!validation.valid) {
+      setValidationError(validation.error || 'Invalid file');
+      return;
     }
+
+    setValidationError(null);
+    setFile(selectedFile);
+    const category = validation.category!;
+    setFileCategory(category);
+
+    // Create preview URL for supported types
+    const url = URL.createObjectURL(selectedFile);
+    setPreviewUrl(url);
+
+    // Save to localStorage immediately
+    const fileId = Date.now().toString();
+    const fileMetadata = {
+      id: fileId,
+      filename: selectedFile.name,
+      category: category,
+      uploadedAt: new Date().toISOString(),
+      analyzed: false,
+      localUrl: url,
+    };
+
+    const existingFiles = JSON.parse(localStorage.getItem('uploadedFiles') || '[]');
+    existingFiles.push(fileMetadata);
+    localStorage.setItem('uploadedFiles', JSON.stringify(existingFiles));
   };
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -57,12 +71,12 @@ export default function AnalyzePage() {
       return;
     }
     // Set the video URL for preview
-    setVideoUrl(urlInput.trim());
+    setPreviewUrl(urlInput.trim());
   };
 
   const handleUploadAndAnalyze = async () => {
     if (!file && uploadMode === 'file') return;
-    if (!videoUrl && uploadMode === 'url') return;
+    if (!previewUrl && uploadMode === 'url') return;
 
     setIsUploading(true);
     setUploadProgress(0);
@@ -354,20 +368,20 @@ export default function AnalyzePage() {
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="max-w-7xl mx-auto">
-          <h1 className="text-2xl font-bold text-gray-900">Video Analysis</h1>
-          <p className="text-gray-600">Upload and analyze videos with AI-powered scene detection</p>
+          <h1 className="text-2xl font-bold text-gray-900">File Analysis</h1>
+          <p className="text-gray-600">Upload and analyze videos, images, audio, PDFs, and documents with Gemini 3 Flash</p>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto p-6">
         {/* Upload Mode Toggle */}
-        {!videoUrl && (
+        {!previewUrl && (
           <div className="flex mb-6 bg-white rounded-xl shadow-sm p-1 max-w-md mx-auto">
             <button
               type="button"
               onClick={() => {
                 setUploadMode('file');
-                setVideoUrl(null);
+                setPreviewUrl(null);
                 setUrlInput('');
               }}
               className={`flex-1 py-3 px-4 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 ${uploadMode === 'file'
@@ -382,7 +396,7 @@ export default function AnalyzePage() {
               type="button"
               onClick={() => {
                 setUploadMode('url');
-                setVideoUrl(null);
+                setPreviewUrl(null);
                 setFile(null);
               }}
               className={`flex-1 py-3 px-4 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 ${uploadMode === 'url'
@@ -396,8 +410,19 @@ export default function AnalyzePage() {
           </div>
         )}
 
+        {/* Validation Error */}
+        {validationError && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 bg-red-50 border border-red-200 rounded-xl p-4 text-center max-w-2xl mx-auto"
+          >
+            <p className="text-red-600 font-medium">{validationError}</p>
+          </motion.div>
+        )}
+
         {/* Upload Area */}
-        {!videoUrl ? (
+        {!previewUrl ? (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -412,16 +437,35 @@ export default function AnalyzePage() {
                 </div>
 
                 <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                  Upload your video
+                  Upload your file
                 </h3>
-                <p className="text-gray-600 mb-6">
-                  Drag and drop or click to select a video file (up to 2GB)
+                <p className="text-gray-600 mb-4">
+                  Drag and drop or click to select a file
                 </p>
+
+                {/* Supported file types */}
+                <div className="flex flex-wrap justify-center gap-2 mb-6 max-w-lg mx-auto">
+                  <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium flex items-center gap-1">
+                    <VideoIcon className="w-3 h-3" /> Video
+                  </span>
+                  <span className="px-3 py-1 bg-green-50 text-green-700 rounded-full text-xs font-medium flex items-center gap-1">
+                    <ImageIcon className="w-3 h-3" /> Images
+                  </span>
+                  <span className="px-3 py-1 bg-purple-50 text-purple-700 rounded-full text-xs font-medium flex items-center gap-1">
+                    <Music className="w-3 h-3" /> Audio
+                  </span>
+                  <span className="px-3 py-1 bg-orange-50 text-orange-700 rounded-full text-xs font-medium flex items-center gap-1">
+                    <FileText className="w-3 h-3" /> PDF
+                  </span>
+                  <span className="px-3 py-1 bg-pink-50 text-pink-700 rounded-full text-xs font-medium flex items-center gap-1">
+                    <FileSpreadsheet className="w-3 h-3" /> Documents
+                  </span>
+                </div>
 
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="video/*"
+                  accept={FILE_INPUT_ACCEPT}
                   onChange={(e) => e.target.files && handleFileSelect(e.target.files[0])}
                   className="hidden"
                 />
@@ -430,11 +474,11 @@ export default function AnalyzePage() {
                   onClick={() => fileInputRef.current?.click()}
                   className="px-8 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors"
                 >
-                  Select Video
+                  Select File
                 </button>
 
                 <p className="text-sm text-gray-500 mt-4">
-                  Supported formats: MP4, MOV, AVI, WebM
+                  Max sizes: Video/Audio 2GB, Images 20MB, PDFs/Documents 50MB
                 </p>
               </>
             ) : (
@@ -485,7 +529,7 @@ export default function AnalyzePage() {
           </motion.div>
         ) : (
           <div className="space-y-6">
-            {/* Video Player - Native Controls */}
+            {/* File Preview - Dynamic based on file type */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -495,24 +539,82 @@ export default function AnalyzePage() {
                 {/* Close Button */}
                 <button
                   onClick={() => {
-                    setVideoUrl(null);
+                    setPreviewUrl(null);
                     setFile(null);
                     setUrlInput('');
+                    setFileCategory(null);
                   }}
                   className="absolute top-4 right-4 z-10 p-2 bg-black/50 hover:bg-black/70 rounded-lg transition-colors"
                 >
                   <X className="w-5 h-5 text-white" />
                 </button>
 
-                {/* Native Video Player */}
-                <video
-                  src={videoUrl}
-                  controls
-                  className="w-full"
-                  preload="metadata"
-                >
-                  Your browser does not support the video tag.
-                </video>
+                {/* File Type Badge */}
+                {fileCategory && (
+                  <div className="absolute top-4 left-4 z-10 px-3 py-1 bg-black/50 rounded-full text-white text-sm font-medium flex items-center gap-2">
+                    <span>{getFileIcon(fileCategory)}</span>
+                    <span>{getCategoryDisplayName(fileCategory)}</span>
+                  </div>
+                )}
+
+                {/* Dynamic Preview based on file type */}
+                {fileCategory === 'video' && (
+                  <video
+                    src={previewUrl}
+                    controls
+                    className="w-full"
+                    preload="metadata"
+                  >
+                    Your browser does not support the video tag.
+                  </video>
+                )}
+
+                {fileCategory === 'audio' && (
+                  <div className="w-full p-8 bg-gradient-to-br from-purple-50 to-pink-50 flex flex-col items-center justify-center">
+                    <div className="w-24 h-24 bg-purple-100 rounded-full flex items-center justify-center mb-4">
+                      <Music className="w-12 h-12 text-purple-600" />
+                    </div>
+                    <audio src={previewUrl} controls className="w-full max-w-md">
+                      Your browser does not support the audio tag.
+                    </audio>
+                    <p className="text-gray-600 mt-4">{file?.name}</p>
+                  </div>
+                )}
+
+                {fileCategory === 'image' && (
+                  <div className="w-full flex items-center justify-center bg-gray-100">
+                    <img
+                      src={previewUrl}
+                      alt={file?.name || 'Preview'}
+                      className="max-w-full max-h-[500px] object-contain"
+                    />
+                  </div>
+                )}
+
+                {fileCategory === 'pdf' && (
+                  <div className="w-full h-[500px] bg-gray-100">
+                    <iframe
+                      src={previewUrl}
+                      className="w-full h-full"
+                      title={file?.name || 'PDF Preview'}
+                    />
+                  </div>
+                )}
+
+                {(fileCategory === 'document' || fileCategory === 'spreadsheet' || fileCategory === 'text') && (
+                  <div className="w-full p-8 bg-gradient-to-br from-orange-50 to-yellow-50 flex flex-col items-center justify-center min-h-[300px]">
+                    <div className="w-24 h-24 bg-orange-100 rounded-2xl flex items-center justify-center mb-4">
+                      <FileText className="w-12 h-12 text-orange-600" />
+                    </div>
+                    <p className="text-lg font-medium text-gray-900">{file?.name}</p>
+                    <p className="text-gray-600 mt-2">
+                      {file ? formatFileSize(file.size) : ''}
+                    </p>
+                    <p className="text-sm text-gray-500 mt-4 text-center max-w-md">
+                      Document preview not available. The file will be analyzed by Gemini 3 Flash.
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Action Button */}
@@ -523,10 +625,10 @@ export default function AnalyzePage() {
                   className="w-full px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl font-semibold hover:from-blue-600 hover:to-indigo-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Sparkles className="w-5 h-5" />
-                  {isUploading ? 'Uploading...' : 'Upload & Analyze with Gemini 3 Flash'}
+                  {isUploading ? 'Uploading...' : `Upload & Analyze ${fileCategory ? getCategoryDisplayName(fileCategory) : 'File'}`}
                 </button>
                 <p className="text-sm text-gray-500 text-center mt-3">
-                  Video will be saved to "My Videos" and analyzed with AI
+                  File will be saved to "My Files" and analyzed with Gemini 3 Flash
                 </p>
               </div>
             </motion.div>
@@ -545,7 +647,7 @@ export default function AnalyzePage() {
                       <Sparkles className="w-5 h-5 text-blue-600 animate-pulse" />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-gray-900">Uploading video...</h3>
+                      <h3 className="font-semibold text-gray-900">Uploading {fileCategory ? getCategoryDisplayName(fileCategory).toLowerCase() : 'file'}...</h3>
                       <p className="text-sm text-gray-600">{uploadStatus || 'Processing with Gemini 3 Flash'}</p>
                     </div>
                   </div>

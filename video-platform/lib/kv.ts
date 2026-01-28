@@ -1,5 +1,45 @@
 import { kv } from '@vercel/kv';
+import { FileCategory } from './fileTypes';
 
+// Generic file metadata interface (replaces video-specific)
+export interface FileMetadata {
+  id: string;
+  userId: string;
+  title: string;
+  fileName: string;
+  mimeType: string;
+  category: FileCategory;
+  size: number;
+  geminiFileUri?: string;
+  playbackUrl?: string; // For video/audio files stored in blob storage
+  uploadedAt: string;
+  status: 'uploading' | 'processing' | 'ready' | 'error';
+}
+
+// Analysis interface updated to support all file types
+export interface FileAnalysis {
+  fileId: string;
+  category: FileCategory;
+  summary: string;
+  // Video-specific fields (optional)
+  scenes?: Array<{
+    start: string;
+    end: string;
+    label: string;
+    description: string;
+  }>;
+  // Image-specific fields (optional)
+  objects?: string[];
+  textContent?: string; // OCR results for images/PDFs
+  // Audio-specific fields (optional)
+  transcription?: string;
+  // Document-specific fields (optional)
+  keyPoints?: string[];
+  entities?: string[];
+  createdAt: string;
+}
+
+// Legacy VideoAnalysis for backward compatibility
 export interface VideoAnalysis {
   videoId: string;
   summary: string;
@@ -12,14 +52,37 @@ export interface VideoAnalysis {
   createdAt: string;
 }
 
-export async function saveAnalysis(videoId: string, analysis: VideoAnalysis) {
-  await kv.set(`analysis:${videoId}`, analysis, { ex: 172800 }); // 48 hours
+// Generic file operations
+export async function saveFile(fileId: string, metadata: FileMetadata) {
+  await kv.set(`file:${fileId}`, metadata);
 }
 
-export async function getAnalysis(videoId: string): Promise<VideoAnalysis | null> {
-  return await kv.get(`analysis:${videoId}`);
+export async function getFile(fileId: string): Promise<FileMetadata | null> {
+  return await kv.get(`file:${fileId}`);
 }
 
+export async function listFiles(userId: string): Promise<FileMetadata[]> {
+  const keys = await kv.keys(`file:*`);
+  const files = await Promise.all(
+    keys.map(key => kv.get(key))
+  );
+  return files.filter(f => f && (f as FileMetadata).userId === userId) as FileMetadata[];
+}
+
+export async function deleteFile(fileId: string) {
+  await kv.del(`file:${fileId}`);
+}
+
+// Analysis operations (generic)
+export async function saveAnalysis(fileId: string, analysis: FileAnalysis | VideoAnalysis) {
+  await kv.set(`analysis:${fileId}`, analysis, { ex: 172800 }); // 48 hours
+}
+
+export async function getAnalysis(fileId: string): Promise<FileAnalysis | VideoAnalysis | null> {
+  return await kv.get(`analysis:${fileId}`);
+}
+
+// Legacy video operations (for backward compatibility during migration)
 export async function saveVideo(videoId: string, metadata: any) {
   await kv.set(`video:${videoId}`, metadata);
 }

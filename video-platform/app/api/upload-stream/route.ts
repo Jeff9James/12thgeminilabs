@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
-import { saveVideo } from '@/lib/kv';
+import { saveFile } from '@/lib/kv';
+import { validateFile, formatFileSize, FileCategory } from '@/lib/fileTypes';
 import { v4 as uuidv4 } from 'uuid';
 import { put } from '@vercel/blob';
 
@@ -10,41 +11,55 @@ export const maxDuration = 300; // 5 minutes max
 
 export async function POST(request: NextRequest) {
   const encoder = new TextEncoder();
-  
+
   const stream = new ReadableStream({
     async start(controller) {
       try {
         // Send immediate response to prevent timeout
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: 'Starting upload...' })}\n\n`));
-        
+
         const formData = await request.formData();
-        const file = formData.get('video') as File;
-        
+        const file = formData.get('file') as File;
+
         if (!file) {
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: 'No file provided' })}\n\n`));
           controller.close();
           return;
         }
 
-        const videoId = uuidv4();
+        // Validate file type and size
+        const validation = validateFile(file);
+        if (!validation.valid) {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: validation.error })}\n\n`));
+          controller.close();
+          return;
+        }
+
+        const fileId = uuidv4();
+        const category = validation.category!;
         const fileBuffer = await file.arrayBuffer();
         const fileData = Buffer.from(fileBuffer);
-        
-        // Upload to Vercel Blob for playback
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: 'Saving video for playback...' })}\n\n`));
-        
-        const blob = await put(`videos/${videoId}-${file.name}`, fileData, {
-          access: 'public',
-          contentType: file.type
-        });
-        
-        const playbackUrl = blob.url;
-        
+
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: `Processing ${category} file (${formatFileSize(fileData.length)})...` })}\n\n`));
+
+        // Only upload to Vercel Blob for video and audio files (for playback)
+        let playbackUrl: string | undefined;
+        if (category === 'video' || category === 'audio') {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: 'Saving to cloud storage for playback...' })}\n\n`));
+
+          const blob = await put(`files/${fileId}-${file.name}`, fileData, {
+            access: 'public',
+            contentType: file.type
+          });
+
+          playbackUrl = blob.url;
+        }
+
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: 'Uploading to Gemini for analysis...' })}\n\n`));
-        
+
         // Use Gemini REST API for resumable upload
         const apiKey = process.env.GEMINI_API_KEY!;
-        
+
         // Step 1: Initialize resumable upload
         const initResponse = await fetch('https://generativelanguage.googleapis.com/upload/v1beta/files', {
           method: 'POST',
@@ -62,14 +77,14 @@ export async function POST(request: NextRequest) {
             }
           })
         });
-        
+
         const uploadUrl = initResponse.headers.get('X-Goog-Upload-URL');
         if (!uploadUrl) {
           throw new Error('Failed to initialize upload');
         }
-        
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: `Uploading ${Math.round(fileData.length / 1024 / 1024)}MB...` })}\n\n`));
-        
+
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: `Uploading ${formatFileSize(fileData.length)}...` })}\n\n`));
+
         // Step 2: Upload the file
         const uploadResponse = await fetch(uploadUrl, {
           method: 'POST',
@@ -80,54 +95,54 @@ export async function POST(request: NextRequest) {
           },
           body: fileData
         });
-        
+
         if (!uploadResponse.ok) {
           throw new Error(`Upload failed: ${uploadResponse.statusText}`);
         }
-        
+
         const uploadResult = await uploadResponse.json();
-        const fileName = uploadResult.file.name;
-        
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: 'Processing video...' })}\n\n`));
-        
+        const geminiFileName = uploadResult.file.name;
+
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: 'Processing with Gemini...' })}\n\n`));
+
         // Step 3: Wait for processing
-        let fileInfo = await fetch(`https://generativelanguage.googleapis.com/v1beta/${fileName}?key=${apiKey}`)
+        let fileInfo = await fetch(`https://generativelanguage.googleapis.com/v1beta/${geminiFileName}?key=${apiKey}`)
           .then(r => r.json());
-        
+
         let attempts = 0;
         while (fileInfo.state === 'PROCESSING' && attempts < 60) {
           await new Promise(resolve => setTimeout(resolve, 3000));
-          fileInfo = await fetch(`https://generativelanguage.googleapis.com/v1beta/${fileName}?key=${apiKey}`)
+          fileInfo = await fetch(`https://generativelanguage.googleapis.com/v1beta/${geminiFileName}?key=${apiKey}`)
             .then(r => r.json());
           attempts++;
-          
+
           if (attempts % 3 === 0) {
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: `Processing... (${attempts * 3}s)` })}\n\n`));
           }
         }
-        
+
         if (fileInfo.state === 'FAILED') {
-          throw new Error('Video processing failed');
+          throw new Error('File processing failed');
         }
-        
+
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: 'Saving metadata...' })}\n\n`));
-        
-        // Save metadata to KV
-        await saveVideo(videoId, {
-          id: videoId,
-          title: file.name,
-          geminiFileUri: fileInfo.uri,
-          fileUri: fileInfo.uri, // Also save as fileUri for backward compatibility
-          geminiFileName: fileName,
-          playbackUrl: playbackUrl, // Add playback URL
-          createdAt: new Date().toISOString(),
+
+        // Save metadata to KV using new generic file structure
+        await saveFile(fileId, {
+          id: fileId,
           userId: 'demo-user',
-          status: 'ready',
+          title: file.name,
+          fileName: file.name,
           mimeType: file.type,
-          size: fileData.length
+          category: category,
+          size: fileData.length,
+          geminiFileUri: fileInfo.uri,
+          playbackUrl: playbackUrl,
+          uploadedAt: new Date().toISOString(),
+          status: 'ready'
         });
 
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ success: true, videoId })}\n\n`));
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ success: true, fileId, category })}\n\n`));
         controller.close();
       } catch (error: any) {
         console.error('Upload error:', error);
