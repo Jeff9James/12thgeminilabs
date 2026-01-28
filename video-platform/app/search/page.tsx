@@ -20,45 +20,69 @@ export default function SearchPage() {
   const [isSearching, setIsSearching] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
 
-  // Mock search function - replace with actual API call
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!query.trim()) return;
 
     setIsSearching(true);
-    
-    // Simulate API call
-    setTimeout(() => {
-      // Mock results
-      const mockResults: SearchResult[] = [
-        {
-          id: '1',
-          videoId: 'vid1',
-          videoTitle: 'Holiday Special',
-          timestamp: 125,
-          snippet: 'A red-nosed reindeer appears guiding Santa\'s sleigh through the night sky',
-          relevance: 0.95,
+    setResults([]);
+
+    try {
+      // Get all videos from localStorage
+      const storedVideos = localStorage.getItem('uploadedVideos');
+      if (!storedVideos) {
+        alert('No videos found. Please upload some videos first.');
+        setIsSearching(false);
+        return;
+      }
+
+      const videos = JSON.parse(storedVideos);
+      
+      // Filter videos that have been uploaded to Gemini
+      const searchableVideos = videos.filter((v: any) => v.geminiFileUri);
+      
+      if (searchableVideos.length === 0) {
+        alert('No videos available for search. Please upload and analyze videos first.');
+        setIsSearching(false);
+        return;
+      }
+
+      // Call search API
+      const response = await fetch('/api/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        {
-          id: '2',
-          videoId: 'vid1',
-          videoTitle: 'Holiday Special',
-          timestamp: 245,
-          snippet: 'The reindeer lands on the rooftop, his nose glowing brightly in the fog',
-          relevance: 0.87,
-        },
-        {
-          id: '3',
-          videoId: 'vid2',
-          videoTitle: 'Christmas Story',
-          timestamp: 67,
-          snippet: 'Children gather around as the reindeer with the red nose arrives',
-          relevance: 0.82,
-        },
-      ];
-      setResults(mockResults);
+        body: JSON.stringify({
+          query: query.trim(),
+          videos: searchableVideos.map((v: any) => ({
+            id: v.id,
+            filename: v.filename,
+            title: v.filename,
+            geminiFileUri: v.geminiFileUri,
+            mimeType: 'video/mp4',
+          }))
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Search request failed');
+      }
+
+      const data = await response.json();
+      
+      if (data.success) {
+        setResults(data.results || []);
+      } else {
+        throw new Error(data.error || 'Search failed');
+      }
+
+    } catch (error: any) {
+      console.error('Search error:', error);
+      alert(`Search failed: ${error.message}. Please try again.`);
+    } finally {
       setIsSearching(false);
-    }, 1500);
+    }
   };
 
   const formatTimestamp = (seconds: number) => {
@@ -181,7 +205,7 @@ export default function SearchPage() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.1 }}
                     className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg transition-all cursor-pointer group"
-                    onClick={() => setSelectedVideo(result.videoId)}
+                    onClick={() => window.location.href = `/videos/${result.videoId}#t=${result.timestamp}`}
                   >
                     {/* Thumbnail */}
                     <div className="relative aspect-video bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center">
