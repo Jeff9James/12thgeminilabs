@@ -51,94 +51,156 @@ export default function AnalyzePage() {
     setUploadProgress(0);
 
     try {
-      const formData = new FormData();
-      formData.append('video', file);
+      // Get API key from our server (secure)
+      const keyResponse = await fetch('/api/get-upload-url');
+      const { apiKey } = await keyResponse.json();
+      
+      setUploadProgress(5);
 
-      // Use streaming upload endpoint
-      const response = await fetch('/api/upload-stream', {
+      // Step 1: Initialize resumable upload DIRECTLY to Gemini
+      console.log('Initializing upload to Gemini...');
+      const initResponse = await fetch('https://generativelanguage.googleapis.com/upload/v1beta/files', {
         method: 'POST',
-        body: formData,
+        headers: {
+          'X-Goog-Upload-Protocol': 'resumable',
+          'X-Goog-Upload-Command': 'start',
+          'X-Goog-Upload-Header-Content-Length': file.size.toString(),
+          'X-Goog-Upload-Header-Content-Type': file.type,
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey,
+        },
+        body: JSON.stringify({
+          file: {
+            display_name: file.name
+          }
+        })
       });
 
-      if (!response.ok || !response.body) {
-        throw new Error('Upload failed');
+      if (!initResponse.ok) {
+        const error = await initResponse.text();
+        throw new Error(`Failed to initialize upload: ${error}`);
       }
 
-      // Read the event stream
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
+      const uploadUrl = initResponse.headers.get('X-Goog-Upload-URL');
+      if (!uploadUrl) {
+        throw new Error('No upload URL received from Gemini');
+      }
 
-      let videoId = '';
-      let buffer = '';
+      setUploadProgress(15);
 
-      while (true) {
-        const { done, value } = await reader.read();
-        
-        if (done) break;
+      // Step 2: Upload file bytes DIRECTLY to Gemini (bypassing our server!)
+      console.log(`Uploading ${Math.round(file.size / 1024 / 1024)}MB to Gemini...`);
+      const uploadResponse = await fetch(uploadUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Length': file.size.toString(),
+          'X-Goog-Upload-Offset': '0',
+          'X-Goog-Upload-Command': 'upload, finalize',
+        },
+        body: file // Send file directly!
+      });
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n\n');
-        buffer = lines.pop() || '';
+      if (!uploadResponse.ok) {
+        const error = await uploadResponse.text();
+        throw new Error(`Failed to upload file: ${error}`);
+      }
 
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = JSON.parse(line.slice(6));
-            
-            if (data.error) {
-              throw new Error(data.error);
-            }
-            
-            if (data.progress) {
-              // Update progress text (you can add a state for this if needed)
-              console.log(data.progress);
-              
-              // Estimate progress
-              if (data.progress.includes('Starting')) setUploadProgress(5);
-              else if (data.progress.includes('Saving video')) setUploadProgress(15);
-              else if (data.progress.includes('Uploading to Gemini')) setUploadProgress(30);
-              else if (data.progress.includes('Uploading')) setUploadProgress(50);
-              else if (data.progress.includes('Processing')) setUploadProgress(70);
-              else if (data.progress.includes('Saving metadata')) setUploadProgress(90);
-            }
-            
-            if (data.success && data.videoId) {
-              videoId = data.videoId;
-              setUploadProgress(100);
-            }
+      const uploadResult = await uploadResponse.json();
+      const fileName = uploadResult.file.name;
+      
+      setUploadProgress(60);
+
+      // Step 3: Wait for Gemini processing
+      console.log('Waiting for Gemini to process video...');
+      let fileInfo = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/${fileName}`,
+        {
+          headers: {
+            'x-goog-api-key': apiKey,
           }
         }
+      ).then(r => r.json());
+
+      let attempts = 0;
+      const maxAttempts = 60; // 3 minutes max
+
+      while (fileInfo.state === 'PROCESSING' && attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        fileInfo = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/${fileName}`,
+          {
+            headers: {
+              'x-goog-api-key': apiKey,
+            }
+          }
+        ).then(r => r.json());
+        
+        attempts++;
+        setUploadProgress(60 + (attempts / maxAttempts) * 30);
       }
 
-      if (!videoId) {
-        throw new Error('Upload completed but no video ID received');
+      if (fileInfo.state === 'FAILED') {
+        throw new Error('Video processing failed on Gemini servers');
+      }
+
+      if (fileInfo.state === 'PROCESSING') {
+        throw new Error('Video processing timeout. The video may still complete - check "My Videos" later.');
+      }
+
+      setUploadProgress(95);
+
+      // Step 4: Save metadata to our database
+      const videoId = Date.now().toString();
+      console.log('Saving metadata...');
+      
+      try {
+        await fetch('/api/videos', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            id: videoId,
+            title: file.name,
+            geminiFileUri: fileInfo.uri,
+            geminiFileName: fileName,
+            mimeType: file.type,
+            size: file.size,
+          })
+        });
+      } catch (err) {
+        console.warn('Failed to save to database, using localStorage only:', err);
       }
 
       // Update localStorage
       const existingVideos = JSON.parse(localStorage.getItem('uploadedVideos') || '[]');
       const videoIndex = existingVideos.findIndex((v: any) => v.filename === file.name);
       
+      const videoData = {
+        id: videoId,
+        filename: file.name,
+        uploadedAt: new Date().toISOString(),
+        analyzed: false,
+        localUrl: videoUrl,
+        geminiFileUri: fileInfo.uri,
+        geminiFileName: fileName,
+      };
+
       if (videoIndex !== -1) {
-        existingVideos[videoIndex] = {
-          ...existingVideos[videoIndex],
-          id: videoId,
-          analyzed: false,
-        };
+        existingVideos[videoIndex] = videoData;
       } else {
-        existingVideos.push({
-          id: videoId,
-          filename: file.name,
-          uploadedAt: new Date().toISOString(),
-          analyzed: false,
-          localUrl: videoUrl,
-        });
+        existingVideos.push(videoData);
       }
+      
       localStorage.setItem('uploadedVideos', JSON.stringify(existingVideos));
+      setUploadProgress(100);
 
       // Redirect to video detail page
       router.push(`/videos/${videoId}`);
     } catch (error) {
       console.error('Upload error:', error);
-      alert(`Upload failed: ${(error as Error).message}. Please try again.`);
+      alert(`Upload failed: ${(error as Error).message}\n\nPlease try again or use a smaller video file.`);
     } finally {
       setIsUploading(false);
     }
