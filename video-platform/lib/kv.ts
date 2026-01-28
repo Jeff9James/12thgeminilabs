@@ -51,3 +51,22 @@ export async function saveChatHistory(videoId: string, messages: ChatMessage[]) 
 export async function getChatHistory(videoId: string): Promise<ChatMessage[] | null> {
   return await kv.get(`chat:${videoId}`);
 }
+
+// Search cache management
+export interface SearchCache {
+  query: string;
+  results: any[];
+  timestamp: string;
+}
+
+export async function saveSearchResults(cacheKey: string, results: any[]) {
+  await kv.set(`search:${cacheKey}`, {
+    results,
+    timestamp: new Date().toISOString()
+  }, { ex: 3600 }); // Cache for 1 hour
+}
+
+export async function getSearchResults(cacheKey: string): Promise<any[] | null> {
+  const cached = await kv.get<SearchCache>(`search:${cacheKey}`);
+  return cached ? cached.results : null;
+}

@@ -21,6 +21,7 @@ export default function SearchPage() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
+  const [searchStatus, setSearchStatus] = useState<string>('');
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,6 +29,7 @@ export default function SearchPage() {
 
     setIsSearching(true);
     setResults([]);
+    setSearchStatus('Preparing search...');
 
     try {
       // Get all videos from localStorage
@@ -48,6 +50,8 @@ export default function SearchPage() {
         setIsSearching(false);
         return;
       }
+
+      setSearchStatus(`Searching ${searchableVideos.length} video${searchableVideos.length > 1 ? 's' : ''}...`);
 
       // Call search API
       const response = await fetch('/api/search', {
@@ -75,6 +79,13 @@ export default function SearchPage() {
       
       if (data.success) {
         setResults(data.results || []);
+        if (data.cached) {
+          setSearchStatus('Results from cache');
+        } else {
+          setSearchStatus('Search complete');
+        }
+        // Clear status after 2 seconds
+        setTimeout(() => setSearchStatus(''), 2000);
       } else {
         throw new Error(data.error || 'Search failed');
       }
@@ -82,6 +93,7 @@ export default function SearchPage() {
     } catch (error: any) {
       console.error('Search error:', error);
       alert(`Search failed: ${error.message}. Please try again.`);
+      setSearchStatus('');
     } finally {
       setIsSearching(false);
     }
@@ -179,7 +191,8 @@ export default function SearchPage() {
               className="flex flex-col items-center justify-center py-20"
             >
               <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4" />
-              <p className="text-gray-600 text-lg">Searching your videos...</p>
+              <p className="text-gray-600 text-lg">{searchStatus || 'Searching your videos...'}</p>
+              <p className="text-gray-500 text-sm mt-2">Using parallel AI search for faster results</p>
             </motion.div>
           )}
 

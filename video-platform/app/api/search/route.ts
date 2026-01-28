@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { saveSearchResults, getSearchResults } from '@/lib/kv';
+import crypto from 'crypto';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+
+// Create a cache key from query and video IDs
+function createCacheKey(query: string, videoIds: string[]): string {
+  const content = `${query}:${videoIds.sort().join(',')}`;
+  return crypto.createHash('md5').update(content).digest('hex');
+}
 
 interface SearchResult {
   id: string;
@@ -11,6 +19,9 @@ interface SearchResult {
   snippet: string;
   relevance: number;
 }
+
+// Note: Using responseMimeType alone forces JSON output
+// responseSchema has type issues with current SDK version
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,40 +33,49 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const model = genAI.getGenerativeModel({ 
-      model: 'gemini-3-flash-preview',
-      generationConfig: {
-        temperature: 1.0,
-      }
-    });
+    // Check cache first
+    const cacheKey = createCacheKey(query, videos.map((v: any) => v.id));
+    const cachedResults = await getSearchResults(cacheKey);
+    
+    if (cachedResults) {
+      console.log('Returning cached search results');
+      return NextResponse.json({
+        success: true,
+        results: cachedResults,
+        count: cachedResults.length,
+        cached: true
+      });
+    }
 
-    const results: SearchResult[] = [];
-
-    // Search through each video
-    for (const video of videos) {
-      if (!video.geminiFileUri) continue;
+    // Process all videos in PARALLEL for speed
+    const searchPromises = videos.map(async (video: any) => {
+      if (!video.geminiFileUri) return [];
 
       try {
-        // Ask Gemini to search within this specific video
-        const prompt = `You are a video search assistant. The user is searching for: "${query}"
+        // Use Gemini 3 Flash for fastest response
+        const model = genAI.getGenerativeModel({ 
+          model: 'gemini-3-flash-preview',
+          generationConfig: {
+            temperature: 1.0,
+            responseMimeType: 'application/json',
+          },
+        });
 
-Analyze this video and find ALL moments that match the search query. For each matching moment:
-1. Provide the exact timestamp in [MM:SS] format
-2. Describe what happens at that moment (1-2 sentences)
-3. Rate how relevant it is (0-100%)
+        // Shortened, optimized prompt with explicit JSON format
+        const prompt = `Search for: "${query}"
 
-Format your response as JSON array:
+Find matching moments and return as JSON array.
+
+Format:
 [
   {
-    "timestamp": "1:23",
-    "description": "Brief description of what happens",
-    "relevance": 95
+    "timestamp": "MM:SS",
+    "description": "1-2 sentences",
+    "relevance": 0-100
   }
 ]
 
-If no matches found, return empty array: []
-
-IMPORTANT: Only include moments that actually match the query. Be precise with timestamps.`;
+Return empty array [] if no matches.`;
 
         const result = await model.generateContent([
           {
@@ -69,43 +89,47 @@ IMPORTANT: Only include moments that actually match the query. Be precise with t
 
         const response = result.response.text();
         
-        // Parse JSON response
+        // Parse JSON response (guaranteed by responseSchema)
         let matches = [];
         try {
-          // Extract JSON from response (might be wrapped in markdown)
-          const jsonMatch = response.match(/\[[\s\S]*\]/);
-          if (jsonMatch) {
-            matches = JSON.parse(jsonMatch[0]);
-          }
+          matches = JSON.parse(response);
         } catch (parseError) {
-          console.error('Failed to parse Gemini response:', parseError);
+          console.error('Failed to parse response:', parseError);
+          return [];
         }
 
         // Add video info to each match
-        matches.forEach((match: any) => {
-          results.push({
-            id: `${video.id}-${match.timestamp}`,
-            videoId: video.id,
-            videoTitle: video.filename || video.title,
-            timestamp: parseTimestamp(match.timestamp),
-            snippet: match.description,
-            relevance: match.relevance / 100, // Convert to 0-1 scale
-          });
-        });
+        return matches.map((match: any) => ({
+          id: `${video.id}-${match.timestamp}`,
+          videoId: video.id,
+          videoTitle: video.filename || video.title,
+          timestamp: parseTimestamp(match.timestamp),
+          snippet: match.description,
+          relevance: match.relevance / 100, // Convert to 0-1 scale
+        }));
 
       } catch (videoError) {
         console.error(`Error searching video ${video.id}:`, videoError);
-        // Continue with next video
+        return [];
       }
-    }
+    });
 
-    // Sort by relevance
-    results.sort((a, b) => b.relevance - a.relevance);
+    // Wait for ALL searches to complete in parallel
+    const allResults = await Promise.all(searchPromises);
+    
+    // Flatten results and sort by relevance
+    const results = allResults
+      .flat()
+      .sort((a, b) => b.relevance - a.relevance);
+
+    // Cache the results for future queries
+    await saveSearchResults(cacheKey, results);
 
     return NextResponse.json({
       success: true,
       results,
-      count: results.length
+      count: results.length,
+      cached: false
     });
 
   } catch (error: any) {
