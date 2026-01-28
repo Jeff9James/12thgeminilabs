@@ -4,6 +4,7 @@ import { useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Upload, Sparkles, Video as VideoIcon, X } from 'lucide-react';
+import { saveVideoFile } from '@/lib/indexeddb';
 
 export default function AnalyzePage() {
   const [file, setFile] = useState<File | null>(null);
@@ -150,8 +151,17 @@ export default function AnalyzePage() {
 
       setUploadProgress(95);
 
-      // Step 4: Save metadata to our database
+      // Step 4: Save video file to IndexedDB for playback
       const videoId = Date.now().toString();
+      console.log('Saving video file to IndexedDB...');
+      
+      try {
+        await saveVideoFile(videoId, file);
+      } catch (err) {
+        console.warn('Failed to save video to IndexedDB:', err);
+      }
+
+      // Step 5: Save metadata to our database
       console.log('Saving metadata...');
       
       try {
@@ -182,9 +192,9 @@ export default function AnalyzePage() {
         filename: file.name,
         uploadedAt: new Date().toISOString(),
         analyzed: false,
-        localUrl: videoUrl,
         geminiFileUri: fileInfo.uri,
         geminiFileName: fileName,
+        hasLocalFile: true, // Flag to indicate IndexedDB has the file
       };
 
       if (videoIndex !== -1) {

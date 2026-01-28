@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Video, Clock, Calendar, Trash2, Play } from 'lucide-react';
 import Link from 'next/link';
+import { deleteVideoFile } from '@/lib/indexeddb';
 
 interface VideoMetadata {
   id: string;
@@ -24,13 +25,21 @@ export default function VideosPage() {
     }
   }, []);
 
-  const deleteVideo = (id: string) => {
+  const deleteVideo = async (id: string) => {
     const updatedVideos = videos.filter(v => v.id !== id);
     setVideos(updatedVideos);
     localStorage.setItem('uploadedVideos', JSON.stringify(updatedVideos));
     
-    // Also clean up analysis data
+    // Clean up IndexedDB
+    try {
+      await deleteVideoFile(id);
+    } catch (err) {
+      console.warn('Failed to delete video file from IndexedDB:', err);
+    }
+    
+    // Also clean up analysis and chat data
     localStorage.removeItem(`analysis_${id}`);
+    localStorage.removeItem(`chat_${id}`);
   };
 
   const formatDate = (dateString: string) => {

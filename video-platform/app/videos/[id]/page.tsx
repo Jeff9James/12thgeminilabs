@@ -6,6 +6,7 @@ import VideoChat from '@/components/VideoChat';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Play, Clock, Calendar, Sparkles, MessageSquare } from 'lucide-react';
+import { createBlobUrl } from '@/lib/indexeddb';
 
 // Helper function to parse timestamps like "0:05" or "1:23" to seconds
 function parseTimeToSeconds(timeStr: string): number {
@@ -26,14 +27,23 @@ export default function VideoPage({ params }: { params: Promise<{ id: string }> 
   const [activeSection, setActiveSection] = useState<'analysis' | 'chat' | null>(null);
 
   useEffect(() => {
-    params.then(p => {
+    params.then(async p => {
       setId(p.id);
+      
+      // Try to get from API first, fallback to localStorage
       fetch(`/api/videos/${p.id}`)
-        .then(res => res.json())
-        .then(data => {
+        .then(async res => {
+          const data = await res.json();
           if (data.success) {
-            setVideo(data.data.video);
+            // Try to get local file from IndexedDB for playback
+            const playbackUrl = await createBlobUrl(p.id);
+            
+            setVideo({
+              ...data.data.video,
+              playbackUrl: playbackUrl || data.data.video.playbackUrl,
+            });
             setAnalysis(data.data.analysis);
+            
             // Default to chat view (always available), or analysis if it exists
             if (data.data.analysis) {
               setActiveSection('analysis');
@@ -43,8 +53,31 @@ export default function VideoPage({ params }: { params: Promise<{ id: string }> 
           }
           setLoading(false);
         })
-        .catch(err => {
-          console.error(err);
+        .catch(async err => {
+          console.error('API fetch failed, trying localStorage:', err);
+          
+          // Fallback to localStorage
+          const storedVideos = localStorage.getItem('uploadedVideos');
+          if (storedVideos) {
+            const videos = JSON.parse(storedVideos);
+            const localVideo = videos.find((v: any) => v.id === p.id);
+            
+            if (localVideo) {
+              // Get video file from IndexedDB
+              const playbackUrl = await createBlobUrl(p.id);
+              
+              setVideo({
+                id: localVideo.id,
+                title: localVideo.filename,
+                playbackUrl: playbackUrl,
+                geminiFileUri: localVideo.geminiFileUri,
+                mimeType: 'video/mp4',
+                createdAt: localVideo.uploadedAt,
+              });
+              setActiveSection('chat');
+            }
+          }
+          
           setLoading(false);
         });
     });
