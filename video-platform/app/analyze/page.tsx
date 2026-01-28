@@ -3,15 +3,21 @@
 import { useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, Sparkles, Video as VideoIcon, X } from 'lucide-react';
+import { Upload, Sparkles, Video as VideoIcon, X, Link as LinkIcon } from 'lucide-react';
 import { saveVideoFile } from '@/lib/indexeddb';
 
+type UploadMode = 'file' | 'url';
+
 export default function AnalyzePage() {
+  const [uploadMode, setUploadMode] = useState<UploadMode>('file');
   const [file, setFile] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [urlInput, setUrlInput] = useState('');
+  const [titleInput, setTitleInput] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  
+  const [uploadStatus, setUploadStatus] = useState('');
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
@@ -20,7 +26,7 @@ export default function AnalyzePage() {
       setFile(selectedFile);
       const url = URL.createObjectURL(selectedFile);
       setVideoUrl(url);
-      
+
       // Save to localStorage immediately
       const videoId = Date.now().toString();
       const videoMetadata = {
@@ -30,7 +36,7 @@ export default function AnalyzePage() {
         analyzed: false,
         localUrl: url,
       };
-      
+
       const existingVideos = JSON.parse(localStorage.getItem('uploadedVideos') || '[]');
       existingVideos.push(videoMetadata);
       localStorage.setItem('uploadedVideos', JSON.stringify(existingVideos));
@@ -45,8 +51,18 @@ export default function AnalyzePage() {
     }
   }, []);
 
+  const handleUrlPreview = () => {
+    if (!urlInput.trim()) {
+      alert('Please enter a video URL');
+      return;
+    }
+    // Set the video URL for preview
+    setVideoUrl(urlInput.trim());
+  };
+
   const handleUploadAndAnalyze = async () => {
-    if (!file) return;
+    if (!file && uploadMode === 'file') return;
+    if (!videoUrl && uploadMode === 'url') return;
 
     setIsUploading(true);
     setUploadProgress(0);
@@ -55,24 +71,66 @@ export default function AnalyzePage() {
       // Get API key from our server (secure)
       const keyResponse = await fetch('/api/get-upload-url');
       const { apiKey } = await keyResponse.json();
-      
+
       setUploadProgress(5);
+
+      let fileData: Buffer | Blob;
+      let fileName: string;
+      let fileType: string;
+      let fileSize: number;
+
+      if (uploadMode === 'url') {
+        // Fetch video from URL
+        setUploadStatus('Fetching video from URL...');
+        const videoResponse = await fetch(urlInput.trim(), {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          }
+        });
+
+        if (!videoResponse.ok) {
+          throw new Error(`Failed to fetch video: ${videoResponse.status} ${videoResponse.statusText}`);
+        }
+
+        const contentLength = videoResponse.headers.get('content-length');
+        if (contentLength) {
+          const sizeInMB = parseInt(contentLength) / (1024 * 1024);
+          if (sizeInMB > 100) {
+            throw new Error(`Video too large (${Math.round(sizeInMB)}MB). Maximum size for URL import is 100MB.`);
+          }
+        }
+
+        fileData = await videoResponse.blob();
+        fileSize = fileData.size;
+
+        const urlPath = new URL(urlInput.trim()).pathname;
+        fileName = titleInput.trim() || urlPath.split('/').pop() || 'video.mp4';
+        fileType = videoResponse.headers.get('content-type') || 'video/mp4';
+
+        setUploadProgress(20);
+      } else {
+        fileData = file!;
+        fileName = file!.name;
+        fileType = file!.type;
+        fileSize = file!.size;
+      }
 
       // Step 1: Initialize resumable upload DIRECTLY to Gemini
       console.log('Initializing upload to Gemini...');
+      setUploadStatus('Initializing upload to Gemini...');
       const initResponse = await fetch('https://generativelanguage.googleapis.com/upload/v1beta/files', {
         method: 'POST',
         headers: {
           'X-Goog-Upload-Protocol': 'resumable',
           'X-Goog-Upload-Command': 'start',
-          'X-Goog-Upload-Header-Content-Length': file.size.toString(),
-          'X-Goog-Upload-Header-Content-Type': file.type,
+          'X-Goog-Upload-Header-Content-Length': fileSize.toString(),
+          'X-Goog-Upload-Header-Content-Type': fileType,
           'Content-Type': 'application/json',
           'x-goog-api-key': apiKey,
         },
         body: JSON.stringify({
           file: {
-            display_name: file.name
+            display_name: fileName
           }
         })
       });
@@ -90,15 +148,16 @@ export default function AnalyzePage() {
       setUploadProgress(15);
 
       // Step 2: Upload file bytes DIRECTLY to Gemini (bypassing our server!)
-      console.log(`Uploading ${Math.round(file.size / 1024 / 1024)}MB to Gemini...`);
+      console.log(`Uploading ${Math.round(fileSize / 1024 / 1024)}MB to Gemini...`);
+      setUploadStatus(`Uploading ${Math.round(fileSize / 1024 / 1024)}MB to Gemini...`);
       const uploadResponse = await fetch(uploadUrl, {
         method: 'POST',
         headers: {
-          'Content-Length': file.size.toString(),
+          'Content-Length': fileSize.toString(),
           'X-Goog-Upload-Offset': '0',
           'X-Goog-Upload-Command': 'upload, finalize',
         },
-        body: file // Send file directly!
+        body: fileData
       });
 
       if (!uploadResponse.ok) {
@@ -107,14 +166,15 @@ export default function AnalyzePage() {
       }
 
       const uploadResult = await uploadResponse.json();
-      const fileName = uploadResult.file.name;
-      
+      const geminiFileName = uploadResult.file.name;
+
       setUploadProgress(60);
 
       // Step 3: Wait for Gemini processing
       console.log('Waiting for Gemini to process video...');
+      setUploadStatus('Processing video with Gemini...');
       let fileInfo = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/${fileName}`,
+        `https://generativelanguage.googleapis.com/v1beta/${geminiFileName}`,
         {
           headers: {
             'x-goog-api-key': apiKey,
@@ -127,18 +187,19 @@ export default function AnalyzePage() {
 
       while (fileInfo.state === 'PROCESSING' && attempts < maxAttempts) {
         await new Promise(resolve => setTimeout(resolve, 3000));
-        
+
         fileInfo = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/${fileName}`,
+          `https://generativelanguage.googleapis.com/v1beta/${geminiFileName}`,
           {
             headers: {
               'x-goog-api-key': apiKey,
             }
           }
         ).then(r => r.json());
-        
+
         attempts++;
         setUploadProgress(60 + (attempts / maxAttempts) * 30);
+        setUploadStatus(`Processing... (${attempts * 3}s)`);
       }
 
       if (fileInfo.state === 'FAILED') {
@@ -150,20 +211,23 @@ export default function AnalyzePage() {
       }
 
       setUploadProgress(95);
+      setUploadStatus('Saving metadata...');
 
-      // Step 4: Save video file to IndexedDB for playback
+      // Step 4: Save video file to IndexedDB for playback (only for file uploads)
       const videoId = Date.now().toString();
-      console.log('Saving video file to IndexedDB...');
-      
-      try {
-        await saveVideoFile(videoId, file);
-      } catch (err) {
-        console.warn('Failed to save video to IndexedDB:', err);
+
+      if (uploadMode === 'file' && file) {
+        console.log('Saving video file to IndexedDB...');
+        try {
+          await saveVideoFile(videoId, file);
+        } catch (err) {
+          console.warn('Failed to save video to IndexedDB:', err);
+        }
       }
 
       // Step 5: Save metadata to our database
       console.log('Saving metadata...');
-      
+
       try {
         await fetch('/api/videos', {
           method: 'POST',
@@ -172,11 +236,14 @@ export default function AnalyzePage() {
           },
           body: JSON.stringify({
             id: videoId,
-            title: file.name,
+            title: fileName,
             geminiFileUri: fileInfo.uri,
-            geminiFileName: fileName,
-            mimeType: file.type,
-            size: file.size,
+            geminiFileName: geminiFileName,
+            mimeType: fileType,
+            size: fileSize,
+            playbackUrl: uploadMode === 'url' ? urlInput : undefined,
+            sourceUrl: uploadMode === 'url' ? urlInput : undefined,
+            sourceType: uploadMode === 'url' ? 'url-import' : 'file-upload',
           })
         });
       } catch (err) {
@@ -185,16 +252,18 @@ export default function AnalyzePage() {
 
       // Update localStorage
       const existingVideos = JSON.parse(localStorage.getItem('uploadedVideos') || '[]');
-      const videoIndex = existingVideos.findIndex((v: any) => v.filename === file.name);
-      
+      const videoIndex = existingVideos.findIndex((v: any) => v.id === videoId);
+
       const videoData = {
         id: videoId,
-        filename: file.name,
+        filename: fileName,
         uploadedAt: new Date().toISOString(),
         analyzed: false,
         geminiFileUri: fileInfo.uri,
-        geminiFileName: fileName,
-        hasLocalFile: true, // Flag to indicate IndexedDB has the file
+        geminiFileName: geminiFileName,
+        hasLocalFile: uploadMode === 'file',
+        sourceUrl: uploadMode === 'url' ? urlInput : undefined,
+        sourceType: uploadMode === 'url' ? 'url-import' : 'file-upload',
       };
 
       if (videoIndex !== -1) {
@@ -202,7 +271,7 @@ export default function AnalyzePage() {
       } else {
         existingVideos.push(videoData);
       }
-      
+
       localStorage.setItem('uploadedVideos', JSON.stringify(existingVideos));
       setUploadProgress(100);
 
@@ -213,6 +282,7 @@ export default function AnalyzePage() {
       alert(`Upload failed: ${(error as Error).message}\n\nPlease try again or use a smaller video file.`);
     } finally {
       setIsUploading(false);
+      setUploadStatus('');
     }
   };
 
@@ -227,44 +297,125 @@ export default function AnalyzePage() {
       </div>
 
       <div className="max-w-7xl mx-auto p-6">
+        {/* Upload Mode Toggle */}
+        {!videoUrl && (
+          <div className="flex mb-6 bg-white rounded-xl shadow-sm p-1 max-w-md mx-auto">
+            <button
+              type="button"
+              onClick={() => {
+                setUploadMode('file');
+                setVideoUrl(null);
+                setUrlInput('');
+              }}
+              className={`flex-1 py-3 px-4 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 ${uploadMode === 'file'
+                  ? 'bg-blue-50 text-blue-600'
+                  : 'text-gray-600 hover:text-gray-800'
+                }`}
+            >
+              <Upload className="w-4 h-4" />
+              Upload File
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setUploadMode('url');
+                setVideoUrl(null);
+                setFile(null);
+              }}
+              className={`flex-1 py-3 px-4 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 ${uploadMode === 'url'
+                  ? 'bg-blue-50 text-blue-600'
+                  : 'text-gray-600 hover:text-gray-800'
+                }`}
+            >
+              <LinkIcon className="w-4 h-4" />
+              Import from URL
+            </button>
+          </div>
+        )}
+
         {/* Upload Area */}
         {!videoUrl ? (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="bg-white rounded-2xl shadow-sm border-2 border-dashed border-gray-300 p-12 text-center hover:border-blue-400 transition-colors"
-            onDrop={handleDrop}
-            onDragOver={(e) => e.preventDefault()}
+            onDrop={uploadMode === 'file' ? handleDrop : undefined}
+            onDragOver={uploadMode === 'file' ? (e) => e.preventDefault() : undefined}
           >
-            <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
-              <Upload className="w-10 h-10 text-white" />
-            </div>
-            
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">
-              Upload your video
-            </h3>
-            <p className="text-gray-600 mb-6">
-              Drag and drop or click to select a video file (up to 2GB)
-            </p>
-            
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="video/*"
-              onChange={(e) => e.target.files && handleFileSelect(e.target.files[0])}
-              className="hidden"
-            />
-            
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="px-8 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors"
-            >
-              Select Video
-            </button>
+            {uploadMode === 'file' ? (
+              <>
+                <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                  <Upload className="w-10 h-10 text-white" />
+                </div>
 
-            <p className="text-sm text-gray-500 mt-4">
-              Supported formats: MP4, MOV, AVI, WebM
-            </p>
+                <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                  Upload your video
+                </h3>
+                <p className="text-gray-600 mb-6">
+                  Drag and drop or click to select a video file (up to 2GB)
+                </p>
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="video/*"
+                  onChange={(e) => e.target.files && handleFileSelect(e.target.files[0])}
+                  className="hidden"
+                />
+
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="px-8 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors"
+                >
+                  Select Video
+                </button>
+
+                <p className="text-sm text-gray-500 mt-4">
+                  Supported formats: MP4, MOV, AVI, WebM
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-teal-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                  <LinkIcon className="w-10 h-10 text-white" />
+                </div>
+
+                <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                  Import from URL
+                </h3>
+                <p className="text-gray-600 mb-6">
+                  Paste a video URL from YouTube, Vimeo, Cloudinary, S3, or direct link
+                </p>
+
+                <div className="max-w-md mx-auto space-y-4">
+                  <input
+                    type="url"
+                    value={urlInput}
+                    onChange={(e) => setUrlInput(e.target.value)}
+                    placeholder="https://example.com/video.mp4"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <input
+                    type="text"
+                    value={titleInput}
+                    onChange={(e) => setTitleInput(e.target.value)}
+                    placeholder="Title (optional)"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <button
+                    onClick={handleUrlPreview}
+                    disabled={!urlInput.trim()}
+                    className="w-full px-8 py-3 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Preview Video
+                  </button>
+                </div>
+
+                <p className="text-sm text-gray-500 mt-4">
+                  Maximum size: 100MB for URL imports
+                </p>
+              </>
+            )}
           </motion.div>
         ) : (
           <div className="space-y-6">
@@ -280,6 +431,7 @@ export default function AnalyzePage() {
                   onClick={() => {
                     setVideoUrl(null);
                     setFile(null);
+                    setUrlInput('');
                   }}
                   className="absolute top-4 right-4 z-10 p-2 bg-black/50 hover:bg-black/70 rounded-lg transition-colors"
                 >
@@ -328,10 +480,10 @@ export default function AnalyzePage() {
                     </div>
                     <div>
                       <h3 className="font-semibold text-gray-900">Uploading video...</h3>
-                      <p className="text-sm text-gray-600">Processing with Gemini 3 Flash</p>
+                      <p className="text-sm text-gray-600">{uploadStatus || 'Processing with Gemini 3 Flash'}</p>
                     </div>
                   </div>
-                  
+
                   <div className="relative h-2 bg-gray-200 rounded-full overflow-hidden">
                     <motion.div
                       className="absolute h-full bg-gradient-to-r from-blue-500 to-indigo-600"
@@ -340,7 +492,7 @@ export default function AnalyzePage() {
                       transition={{ duration: 0.3 }}
                     />
                   </div>
-                  
+
                   <p className="text-sm text-gray-600 mt-2">{uploadProgress}% complete</p>
                 </motion.div>
               )}
