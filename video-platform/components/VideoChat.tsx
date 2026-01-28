@@ -67,6 +67,28 @@ export default function VideoChat({ videoId }: VideoChatProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
+  // Load chat history from localStorage on mount
+  useEffect(() => {
+    const chatKey = `chat_${videoId}`;
+    const savedChat = localStorage.getItem(chatKey);
+    if (savedChat) {
+      try {
+        const parsedChat = JSON.parse(savedChat);
+        setMessages(parsedChat);
+      } catch (error) {
+        console.error('Failed to load chat history:', error);
+      }
+    }
+  }, [videoId]);
+
+  // Save chat history to localStorage whenever messages change
+  useEffect(() => {
+    if (messages.length > 0) {
+      const chatKey = `chat_${videoId}`;
+      localStorage.setItem(chatKey, JSON.stringify(messages));
+    }
+  }, [messages, videoId]);
+
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -124,6 +146,7 @@ export default function VideoChat({ videoId }: VideoChatProps) {
       };
 
       setMessages(prev => [...prev, assistantMessage]);
+      
     } catch (error: any) {
       console.error('Chat error:', error);
       
@@ -155,15 +178,33 @@ export default function VideoChat({ videoId }: VideoChatProps) {
     <div className="bg-white rounded-lg shadow-lg flex flex-col h-[600px]">
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 rounded-t-lg">
-        <h2 className="text-xl font-bold flex items-center gap-2">
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-          </svg>
-          Chat with Video AI
-        </h2>
-        <p className="text-sm text-blue-100 mt-1">
-          Ask questions about the video content. Click timestamps to jump to moments!
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-bold flex items-center gap-2">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+              Chat with Video AI
+            </h2>
+            <p className="text-sm text-blue-100 mt-1">
+              Ask questions about the video content. Click timestamps to jump to moments!
+            </p>
+          </div>
+          {messages.length > 0 && (
+            <button
+              onClick={() => {
+                if (confirm('Clear this chat session? This cannot be undone.')) {
+                  setMessages([]);
+                  localStorage.removeItem(`chat_${videoId}`);
+                }
+              }}
+              className="px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-medium transition-colors"
+              title="Clear chat history"
+            >
+              Clear Chat
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Messages Area */}

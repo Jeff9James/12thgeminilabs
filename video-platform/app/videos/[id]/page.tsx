@@ -34,9 +34,11 @@ export default function VideoPage({ params }: { params: Promise<{ id: string }> 
           if (data.success) {
             setVideo(data.data.video);
             setAnalysis(data.data.analysis);
-            // If analysis exists, default to analysis view
+            // Default to chat view (always available), or analysis if it exists
             if (data.data.analysis) {
               setActiveSection('analysis');
+            } else {
+              setActiveSection('chat');
             }
           }
           setLoading(false);
