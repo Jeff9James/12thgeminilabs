@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import StreamingAnalysis from '@/components/StreamingAnalysis';
 import VideoChat from '@/components/VideoChat';
 import Link from 'next/link';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowLeft, Play, Clock, Calendar, Sparkles, MessageSquare } from 'lucide-react';
 
 // Helper function to parse timestamps like "0:05" or "1:23" to seconds
 function parseTimeToSeconds(timeStr: string): number {
@@ -70,108 +72,155 @@ export default function VideoPage({ params }: { params: Promise<{ id: string }> 
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
-      <div className="max-w-4xl mx-auto">
-        <Link href="/" className="text-blue-600 hover:text-blue-800 mb-4 inline-block">
-          ← Back to Home
-        </Link>
-        
-        {/* Video Title */}
-        <div className="mb-4">
-          <h1 className="text-3xl font-bold text-gray-900">{video.title}</h1>
-          <p className="text-sm text-gray-600 mt-1">
-            Uploaded: {new Date(video.createdAt).toLocaleString()}
-          </p>
-        </div>
-
-        {/* Video Preview */}
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-          {video.playbackUrl ? (
-            <video 
-              id="videoPlayer"
-              controls
-              className="w-full rounded-lg bg-black"
-              preload="metadata"
-            >
-              <source src={video.playbackUrl} type={video.mimeType || 'video/mp4'} />
-              Your browser does not support the video tag.
-            </video>
-          ) : (
-            <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg overflow-hidden aspect-video flex items-center justify-center">
-              <div className="text-center text-white p-8">
-                <svg className="w-20 h-20 mx-auto mb-4 opacity-50" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" />
-                </svg>
-                <p className="text-lg font-semibold mb-2">Video Preview</p>
-                <p className="text-sm opacity-75">Video not available for playback</p>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 px-6 py-4">
+        <div className="max-w-7xl mx-auto">
+          <Link 
+            href="/videos" 
+            className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 font-medium mb-4"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to My Videos
+          </Link>
+          
+          {/* Video Title & Meta */}
+          <div className="mt-4">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">{video.title}</h1>
+            <div className="flex flex-wrap gap-4 text-sm text-gray-600">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4" />
+                {new Date(video.createdAt).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}
               </div>
+              {analysis && (
+                <div className="flex items-center gap-2 text-green-600">
+                  <Sparkles className="w-4 h-4" />
+                  Analyzed
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
+      </div>
 
-        {/* Toggle Buttons */}
-        <div className="flex gap-4 mb-6">
+      <div className="max-w-7xl mx-auto p-6">
+        {/* Video Preview */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white rounded-2xl shadow-sm overflow-hidden mb-6"
+        >
+          <div className="relative bg-black aspect-video">
+            {video.playbackUrl ? (
+              <video 
+                id="videoPlayer"
+                controls
+                className="w-full h-full"
+                preload="metadata"
+              >
+                <source src={video.playbackUrl} type={video.mimeType || 'video/mp4'} />
+                Your browser does not support the video tag.
+              </video>
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <div className="text-center text-white p-8">
+                  <Play className="w-20 h-20 mx-auto mb-4 opacity-50" />
+                  <p className="text-lg font-semibold mb-2">Video Preview</p>
+                  <p className="text-sm opacity-75">Video not available for playback</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </motion.div>
+
+        {/* Action Tabs */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="flex gap-3 mb-6"
+        >
           <button
             onClick={() => setActiveSection('analysis')}
-            className={`flex-1 py-4 px-6 rounded-lg font-semibold text-lg transition-all duration-200 flex items-center justify-center gap-2 ${
+            className={`flex-1 py-4 px-6 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${
               activeSection === 'analysis'
-                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg scale-105'
-                : 'bg-white text-gray-700 hover:bg-gray-50 shadow border border-gray-200'
+                ? 'bg-blue-600 text-white shadow-lg'
+                : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
             }`}
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
+            <Sparkles className="w-5 h-5" />
             Analyze Video
           </button>
           
           <button
             onClick={() => setActiveSection('chat')}
-            className={`flex-1 py-4 px-6 rounded-lg font-semibold text-lg transition-all duration-200 flex items-center justify-center gap-2 ${
+            className={`flex-1 py-4 px-6 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${
               activeSection === 'chat'
-                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg scale-105'
-                : 'bg-white text-gray-700 hover:bg-gray-50 shadow border border-gray-200'
+                ? 'bg-blue-600 text-white shadow-lg'
+                : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
             }`}
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-            </svg>
+            <MessageSquare className="w-5 h-5" />
             Chat with Video
           </button>
-        </div>
+        </motion.div>
 
-        {/* Chat Section - Hidden but preserved when not active */}
-        <div className={`mb-6 ${activeSection === 'chat' ? '' : 'hidden'}`}>
-          <VideoChat videoId={id} />
-        </div>
+        {/* Content Sections */}
+        <AnimatePresence mode="wait">
+          {activeSection === 'chat' && (
+            <motion.div
+              key="chat"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.2 }}
+            >
+              <VideoChat videoId={id} />
+            </motion.div>
+          )}
 
-        {/* Analysis Section - Only shown when activeSection is 'analysis' */}
-        {activeSection === 'analysis' && (
-          <>
-            {analysis ? (
-              <div className="bg-white rounded-lg shadow-lg p-8">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-bold text-gray-900">AI Analysis</h2>
-                  <span className="text-sm text-gray-500">
-                    Analyzed: {new Date(analysis.createdAt).toLocaleString()}
-                  </span>
-                </div>
-                
-                <div className="prose max-w-none">
+          {activeSection === 'analysis' && (
+            <motion.div
+              key="analysis"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.2 }}
+            >
+              {analysis ? (
+                <div className="bg-white rounded-2xl shadow-sm p-8">
+                  <div className="flex justify-between items-center mb-8">
+                    <h2 className="text-2xl font-bold text-gray-900">AI Analysis</h2>
+                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                      <Clock className="w-4 h-4" />
+                      {new Date(analysis.createdAt).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </div>
+                  </div>
+                  
                   <div className="mb-8">
                     <h3 className="text-xl font-semibold mb-3 text-gray-800">Summary</h3>
-                    <p className="text-gray-700 leading-relaxed">{analysis.summary}</p>
+                    <p className="text-gray-700 leading-relaxed text-lg">{analysis.summary}</p>
                   </div>
                   
                   {analysis.scenes && analysis.scenes.length > 0 && (
                     <div>
                       <h3 className="text-xl font-semibold mb-4 text-gray-800">Scene Breakdown</h3>
                       <p className="text-sm text-gray-600 mb-4">Click on timestamps to jump to that moment in the video</p>
-                      <div className="space-y-4">
+                      <div className="space-y-3">
                         {analysis.scenes.map((scene: any, i: number) => (
-                          <div key={i} className="border-l-4 border-blue-500 pl-4 py-2 bg-blue-50 rounded-r hover:bg-blue-100 transition-colors">
-                            <div className="flex items-baseline gap-2 mb-1 flex-wrap">
-                              <span className="font-mono text-sm text-gray-500">[</span>
+                          <div key={i} className="border-l-4 border-blue-500 pl-5 py-3 bg-blue-50 rounded-r hover:bg-blue-100 transition-colors">
+                            <div className="flex items-baseline gap-2 mb-2 flex-wrap">
                               <button
                                 onClick={() => {
                                   const videoEl = document.getElementById('videoPlayer') as HTMLVideoElement;
@@ -182,49 +231,34 @@ export default function VideoPage({ params }: { params: Promise<{ id: string }> 
                                     videoEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
                                   }
                                 }}
-                                className="font-mono text-sm text-blue-600 font-semibold hover:text-blue-800 hover:underline cursor-pointer transition-colors bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded"
+                                className="inline-flex items-center gap-1 px-3 py-1 bg-white text-blue-600 font-mono text-sm font-semibold hover:bg-blue-600 hover:text-white rounded-lg transition-colors"
                                 title={`Click to jump to ${scene.start}`}
                               >
-                                {scene.start}
+                                <Play className="w-3 h-3" />
+                                {scene.start} - {scene.end}
                               </button>
-                              <span className="font-mono text-sm text-gray-500">-</span>
-                              <button
-                                onClick={() => {
-                                  const videoEl = document.getElementById('videoPlayer') as HTMLVideoElement;
-                                  if (videoEl) {
-                                    const time = parseTimeToSeconds(scene.end);
-                                    videoEl.currentTime = time;
-                                    videoEl.play();
-                                    videoEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                  }
-                                }}
-                                className="font-mono text-sm text-blue-600 font-semibold hover:text-blue-800 hover:underline cursor-pointer transition-colors bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded"
-                                title={`Click to jump to ${scene.end}`}
-                              >
-                                {scene.end}
-                              </button>
-                              <span className="font-mono text-sm text-gray-500">]</span>
-                              <span className="font-semibold text-gray-900 ml-2">{scene.label}</span>
+                              <span className="font-semibold text-gray-900">{scene.label}</span>
                             </div>
-                            <p className="text-sm text-gray-600">{scene.description}</p>
+                            <p className="text-gray-600 leading-relaxed">{scene.description}</p>
+                          </div>
                           </div>
                         ))}
                       </div>
                     </div>
                   )}
                 </div>
-              </div>
-            ) : (
-              <StreamingAnalysis 
-                videoId={id} 
-                onAnalysisComplete={(completedAnalysis) => {
-                  setAnalysis(completedAnalysis);
-                }}
-              />
-            )}
-          </>
-        )}
+              ) : (
+                <StreamingAnalysis 
+                  videoId={id} 
+                  onAnalysisComplete={(completedAnalysis) => {
+                    setAnalysis(completedAnalysis);
+                  }}
+                />
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
-    </main>
+    </div>
   );
 }

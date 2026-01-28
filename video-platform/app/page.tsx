@@ -1,39 +1,168 @@
-import VideoUpload from '@/components/VideoUpload';
+'use client';
+
+import { motion } from 'framer-motion';
+import { Sparkles, Upload, Search, Zap, Clock, Brain } from 'lucide-react';
+import Link from 'next/link';
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-5xl font-bold text-center mb-4 text-gray-900">
-          Gemini Video Analysis Platform
-        </h1>
-        <p className="text-center text-gray-600 mb-12 text-lg">
-          Upload your videos and get AI-powered analysis with streaming results
-        </p>
-        <VideoUpload />
-        
-        <div className="mt-12 bg-white rounded-lg shadow-lg p-8">
-          <h2 className="text-2xl font-bold mb-4 text-gray-900">Features</h2>
-          <ul className="space-y-3 text-gray-700">
-            <li className="flex items-start">
-              <span className="text-green-500 mr-2">✓</span>
-              <span><strong>Real-time Analysis:</strong> Watch AI analyze your video with streaming responses</span>
-            </li>
-            <li className="flex items-start">
-              <span className="text-green-500 mr-2">✓</span>
-              <span><strong>Temporal Breakdown:</strong> Get precise scene detection with timestamps</span>
-            </li>
-            <li className="flex items-start">
-              <span className="text-green-500 mr-2">✓</span>
-              <span><strong>Persistent Results:</strong> Analysis cached for 48 hours</span>
-            </li>
-            <li className="flex items-start">
-              <span className="text-green-500 mr-2">✓</span>
-              <span><strong>Powered by Gemini 2.0:</strong> Latest AI model for video understanding</span>
-            </li>
-          </ul>
+    <div className="min-h-screen">
+      {/* Hero Section */}
+      <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700">
+        <div className="absolute inset-0 bg-grid-white/[0.05] bg-[size:20px_20px]" />
+        <div className="relative max-w-7xl mx-auto px-6 py-24 sm:py-32 lg:px-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="text-center"
+          >
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-full mb-8">
+              <Sparkles className="w-4 h-4 text-yellow-300" />
+              <span className="text-sm font-medium text-white">Powered by Gemini 3</span>
+            </div>
+            
+            <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-white mb-6 leading-tight">
+              Advanced Video Understanding
+              <br />
+              <span className="bg-gradient-to-r from-yellow-300 to-pink-300 bg-clip-text text-transparent">
+                with Gemini 3
+              </span>
+            </h1>
+            
+            <p className="text-xl sm:text-2xl text-blue-100 mb-8 max-w-3xl mx-auto">
+              Temporal & Spatial Reasoning – Understand video context across time and space
+            </p>
+            
+            <p className="text-lg text-blue-200 mb-12 max-w-2xl mx-auto">
+              Upload videos, search moments with natural language, and get AI-powered scene analysis with precise timestamps
+            </p>
+            
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link
+                href="/analyze"
+                className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-white text-blue-600 rounded-xl font-semibold text-lg hover:bg-blue-50 transition-all shadow-xl hover:shadow-2xl hover:scale-105"
+              >
+                <Upload className="w-5 h-5" />
+                Upload & Analyze
+              </Link>
+              <Link
+                href="/search"
+                className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-white/10 backdrop-blur-sm text-white rounded-xl font-semibold text-lg hover:bg-white/20 transition-all border border-white/20"
+              >
+                <Search className="w-5 h-5" />
+                Try Search
+              </Link>
+            </div>
+          </motion.div>
         </div>
       </div>
-    </main>
+
+      {/* Features Section */}
+      <div className="max-w-7xl mx-auto px-6 py-24 lg:px-8">
+        <motion.div
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          transition={{ duration: 0.6 }}
+          viewport={{ once: true }}
+          className="text-center mb-16"
+        >
+          <h2 className="text-4xl font-bold text-gray-900 mb-4">
+            Why Choose Gemini Video?
+          </h2>
+          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+            Professional-grade video analysis powered by state-of-the-art AI
+          </p>
+        </motion.div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {[
+            {
+              icon: Brain,
+              title: 'Temporal Reasoning',
+              description: 'Understand events across time with precise scene detection and timestamp markers',
+              color: 'from-blue-500 to-cyan-500',
+            },
+            {
+              icon: Search,
+              title: 'Natural Language Search',
+              description: 'Find moments with queries like "Find scenes where a red-nosed reindeer appears"',
+              color: 'from-purple-500 to-pink-500',
+            },
+            {
+              icon: Zap,
+              title: 'Real-time Analysis',
+              description: 'Watch AI analyze your video with streaming responses and instant feedback',
+              color: 'from-orange-500 to-red-500',
+            },
+            {
+              icon: Clock,
+              title: 'Timeline Visualization',
+              description: 'Interactive timeline with color-coded segments for easy navigation',
+              color: 'from-green-500 to-emerald-500',
+            },
+            {
+              icon: Sparkles,
+              title: 'Scene Understanding',
+              description: 'Deep comprehension of video content with spatial and contextual reasoning',
+              color: 'from-indigo-500 to-purple-500',
+            },
+            {
+              icon: Upload,
+              title: 'Easy Upload',
+              description: 'Drag & drop videos up to 2GB, processed and cached for 48 hours',
+              color: 'from-pink-500 to-rose-500',
+            },
+          ].map((feature, index) => (
+            <motion.div
+              key={feature.title}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: index * 0.1 }}
+              viewport={{ once: true }}
+              className="relative group"
+            >
+              <div className="h-full bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all border border-gray-100 hover:border-gray-200">
+                <div className={`inline-flex p-3 rounded-xl bg-gradient-to-br ${feature.color} mb-4`}>
+                  <feature.icon className="w-6 h-6 text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-3">
+                  {feature.title}
+                </h3>
+                <p className="text-gray-600 leading-relaxed">
+                  {feature.description}
+                </p>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+
+      {/* CTA Section */}
+      <div className="bg-gradient-to-br from-gray-900 to-gray-800 py-24">
+        <div className="max-w-4xl mx-auto px-6 text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            viewport={{ once: true }}
+          >
+            <h2 className="text-4xl font-bold text-white mb-6">
+              Ready to transform your video analysis?
+            </h2>
+            <p className="text-xl text-gray-300 mb-8">
+              Experience the power of Gemini 3's advanced video understanding
+            </p>
+            <Link
+              href="/analyze"
+              className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl font-semibold text-lg hover:from-blue-600 hover:to-indigo-700 transition-all shadow-xl hover:shadow-2xl hover:scale-105"
+            >
+              <Upload className="w-5 h-5" />
+              Get Started Free
+            </Link>
+          </motion.div>
+        </div>
+      </div>
+    </div>
   );
 }
