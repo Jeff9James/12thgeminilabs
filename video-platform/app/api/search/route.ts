@@ -3,6 +3,15 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
+interface SearchResult {
+  id: string;
+  videoId: string;
+  videoTitle: string;
+  timestamp: number;
+  snippet: string;
+  relevance: number;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { query, videos } = await request.json();
@@ -20,7 +29,7 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    const results = [];
+    const results: SearchResult[] = [];
 
     // Search through each video
     for (const video of videos) {
