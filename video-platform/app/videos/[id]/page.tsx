@@ -241,7 +241,6 @@ export default function VideoPage({ params }: { params: Promise<{ id: string }> 
                             </div>
                             <p className="text-gray-600 leading-relaxed">{scene.description}</p>
                           </div>
-                          </div>
                         ))}
                       </div>
                     </div>
