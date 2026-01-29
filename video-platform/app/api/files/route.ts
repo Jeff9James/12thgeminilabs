@@ -1,8 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { saveFile } from '@/lib/kv';
+import { saveFile, getFile, listFiles, deleteFile } from '@/lib/kv';
 import { FileCategory } from '@/lib/fileTypes';
 import { v4 as uuidv4 } from 'uuid';
 
+// GET /api/files - List all files for the current user
+export async function GET(request: NextRequest) {
+    try {
+        const files = await listFiles('demo-user');
+        return NextResponse.json({
+            success: true,
+            files
+        });
+    } catch (error: any) {
+        console.error('List files error:', error);
+        return NextResponse.json({
+            error: error.message
+        }, { status: 500 });
+    }
+}
+
+// POST /api/files - Save file metadata
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
@@ -27,7 +44,7 @@ export async function POST(request: NextRequest) {
             playbackUrl,
             uploadedAt: new Date().toISOString(),
             userId: 'demo-user',
-            status: 'ready'
+            status: 'ready' as const
         });
 
         return NextResponse.json({
@@ -36,6 +53,24 @@ export async function POST(request: NextRequest) {
         });
     } catch (error: any) {
         console.error('Save file metadata error:', error);
+        return NextResponse.json({
+            error: error.message
+        }, { status: 500 });
+    }
+}
+
+// DELETE /api/files - Delete all files (admin only)
+export async function DELETE(request: NextRequest) {
+    try {
+        const files = await listFiles('demo-user');
+        await Promise.all(files.map(f => deleteFile(f.id)));
+
+        return NextResponse.json({
+            success: true,
+            message: `Deleted ${files.length} files`
+        });
+    } catch (error: any) {
+        console.error('Delete files error:', error);
         return NextResponse.json({
             error: error.message
         }, { status: 500 });
