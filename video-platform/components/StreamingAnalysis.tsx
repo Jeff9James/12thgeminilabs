@@ -52,7 +52,6 @@ interface ParsedAnalysis {
   // Common
   keyPoints?: string[];
   description?: string;
-  setting?: string;
 }
 
 interface StreamingAnalysisProps {

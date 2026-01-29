@@ -29,7 +29,7 @@ export default function VideoPage({ params }: { params: Promise<{ id: string }> 
   useEffect(() => {
     params.then(async p => {
       setId(p.id);
-      
+
       // Try to get from API first, fallback to localStorage
       fetch(`/api/videos/${p.id}`)
         .then(async res => {
@@ -37,13 +37,13 @@ export default function VideoPage({ params }: { params: Promise<{ id: string }> 
           if (data.success) {
             // Try to get local file from IndexedDB for playback
             const playbackUrl = await createBlobUrl(p.id);
-            
+
             setVideo({
               ...data.data.video,
               playbackUrl: playbackUrl || data.data.video.playbackUrl,
             });
             setAnalysis(data.data.analysis);
-            
+
             // Default to chat view (always available), or analysis if it exists
             if (data.data.analysis) {
               setActiveSection('analysis');
@@ -55,17 +55,17 @@ export default function VideoPage({ params }: { params: Promise<{ id: string }> 
         })
         .catch(async err => {
           console.error('API fetch failed, trying localStorage:', err);
-          
+
           // Fallback to localStorage
           const storedVideos = localStorage.getItem('uploadedVideos');
           if (storedVideos) {
             const videos = JSON.parse(storedVideos);
             const localVideo = videos.find((v: any) => v.id === p.id);
-            
+
             if (localVideo) {
               // Get video file from IndexedDB
               const playbackUrl = await createBlobUrl(p.id);
-              
+
               setVideo({
                 id: localVideo.id,
                 title: localVideo.filename,
@@ -77,7 +77,7 @@ export default function VideoPage({ params }: { params: Promise<{ id: string }> 
               setActiveSection('chat');
             }
           }
-          
+
           setLoading(false);
         });
     });
@@ -114,10 +114,10 @@ export default function VideoPage({ params }: { params: Promise<{ id: string }> 
 
     // Run after a short delay to ensure video element is rendered
     const timer = setTimeout(handleTimestamp, 100);
-    
+
     // Also listen for hash changes
     window.addEventListener('hashchange', handleTimestamp);
-    
+
     return () => {
       clearTimeout(timer);
       window.removeEventListener('hashchange', handleTimestamp);
@@ -152,14 +152,14 @@ export default function VideoPage({ params }: { params: Promise<{ id: string }> 
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="max-w-7xl mx-auto">
-          <Link 
-            href="/videos" 
+          <Link
+            href="/videos"
             className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 font-medium mb-4"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to History
           </Link>
-          
+
           {/* Video Title & Meta */}
           <div className="mt-4">
             <h1 className="text-3xl font-bold text-gray-900 mb-2">{video.title}</h1>
@@ -194,7 +194,7 @@ export default function VideoPage({ params }: { params: Promise<{ id: string }> 
         >
           <div className="relative bg-black aspect-video">
             {video.playbackUrl ? (
-              <video 
+              <video
                 id="videoPlayer"
                 controls
                 className="w-full h-full"
@@ -224,23 +224,21 @@ export default function VideoPage({ params }: { params: Promise<{ id: string }> 
         >
           <button
             onClick={() => setActiveSection('analysis')}
-            className={`flex-1 py-4 px-6 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${
-              activeSection === 'analysis'
+            className={`flex-1 py-4 px-6 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${activeSection === 'analysis'
                 ? 'bg-blue-600 text-white shadow-lg'
                 : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-            }`}
+              }`}
           >
             <Sparkles className="w-5 h-5" />
             Analyze Video
           </button>
-          
+
           <button
             onClick={() => setActiveSection('chat')}
-            className={`flex-1 py-4 px-6 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${
-              activeSection === 'chat'
+            className={`flex-1 py-4 px-6 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${activeSection === 'chat'
                 ? 'bg-blue-600 text-white shadow-lg'
                 : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-            }`}
+              }`}
           >
             <MessageSquare className="w-5 h-5" />
             Chat with Video
@@ -283,12 +281,12 @@ export default function VideoPage({ params }: { params: Promise<{ id: string }> 
                       })}
                     </div>
                   </div>
-                  
+
                   <div className="mb-8">
                     <h3 className="text-xl font-semibold mb-3 text-gray-800">Summary</h3>
                     <p className="text-gray-700 leading-relaxed text-lg">{analysis.summary}</p>
                   </div>
-                  
+
                   {analysis.scenes && analysis.scenes.length > 0 && (
                     <div>
                       <h3 className="text-xl font-semibold mb-4 text-gray-800">Scene Breakdown</h3>
@@ -323,8 +321,9 @@ export default function VideoPage({ params }: { params: Promise<{ id: string }> 
                   )}
                 </div>
               ) : (
-                <StreamingAnalysis 
-                  videoId={id} 
+                <StreamingAnalysis
+                  fileId={id}
+                  category="video"
                   onAnalysisComplete={(completedAnalysis) => {
                     setAnalysis(completedAnalysis);
                   }}

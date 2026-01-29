@@ -98,7 +98,7 @@ export default function FilePage({ params }: { params: Promise<{ id: string }> }
                             title: localFile.filename || localFile.title,
                             fileName: localFile.filename || localFile.title,
                             category: localFile.category || 'video',
-                            playbackUrl: playbackUrl,
+                            playbackUrl: playbackUrl || undefined,
                             geminiFileUri: localFile.geminiFileUri,
                             mimeType: localFile.mimeType || 'video/mp4',
                             size: localFile.size,
@@ -179,6 +179,20 @@ export default function FilePage({ params }: { params: Promise<{ id: string }> }
     const isVideo = file?.category === 'video';
     const isAudio = file?.category === 'audio';
     const hasTimestamps = isVideo; // Only videos have timestamp features
+
+    // Early return if file is not loaded yet
+    if (!file) {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
+                <div className="max-w-4xl mx-auto text-center">
+                    <h1 className="text-3xl font-bold text-gray-900 mb-4">File not found</h1>
+                    <Link href="/" className="text-blue-600 hover:text-blue-800 underline">
+                        Go back home
+                    </Link>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-gray-50">
