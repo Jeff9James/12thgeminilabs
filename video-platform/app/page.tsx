@@ -21,23 +21,23 @@ export default function Home() {
               <Sparkles className="w-4 h-4 text-yellow-300" />
               <span className="text-sm font-medium text-white">Powered by Gemini 3</span>
             </div>
-            
+
             <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-white mb-6 leading-tight">
-              Advanced Video Understanding
+              Multi-Modal AI Analysis
               <br />
               <span className="bg-gradient-to-r from-yellow-300 to-pink-300 bg-clip-text text-transparent">
                 with Gemini 3
               </span>
             </h1>
-            
+
             <p className="text-xl sm:text-2xl text-blue-100 mb-8 max-w-3xl mx-auto">
-              Temporal & Spatial Reasoning – Understand video context across time and space
+              Videos, Images, Audio, PDFs & Documents – All analyzed by state-of-the-art AI
             </p>
-            
+
             <p className="text-lg text-blue-200 mb-12 max-w-2xl mx-auto">
-              Upload videos, search moments with natural language, and get AI-powered scene analysis with precise timestamps
+              Upload any file type and get AI-powered analysis, chat with your content, and extract insights
             </p>
-            
+
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
                 href="/analyze"
@@ -68,10 +68,10 @@ export default function Home() {
           className="text-center mb-16"
         >
           <h2 className="text-4xl font-bold text-gray-900 mb-4">
-            Why Choose Gemini Video?
+            Why Choose Gemini Files?
           </h2>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Professional-grade video analysis powered by state-of-the-art AI
+            Professional-grade multi-modal analysis powered by state-of-the-art AI
           </p>
         </motion.div>
 
@@ -79,38 +79,38 @@ export default function Home() {
           {[
             {
               icon: Brain,
-              title: 'Temporal Reasoning',
-              description: 'Understand events across time with precise scene detection and timestamp markers',
+              title: 'Multi-Modal Understanding',
+              description: 'Analyze videos, images, audio, PDFs, and documents with the same powerful AI',
               color: 'from-blue-500 to-cyan-500',
             },
             {
               icon: Search,
               title: 'Natural Language Search',
-              description: 'Find moments with queries like "Find scenes where a red-nosed reindeer appears"',
+              description: 'Find moments in videos or content in documents with simple queries',
               color: 'from-purple-500 to-pink-500',
             },
             {
               icon: Zap,
               title: 'Real-time Analysis',
-              description: 'Watch AI analyze your video with streaming responses and instant feedback',
+              description: 'Watch AI analyze your files with streaming responses and instant feedback',
               color: 'from-orange-500 to-red-500',
             },
             {
               icon: Clock,
-              title: 'Timeline Visualization',
-              description: 'Interactive timeline with color-coded segments for easy navigation',
+              title: 'Timeline & OCR',
+              description: 'Video timestamps, image text extraction, and document parsing',
               color: 'from-green-500 to-emerald-500',
             },
             {
               icon: Sparkles,
-              title: 'Scene Understanding',
-              description: 'Deep comprehension of video content with spatial and contextual reasoning',
+              title: 'Intelligent Chat',
+              description: 'Chat with your files - ask questions about any content type',
               color: 'from-indigo-500 to-purple-500',
             },
             {
               icon: Upload,
-              title: 'Easy Upload',
-              description: 'Drag & drop videos up to 2GB, processed and cached for 48 hours',
+              title: 'Universal Upload',
+              description: 'Support for 20+ file formats including video, audio, images, and documents',
               color: 'from-pink-500 to-rose-500',
             },
           ].map((feature, index) => (
@@ -148,10 +148,10 @@ export default function Home() {
             viewport={{ once: true }}
           >
             <h2 className="text-4xl font-bold text-white mb-6">
-              Ready to transform your video analysis?
+              Ready to analyze your files with AI?
             </h2>
             <p className="text-xl text-gray-300 mb-8">
-              Experience the power of Gemini 3's advanced video understanding
+              Experience the power of Gemini 3's multi-modal understanding
             </p>
             <Link
               href="/analyze"

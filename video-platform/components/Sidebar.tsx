@@ -2,16 +2,16 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Video, Search, Sparkles, PlayCircle, Menu, X } from 'lucide-react';
+import { FileText, Search, Sparkles, Menu, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const navItems = [
   {
-    name: 'History',
-    href: '/videos',
-    icon: Video,
+    name: 'My Files',
+    href: '/files',
+    icon: FileText,
   },
   {
     name: 'Search',
@@ -36,7 +36,7 @@ export default function Sidebar() {
           <Sparkles className="w-5 h-5 text-white" />
         </div>
         <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-          Gemini Video
+          Gemini Files
         </span>
       </div>
 
@@ -69,7 +69,7 @@ export default function Sidebar() {
             Powered by Gemini 3
           </h3>
           <p className="text-xs text-gray-600">
-            Advanced video understanding with temporal & spatial reasoning
+            Multi-modal AI analysis for videos, images, audio, PDFs & documents
           </p>
         </div>
       </div>

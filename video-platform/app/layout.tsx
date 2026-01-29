@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Gemini Video Platform - Advanced Video Understanding",
-  description: "Powered by Gemini 3: Temporal & Spatial Reasoning for Video Analysis",
+  title: "Gemini Files - Multi-Modal AI Analysis Platform",
+  description: "Powered by Gemini 3: Analyze videos, images, audio, PDFs, and documents with AI",
 };
 
 export default function RootLayout({
