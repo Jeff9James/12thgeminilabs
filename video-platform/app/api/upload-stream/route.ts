@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { saveFile } from '@/lib/kv';
-import { validateFile, formatFileSize, FileCategory } from '@/lib/fileTypes';
+import { validateFile, formatFileSize, FileCategory, needsConversionForGemini } from '@/lib/fileTypes';
+import { convertSpreadsheetBufferToCSV } from '@/lib/spreadsheetConverter';
 import { v4 as uuidv4 } from 'uuid';
 import { put } from '@vercel/blob';
 
@@ -57,6 +58,27 @@ export async function POST(request: NextRequest) {
 
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: 'Uploading to Gemini for analysis...' })}\n\n`));
 
+        // Check if file needs conversion for Gemini (spreadsheets)
+        let geminiFileData = fileData;
+        let geminiMimeType = file.type;
+        let geminiFileName = file.name;
+
+        if (needsConversionForGemini(file.type)) {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: 'Converting spreadsheet to CSV for Gemini...' })}\n\n`));
+          
+          try {
+            const converted = convertSpreadsheetBufferToCSV(fileBuffer, file.name);
+            geminiFileData = Buffer.from(converted.csvData);
+            geminiMimeType = 'text/csv';
+            geminiFileName = converted.filename;
+            
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: 'Converted to CSV successfully' })}\n\n`));
+          } catch (conversionError: any) {
+            console.error('Conversion error:', conversionError);
+            throw new Error(`Failed to convert spreadsheet: ${conversionError.message}`);
+          }
+        }
+
         // Use Gemini REST API for resumable upload
         const apiKey = process.env.GEMINI_API_KEY!;
 
@@ -66,14 +88,14 @@ export async function POST(request: NextRequest) {
           headers: {
             'X-Goog-Upload-Protocol': 'resumable',
             'X-Goog-Upload-Command': 'start',
-            'X-Goog-Upload-Header-Content-Length': fileData.length.toString(),
-            'X-Goog-Upload-Header-Content-Type': file.type,
+            'X-Goog-Upload-Header-Content-Length': geminiFileData.length.toString(),
+            'X-Goog-Upload-Header-Content-Type': geminiMimeType,
             'Content-Type': 'application/json',
             'x-goog-api-key': apiKey
           },
           body: JSON.stringify({
             file: {
-              display_name: file.name
+              display_name: geminiFileName
             }
           })
         });
@@ -83,17 +105,17 @@ export async function POST(request: NextRequest) {
           throw new Error('Failed to initialize upload');
         }
 
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: `Uploading ${formatFileSize(fileData.length)}...` })}\n\n`));
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: `Uploading ${formatFileSize(geminiFileData.length)}...` })}\n\n`));
 
         // Step 2: Upload the file
         const uploadResponse = await fetch(uploadUrl, {
           method: 'POST',
           headers: {
-            'Content-Length': fileData.length.toString(),
+            'Content-Length': geminiFileData.length.toString(),
             'X-Goog-Upload-Offset': '0',
             'X-Goog-Upload-Command': 'upload, finalize'
           },
-          body: fileData
+          body: geminiFileData
         });
 
         if (!uploadResponse.ok) {

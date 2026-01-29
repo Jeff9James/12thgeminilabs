@@ -64,16 +64,18 @@ export const FILE_TYPE_CONFIGS: Record<FileCategory, FileTypeConfig> = {
     spreadsheet: {
         category: 'spreadsheet',
         mimeTypes: [
-            'application/vnd.ms-excel',
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'application/vnd.oasis.opendocument.spreadsheet',
-            'text/csv',
+            'application/vnd.ms-excel', // .xls (old Excel) - NOT supported by Gemini, will be converted
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx - NOT supported by Gemini, will be converted
+            'application/vnd.oasis.opendocument.spreadsheet', // .ods - NOT supported by Gemini, will be converted
+            'text/csv', // CSV - SUPPORTED by Gemini
         ],
         extensions: ['.xls', '.xlsx', '.ods', '.csv'],
         maxSizeMB: 50, // 50MB
-        geminiSupported: true,
-        description: 'Spreadsheets (XLS, XLSX, CSV)',
+        geminiSupported: true, // CSV is supported, others need conversion
+        description: 'Spreadsheets (XLS, XLSX, ODS, CSV)',
     },
+=======
+=======
     text: {
         category: 'text',
         mimeTypes: ['text/plain', 'text/markdown', 'text/html', 'text/xml', 'application/json'],
@@ -253,4 +255,25 @@ export function getGeminiMediaResolution(category: FileCategory): string {
         default:
             return 'media_resolution_medium';
     }
+}
+
+/**
+ * Check if a spreadsheet MIME type is supported by Gemini API
+ * Only text/csv is natively supported
+ */
+export function isSpreadsheetSupportedByGemini(mimeType: string): boolean {
+    return mimeType === 'text/csv' || mimeType === 'text/plain';
+}
+
+/**
+ * Check if a file needs conversion before uploading to Gemini
+ */
+export function needsConversionForGemini(mimeType: string): boolean {
+    // Old Excel (.xls), modern Excel (.xlsx), and OpenDocument (.ods) need conversion to CSV
+    const unsupportedSpreadsheetTypes = [
+        'application/vnd.ms-excel', // .xls
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+        'application/vnd.oasis.opendocument.spreadsheet', // .ods
+    ];
+    return unsupportedSpreadsheetTypes.includes(mimeType);
 }

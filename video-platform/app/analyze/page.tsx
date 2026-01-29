@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Upload, Sparkles, Video as VideoIcon, X, Link as LinkIcon, FileText, Image as ImageIcon, Music, FileSpreadsheet } from 'lucide-react';
 import { saveVideoFile, savePDFFile, saveFile } from '@/lib/indexeddb';
-import { validateFile, getFileCategory, formatFileSize, FILE_INPUT_ACCEPT, FileCategory, getFileIcon, getCategoryDisplayName } from '@/lib/fileTypes';
+import { validateFile, getFileCategory, formatFileSize, FILE_INPUT_ACCEPT, FileCategory, getFileIcon, getCategoryDisplayName, needsConversionForGemini } from '@/lib/fileTypes';
+import { convertSpreadsheetToCSV } from '@/lib/spreadsheetConverter';
 
 type UploadMode = 'file' | 'url';
 
@@ -195,6 +196,26 @@ export default function AnalyzePage() {
         fileName = file!.name;
         fileType = file!.type;
         fileSize = file!.size;
+      }
+
+      // Convert spreadsheet files to CSV before uploading to Gemini
+      if (needsConversionForGemini(fileType)) {
+        console.log('Converting spreadsheet to CSV for Gemini compatibility...');
+        setUploadStatus('Converting spreadsheet to CSV...');
+        
+        try {
+          const convertedFile = await convertSpreadsheetToCSV(fileData as File);
+          fileData = convertedFile;
+          fileName = convertedFile.name;
+          fileType = 'text/csv';
+          fileSize = convertedFile.size;
+          
+          console.log('Converted to CSV:', fileName);
+          setUploadStatus('Converted to CSV successfully');
+        } catch (conversionError: any) {
+          console.error('Conversion error:', conversionError);
+          throw new Error(`Failed to convert spreadsheet: ${conversionError.message}`);
+        }
       }
 
       // Step 1: Initialize resumable upload DIRECTLY to Gemini

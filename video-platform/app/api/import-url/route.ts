@@ -1,7 +1,8 @@
 import { NextRequest } from 'next/server';
 import { saveFile } from '@/lib/kv';
 import { v4 as uuidv4 } from 'uuid';
-import { getFileCategoryFromMimeType, getFileCategoryFromExtension, FileCategory } from '@/lib/fileTypes';
+import { getFileCategoryFromMimeType, getFileCategoryFromExtension, FileCategory, needsConversionForGemini } from '@/lib/fileTypes';
+import { convertSpreadsheetBufferToCSV } from '@/lib/spreadsheetConverter';
 import { put } from '@vercel/blob';
 
 // Use Node.js runtime for fetch operations
@@ -260,13 +261,29 @@ export async function POST(request: NextRequest) {
 
                 sendEvent(controller, { progress: `Downloaded ${sizeInMB}MB, uploading to Gemini...` });
 
+                // Check if file needs conversion for Gemini (spreadsheets)
+                let geminiFileData = fileData;
+                let geminiMimeType = contentType;
+                let geminiDisplayName = customTitle || fileUrl.pathname.split('/').pop() || `file.${fileExtension}`;
+
+                if (needsConversionForGemini(contentType)) {
+                    sendEvent(controller, { progress: 'Converting spreadsheet to CSV for Gemini...' });
+                    
+                    try {
+                        const converted = convertSpreadsheetBufferToCSV(fileData.buffer, geminiDisplayName);
+                        geminiFileData = Buffer.from(converted.csvData);
+                        geminiMimeType = 'text/csv';
+                        geminiDisplayName = converted.filename;
+                        
+                        sendEvent(controller, { progress: 'Converted to CSV successfully' });
+                    } catch (conversionError: any) {
+                        console.error('Conversion error:', conversionError);
+                        throw new Error(`Failed to convert spreadsheet: ${conversionError.message}`);
+                    }
+                }
+
                 // Use Gemini REST API for resumable upload
                 const apiKey = process.env.GEMINI_API_KEY!;
-
-                // Extract filename from URL or use default
-                const urlPath = fileUrl.pathname;
-                const fileNameFromUrl = urlPath.split('/').pop() || `file.${fileExtension}`;
-                const displayName = customTitle || fileNameFromUrl;
 
                 // Step 1: Initialize resumable upload
                 const initResponse = await fetch('https://generativelanguage.googleapis.com/upload/v1beta/files', {
@@ -274,14 +291,14 @@ export async function POST(request: NextRequest) {
                     headers: {
                         'X-Goog-Upload-Protocol': 'resumable',
                         'X-Goog-Upload-Command': 'start',
-                        'X-Goog-Upload-Header-Content-Length': fileData.length.toString(),
-                        'X-Goog-Upload-Header-Content-Type': contentType,
+                        'X-Goog-Upload-Header-Content-Length': geminiFileData.length.toString(),
+                        'X-Goog-Upload-Header-Content-Type': geminiMimeType,
                         'Content-Type': 'application/json',
                         'x-goog-api-key': apiKey
                     },
                     body: JSON.stringify({
                         file: {
-                            display_name: displayName
+                            display_name: geminiDisplayName
                         }
                     })
                 });
@@ -295,11 +312,11 @@ export async function POST(request: NextRequest) {
                 const uploadResponse = await fetch(uploadUrl, {
                     method: 'POST',
                     headers: {
-                        'Content-Length': fileData.length.toString(),
+                        'Content-Length': geminiFileData.length.toString(),
                         'X-Goog-Upload-Offset': '0',
                         'X-Goog-Upload-Command': 'upload, finalize'
                     },
-                    body: fileData
+                    body: geminiFileData
                 });
 
                 if (!uploadResponse.ok) {
