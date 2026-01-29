@@ -11,6 +11,7 @@ export interface FileMetadata {
   category: FileCategory;
   size: number;
   geminiFileUri?: string;
+  geminiFileName?: string;
   playbackUrl?: string; // For video/audio files stored in blob storage
   uploadedAt: string;
   status: 'uploading' | 'processing' | 'ready' | 'error';
