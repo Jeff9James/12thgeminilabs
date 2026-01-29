@@ -113,6 +113,14 @@ export function getFileCategory(mimeType: string): FileCategory {
 }
 
 /**
+ * Get file category from MIME type (alias for getFileCategory)
+ */
+export function getFileCategoryFromMimeType(mimeType: string): FileCategory | null {
+    const category = getFileCategory(mimeType);
+    return category === 'unknown' ? null : category;
+}
+
+/**
  * Get file category from file extension
  */
 export function getFileCategoryFromExtension(filename: string): FileCategory {
