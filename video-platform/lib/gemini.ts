@@ -4,13 +4,13 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 export async function analyzeVideoStreaming(videoFileUri: string) {
   // Use Gemini 3 Flash as per official docs
-  const model = genAI.getGenerativeModel({ 
+  const model = genAI.getGenerativeModel({
     model: 'gemini-3-flash-preview',
     generationConfig: {
       temperature: 1.0, // Keep at default as per Gemini 3 docs
-    }
+    } as any // thinkingConfig added via type assertion for SDK compatibility
   });
-  
+
   const prompt = `Analyze this video and provide:
 1. A comprehensive summary
 2. Temporal breakdown of scenes with timestamps
@@ -47,11 +47,11 @@ export async function chatWithVideo(
   message: string,
   history: Array<{ role: string; content: string; thoughtSignature?: string }> = []
 ) {
-  const model = genAI.getGenerativeModel({ 
+  const model = genAI.getGenerativeModel({
     model: 'gemini-3-flash-preview',
     generationConfig: {
       temperature: 1.0, // Keep at default as per Gemini 3 docs
-    }
+    } as any
   });
 
   // Build the initial context with the video
@@ -107,7 +107,7 @@ Now, please answer the user's question about the video.`
 
   const result = await chat.sendMessage(message);
   const response = result.response;
-  
+
   return {
     text: response.text(),
     thoughtSignature: extractThoughtSignature(response),
@@ -137,10 +137,10 @@ function extractTimestamps(text: string): string[] {
   const timestampRegex = /\[(\d{1,2}):(\d{2})\]|\[(\d{1,2}):(\d{2}):(\d{2})\]/g;
   const timestamps: string[] = [];
   let match;
-  
+
   while ((match = timestampRegex.exec(text)) !== null) {
     timestamps.push(match[0]);
   }
-  
+
   return [...new Set(timestamps)]; // Remove duplicates
 }

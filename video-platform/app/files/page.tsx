@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { File, Clock, Calendar, Trash2, Play, Music, Image as LucideImageIcon, FileText, FileSpreadsheet, Eye } from 'lucide-react';
 import Link from 'next/link';
-import { deleteVideoFile } from '@/lib/indexeddb';
+import { deleteVideoFile, deletePDFFile } from '@/lib/indexeddb';
 import { FileCategory, getFileIcon, getCategoryDisplayName } from '@/lib/fileTypes';
 
 interface FileMetadata {
@@ -145,9 +145,10 @@ export default function FilesPage() {
             localStorage.setItem('uploadedVideos', JSON.stringify(filtered));
         }
 
-        // Clean up IndexedDB
+        // Clean up IndexedDB - try both video and PDF stores
         try {
             await deleteVideoFile(id);
+            await deletePDFFile(id);
         } catch (err) {
             console.warn('Failed to delete file from IndexedDB:', err);
         }

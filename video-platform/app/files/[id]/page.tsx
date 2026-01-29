@@ -7,7 +7,7 @@ import { FilePreview, FileTypeBadge, FileInfoCard } from '@/components/FilePrevi
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Play, Clock, Calendar, Sparkles, MessageSquare, FileText } from 'lucide-react';
-import { createBlobUrl } from '@/lib/indexeddb';
+import { createBlobUrl, createPDFBlobUrl } from '@/lib/indexeddb';
 import { FileCategory, getCategoryDisplayName, getFileIcon } from '@/lib/fileTypes';
 
 // Helper function to parse timestamps like "0:05" or "1:23" to seconds
@@ -31,6 +31,7 @@ interface FileData {
     geminiFileUri?: string;
     size?: number;
     createdAt: string;
+    uploadedAt?: string; // Alternative date field from localStorage
 }
 
 export default function FilePage({ params }: { params: Promise<{ id: string }> }) {
@@ -49,10 +50,14 @@ export default function FilePage({ params }: { params: Promise<{ id: string }> }
                 .then(async res => {
                     const data = await res.json();
                     if (data.success) {
-                        // Try to get local file from IndexedDB for playback/preview (video/audio/image)
+                        // Try to get local file from IndexedDB for playback/preview (video/audio/image/pdf)
                         let playbackUrl = data.data.file.playbackUrl;
-                        if (!playbackUrl && (data.data.file.category === 'video' || data.data.file.category === 'audio' || data.data.file.category === 'image')) {
-                            playbackUrl = await createBlobUrl(p.id) || undefined;
+                        if (!playbackUrl) {
+                            if (data.data.file.category === 'video' || data.data.file.category === 'audio' || data.data.file.category === 'image') {
+                                playbackUrl = await createBlobUrl(p.id) || undefined;
+                            } else if (data.data.file.category === 'pdf') {
+                                playbackUrl = await createPDFBlobUrl(p.id) || undefined;
+                            }
                         }
 
                         setFile({
@@ -90,19 +95,28 @@ export default function FilePage({ params }: { params: Promise<{ id: string }> }
                     }
 
                     if (localFile) {
-                        // Get file from IndexedDB for playback
-                        const playbackUrl = await createBlobUrl(p.id);
+                        // Get file from IndexedDB for playback/preview
+                        let playbackUrl: string | undefined;
+                        const fileCategory = localFile.category || 'video';
+                        if (fileCategory === 'video' || fileCategory === 'audio' || fileCategory === 'image') {
+                            playbackUrl = await createBlobUrl(p.id) || undefined;
+                        } else if (fileCategory === 'pdf') {
+                            playbackUrl = await createPDFBlobUrl(p.id) || undefined;
+                        }
+
+                        // Use uploadedAt from localStorage (set during upload) for correct date
+                        const uploadDate = localFile.uploadedAt || localFile.createdAt;
 
                         setFile({
                             id: localFile.id,
                             title: localFile.filename || localFile.title,
                             fileName: localFile.filename || localFile.title,
-                            category: localFile.category || 'video',
-                            playbackUrl: playbackUrl || undefined,
+                            category: fileCategory,
+                            playbackUrl: playbackUrl,
                             geminiFileUri: localFile.geminiFileUri,
                             mimeType: localFile.mimeType || 'video/mp4',
                             size: localFile.size,
-                            createdAt: localFile.uploadedAt || localFile.createdAt || new Date().toISOString(),
+                            createdAt: uploadDate || new Date().toISOString(),
                         });
                         setActiveSection('chat');
                     }
@@ -216,16 +230,20 @@ export default function FilePage({ params }: { params: Promise<{ id: string }> }
                         <div className="flex flex-wrap gap-4 text-sm text-gray-600">
                             <div className="flex items-center gap-2">
                                 <Calendar className="w-4 h-4" />
-                                {file.createdAt && !isNaN(new Date(file.createdAt).getTime())
-                                    ? new Date(file.createdAt).toLocaleDateString('en-US', {
-                                        month: 'short',
-                                        day: 'numeric',
-                                        year: 'numeric',
-                                        hour: '2-digit',
-                                        minute: '2-digit'
-                                    })
-                                    : 'Date not available'
-                                }
+                                {(() => {
+                                    // Try createdAt first, then uploadedAt (from localStorage)
+                                    const dateStr = file.createdAt || file.uploadedAt;
+                                    if (dateStr && !isNaN(new Date(dateStr).getTime())) {
+                                        return new Date(dateStr).toLocaleDateString('en-US', {
+                                            month: 'short',
+                                            day: 'numeric',
+                                            year: 'numeric',
+                                            hour: '2-digit',
+                                            minute: '2-digit'
+                                        });
+                                    }
+                                    return 'Date not available';
+                                })()}
                             </div>
                             {analysis && (
                                 <div className="flex items-center gap-2 text-green-600">

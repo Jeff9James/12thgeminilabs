@@ -272,12 +272,13 @@ export async function analyzeFileStreaming(
         model: 'gemini-3-flash-preview',
         generationConfig: {
             temperature: 1.0, // Keep at default as per Gemini 3 docs
-        }
+        } as any
     });
 
     const prompt = getAnalysisPrompt(category);
 
-    const result = await model.generateContentStream([
+    // Build request with thinking config for faster responses
+    const requestParts: any[] = [
         {
             fileData: {
                 mimeType: mimeType,
@@ -285,7 +286,25 @@ export async function analyzeFileStreaming(
             }
         },
         { text: prompt }
-    ]);
+    ];
+
+    // Add thinking config to minimize latency (low thinking level)
+    const generationConfig: any = {
+        temperature: 1.0,
+        thinkingConfig: {
+            thinkingLevel: 'low' // Minimize latency for faster analysis
+        }
+    };
+
+    // For PDFs, use medium media resolution as recommended in docs
+    if (category === 'pdf') {
+        requestParts[0].mediaResolution = { level: 'media_resolution_medium' };
+    }
+
+    const result = await model.generateContentStream({
+        contents: [{ role: 'user', parts: requestParts }],
+        generationConfig
+    });
 
     return result.stream;
 }
@@ -304,7 +323,10 @@ export async function chatWithFile(
         model: 'gemini-3-flash-preview',
         generationConfig: {
             temperature: 1.0, // Keep at default as per Gemini 3 docs
-        }
+            thinkingConfig: {
+                thinkingLevel: 'low' // Minimize latency for faster chat responses
+            }
+        } as any
     });
 
     const contextPrompt = getChatContextPrompt(category);
@@ -317,17 +339,22 @@ export async function chatWithFile(
     history.forEach(msg => {
         if (msg.role === 'user') {
             // Include file data with every user message so Gemini can reference it
+            const userParts: any[] = [
+                {
+                    fileData: {
+                        mimeType: mimeType,
+                        fileUri: fileUri
+                    }
+                },
+                { text: msg.content }
+            ];
+            // Add media resolution for PDFs
+            if (category === 'pdf') {
+                userParts[0].mediaResolution = { level: 'media_resolution_medium' };
+            }
             contents.push({
                 role: 'user',
-                parts: [
-                    {
-                        fileData: {
-                            mimeType: mimeType,
-                            fileUri: fileUri
-                        }
-                    },
-                    { text: msg.content }
-                ]
+                parts: userParts
             });
         } else {
             const parts: any[] = [{ text: msg.content }];
@@ -343,17 +370,22 @@ export async function chatWithFile(
 
     // If this is the first message (no history), add initial context
     if (contents.length === 0) {
+        const initialParts: any[] = [
+            {
+                fileData: {
+                    mimeType: mimeType,
+                    fileUri: fileUri
+                }
+            },
+            { text: contextPrompt }
+        ];
+        // Add media resolution for PDFs
+        if (category === 'pdf') {
+            initialParts[0].mediaResolution = { level: 'media_resolution_medium' };
+        }
         contents.push({
             role: 'user',
-            parts: [
-                {
-                    fileData: {
-                        mimeType: mimeType,
-                        fileUri: fileUri
-                    }
-                },
-                { text: contextPrompt }
-            ]
+            parts: initialParts
         });
         // Add model acknowledgment
         contents.push({
@@ -368,7 +400,7 @@ export async function chatWithFile(
     });
 
     // Send the current message with file data
-    const result = await chat.sendMessage([
+    const messageParts: any[] = [
         {
             fileData: {
                 mimeType: mimeType,
@@ -376,7 +408,13 @@ export async function chatWithFile(
             }
         },
         { text: message }
-    ]);
+    ];
+    // Add media resolution for PDFs
+    if (category === 'pdf') {
+        messageParts[0].mediaResolution = { level: 'media_resolution_medium' };
+    }
+
+    const result = await chat.sendMessage(messageParts);
 
     const response = result.response;
 

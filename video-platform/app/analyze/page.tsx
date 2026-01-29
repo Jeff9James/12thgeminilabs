@@ -4,7 +4,7 @@ import { useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Upload, Sparkles, Video as VideoIcon, X, Link as LinkIcon, FileText, Image as ImageIcon, Music, FileSpreadsheet } from 'lucide-react';
-import { saveVideoFile } from '@/lib/indexeddb';
+import { saveVideoFile, savePDFFile } from '@/lib/indexeddb';
 import { validateFile, getFileCategory, formatFileSize, FILE_INPUT_ACCEPT, FileCategory, getFileIcon, getCategoryDisplayName } from '@/lib/fileTypes';
 
 type UploadMode = 'file' | 'url';
@@ -290,18 +290,25 @@ export default function AnalyzePage() {
       setUploadProgress(95);
       setUploadStatus('Saving metadata...');
 
-      // Step 4: Save file to IndexedDB for playback/preview (video, audio, and images)
+      // Step 4: Save file to IndexedDB for playback/preview (video, audio, images, and PDFs)
       const videoId = Date.now().toString();
 
       if (uploadMode === 'file' && file) {
         const fileCategory = getFileCategory(fileType);
-        // Save video, audio, and image files to IndexedDB for local preview
+        // Save video, audio, image, and PDF files to IndexedDB for local preview
         if (fileCategory === 'video' || fileCategory === 'audio' || fileCategory === 'image') {
           console.log(`Saving ${fileCategory} file to IndexedDB...`);
           try {
             await saveVideoFile(videoId, file);
           } catch (err) {
             console.warn(`Failed to save ${fileCategory} file to IndexedDB:`, err);
+          }
+        } else if (fileCategory === 'pdf') {
+          console.log('Saving PDF file to IndexedDB...');
+          try {
+            await savePDFFile(videoId, file);
+          } catch (err) {
+            console.warn('Failed to save PDF file to IndexedDB:', err);
           }
         }
       }
