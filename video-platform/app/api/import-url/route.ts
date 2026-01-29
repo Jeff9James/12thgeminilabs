@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { saveFile } from '@/lib/kv';
 import { v4 as uuidv4 } from 'uuid';
 import { getFileCategoryFromMimeType, getFileCategoryFromExtension, FileCategory } from '@/lib/fileTypes';
+import { put } from '@vercel/blob';
 
 // Use Node.js runtime for fetch operations
 export const runtime = 'nodejs';
@@ -332,6 +333,22 @@ export async function POST(request: NextRequest) {
 
                 sendEvent(controller, { progress: 'Saving metadata...' });
 
+                // For images from URL, upload to Vercel Blob for reliable preview
+                let playbackUrl = url;
+                if (category === 'image') {
+                    try {
+                        sendEvent(controller, { progress: 'Saving image to cloud storage for preview...' });
+                        const blob = await put(`files/${fileId}-${displayName}`, fileData, {
+                            access: 'public',
+                            contentType: contentType
+                        });
+                        playbackUrl = blob.url;
+                    } catch (err) {
+                        console.warn('Failed to save image to Vercel Blob, using original URL:', err);
+                        // Fall back to original URL
+                    }
+                }
+
                 // Save metadata to KV
                 const fileMetadata = {
                     id: fileId,
@@ -340,7 +357,7 @@ export async function POST(request: NextRequest) {
                     geminiFileUri: geminiFileInfo.uri,
                     fileUri: geminiFileInfo.uri,
                     geminiFileName: geminiFileName,
-                    playbackUrl: url, // Store original URL for playback (if applicable)
+                    playbackUrl: playbackUrl, // Store URL for playback/preview
                     sourceUrl: url,   // Track the source
                     sourceType: 'url-import',
                     createdAt: new Date().toISOString(),

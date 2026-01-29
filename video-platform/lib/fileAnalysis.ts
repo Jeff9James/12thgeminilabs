@@ -309,30 +309,25 @@ export async function chatWithFile(
 
     const contextPrompt = getChatContextPrompt(category);
 
-    // Build the initial context with the file
-    const contents = [
-        {
-            role: 'user',
-            parts: [
-                {
-                    fileData: {
-                        mimeType: mimeType,
-                        fileUri: fileUri
-                    }
-                },
-                {
-                    text: contextPrompt
-                }
-            ]
-        }
-    ];
+    // Build the conversation contents with file data included in EVERY user message
+    // This is required for Gemini to maintain context of the file throughout the conversation
+    const contents: any[] = [];
 
-    // Add conversation history with thought signatures
+    // Add conversation history with file data attached to each user message
     history.forEach(msg => {
         if (msg.role === 'user') {
+            // Include file data with every user message so Gemini can reference it
             contents.push({
                 role: 'user',
-                parts: [{ text: msg.content }]
+                parts: [
+                    {
+                        fileData: {
+                            mimeType: mimeType,
+                            fileUri: fileUri
+                        }
+                    },
+                    { text: msg.content }
+                ]
             });
         } else {
             const parts: any[] = [{ text: msg.content }];
@@ -346,12 +341,43 @@ export async function chatWithFile(
         }
     });
 
-    // Start chat and send message
+    // If this is the first message (no history), add initial context
+    if (contents.length === 0) {
+        contents.push({
+            role: 'user',
+            parts: [
+                {
+                    fileData: {
+                        mimeType: mimeType,
+                        fileUri: fileUri
+                    }
+                },
+                { text: contextPrompt }
+            ]
+        });
+        // Add model acknowledgment
+        contents.push({
+            role: 'model',
+            parts: [{ text: 'I understand. I will analyze the file and answer your questions based on its content.' }]
+        });
+    }
+
+    // Start chat with history
     const chat = model.startChat({
-        history: contents.slice(0, -1),
+        history: contents,
     });
 
-    const result = await chat.sendMessage(message);
+    // Send the current message with file data
+    const result = await chat.sendMessage([
+        {
+            fileData: {
+                mimeType: mimeType,
+                fileUri: fileUri
+            }
+        },
+        { text: message }
+    ]);
+
     const response = result.response;
 
     return {

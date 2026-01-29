@@ -42,10 +42,10 @@ export async function POST(request: NextRequest) {
 
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: `Processing ${category} file (${formatFileSize(fileData.length)})...` })}\n\n`));
 
-        // Only upload to Vercel Blob for video and audio files (for playback)
+        // Upload to Vercel Blob for video, audio, and image files (for playback/preview)
         let playbackUrl: string | undefined;
-        if (category === 'video' || category === 'audio') {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: 'Saving to cloud storage for playback...' })}\n\n`));
+        if (category === 'video' || category === 'audio' || category === 'image') {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: 'Saving to cloud storage for preview...' })}\n\n`));
 
           const blob = await put(`files/${fileId}-${file.name}`, fileData, {
             access: 'public',

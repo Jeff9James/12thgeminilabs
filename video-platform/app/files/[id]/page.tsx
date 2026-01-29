@@ -49,9 +49,9 @@ export default function FilePage({ params }: { params: Promise<{ id: string }> }
                 .then(async res => {
                     const data = await res.json();
                     if (data.success) {
-                        // Try to get local file from IndexedDB for playback (video/audio only)
+                        // Try to get local file from IndexedDB for playback/preview (video/audio/image)
                         let playbackUrl = data.data.file.playbackUrl;
-                        if (!playbackUrl && (data.data.file.category === 'video' || data.data.file.category === 'audio')) {
+                        if (!playbackUrl && (data.data.file.category === 'video' || data.data.file.category === 'audio' || data.data.file.category === 'image')) {
                             playbackUrl = await createBlobUrl(p.id) || undefined;
                         }
 

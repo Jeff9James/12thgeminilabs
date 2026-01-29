@@ -290,15 +290,19 @@ export default function AnalyzePage() {
       setUploadProgress(95);
       setUploadStatus('Saving metadata...');
 
-      // Step 4: Save video file to IndexedDB for playback (only for file uploads)
+      // Step 4: Save file to IndexedDB for playback/preview (video, audio, and images)
       const videoId = Date.now().toString();
 
       if (uploadMode === 'file' && file) {
-        console.log('Saving video file to IndexedDB...');
-        try {
-          await saveVideoFile(videoId, file);
-        } catch (err) {
-          console.warn('Failed to save video to IndexedDB:', err);
+        const fileCategory = getFileCategory(fileType);
+        // Save video, audio, and image files to IndexedDB for local preview
+        if (fileCategory === 'video' || fileCategory === 'audio' || fileCategory === 'image') {
+          console.log(`Saving ${fileCategory} file to IndexedDB...`);
+          try {
+            await saveVideoFile(videoId, file);
+          } catch (err) {
+            console.warn(`Failed to save ${fileCategory} file to IndexedDB:`, err);
+          }
         }
       }
 
