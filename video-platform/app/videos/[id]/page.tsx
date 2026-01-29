@@ -129,7 +129,7 @@ export default function VideoPage({ params }: { params: Promise<{ id: string }> 
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading video...</p>
+          <p className="text-gray-600">Loading file...</p>
         </div>
       </div>
     );
@@ -225,8 +225,8 @@ export default function VideoPage({ params }: { params: Promise<{ id: string }> 
           <button
             onClick={() => setActiveSection('analysis')}
             className={`flex-1 py-4 px-6 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${activeSection === 'analysis'
-                ? 'bg-blue-600 text-white shadow-lg'
-                : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+              ? 'bg-blue-600 text-white shadow-lg'
+              : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
               }`}
           >
             <Sparkles className="w-5 h-5" />
@@ -236,8 +236,8 @@ export default function VideoPage({ params }: { params: Promise<{ id: string }> 
           <button
             onClick={() => setActiveSection('chat')}
             className={`flex-1 py-4 px-6 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${activeSection === 'chat'
-                ? 'bg-blue-600 text-white shadow-lg'
-                : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+              ? 'bg-blue-600 text-white shadow-lg'
+              : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
               }`}
           >
             <MessageSquare className="w-5 h-5" />

@@ -305,8 +305,11 @@ export default function AnalyzePage() {
       // Step 5: Save metadata to our database
       console.log('Saving metadata...');
 
+      // Determine file category from MIME type
+      const fileCategory = getFileCategory(fileType);
+
       try {
-        await fetch('/api/videos', {
+        await fetch('/api/files', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -318,6 +321,7 @@ export default function AnalyzePage() {
             geminiFileName: geminiFileName,
             mimeType: fileType,
             size: fileSize,
+            category: fileCategory,
             playbackUrl: undefined,
             sourceUrl: undefined,
             sourceType: 'file-upload',
@@ -327,13 +331,15 @@ export default function AnalyzePage() {
         console.warn('Failed to save to database, using localStorage only:', err);
       }
 
-      // Update localStorage
-      const existingVideos = JSON.parse(localStorage.getItem('uploadedVideos') || '[]');
-      const videoIndex = existingVideos.findIndex((v: any) => v.id === videoId);
+      // Update localStorage with new 'uploadedFiles' format
+      const existingFiles = JSON.parse(localStorage.getItem('uploadedFiles') || '[]');
+      const fileIndex = existingFiles.findIndex((f: any) => f.id === videoId);
 
-      const videoData = {
+      const fileMetadata = {
         id: videoId,
         filename: fileName,
+        category: fileCategory,
+        mimeType: fileType,
         uploadedAt: new Date().toISOString(),
         analyzed: false,
         geminiFileUri: fileInfo.uri,
@@ -343,17 +349,17 @@ export default function AnalyzePage() {
         sourceType: 'file-upload',
       };
 
-      if (videoIndex !== -1) {
-        existingVideos[videoIndex] = videoData;
+      if (fileIndex !== -1) {
+        existingFiles[fileIndex] = fileMetadata;
       } else {
-        existingVideos.push(videoData);
+        existingFiles.push(fileMetadata);
       }
 
-      localStorage.setItem('uploadedVideos', JSON.stringify(existingVideos));
+      localStorage.setItem('uploadedFiles', JSON.stringify(existingFiles));
       setUploadProgress(100);
 
-      // Redirect to video detail page
-      router.push(`/videos/${videoId}`);
+      // Redirect to file detail page
+      router.push(`/files/${videoId}`);
     } catch (error) {
       console.error('Upload error:', error);
       alert(`Upload failed: ${(error as Error).message}\n\nPlease try again or use a smaller video file.`);
