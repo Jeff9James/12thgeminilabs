@@ -582,6 +582,7 @@ export default function AnalyzePage() {
                 {/* Dynamic Preview based on file type */}
                 {fileCategory === 'video' && (
                   <video
+                    id="videoPlayer"
                     src={previewUrl}
                     controls
                     className="w-full"
@@ -596,7 +597,7 @@ export default function AnalyzePage() {
                     <div className="w-24 h-24 bg-purple-100 rounded-full flex items-center justify-center mb-4">
                       <Music className="w-12 h-12 text-purple-600" />
                     </div>
-                    <audio src={previewUrl} controls className="w-full max-w-md">
+                    <audio id="audioPlayer" src={previewUrl} controls className="w-full max-w-md">
                       Your browser does not support the audio tag.
                     </audio>
                     <p className="text-gray-600 mt-4">{file?.name}</p>

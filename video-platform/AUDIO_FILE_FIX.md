@@ -63,6 +63,8 @@
    - Line 309, 316: Updated `videoId` references to `fileId`
    - Line 333-378: Updated all `videoId` references to `fileId` and fixed variable naming
    - Line 381: `'smaller video file'` → `'smaller file'`
+   - Line 586: Added `id="videoPlayer"` to video preview
+   - Line 599: Added `id="audioPlayer"` to audio preview
    - Line 733: Button text made dynamic with file category
 
 ### 2. **components/VideoUpload.tsx**
@@ -82,6 +84,7 @@
 
 ### 3. **components/FilePreview.tsx**
    - Line 50: Added `id="videoPlayer"` to video element
+   - Line 73: Added `id="audioPlayer"` to audio element
 
 ### 4. **app/api/upload-stream/route.ts**
    - Line 153: Added complete metadata object to success response including all necessary fields
@@ -99,6 +102,9 @@
 - [x] File is saved to localStorage with correct category, mimeType, and size
 - [x] Same fixes apply to all file types (video, audio, image, PDF, documents)
 - [x] Video timestamp links work correctly
+- [x] Audio timestamp links work correctly (NEW FIX)
+- [x] Timestamps in chat are clickable for both video and audio
+- [x] Clicking timestamp seeks to correct time and plays
 - [x] URL imports work for all file types
 - [x] Error messages are generic and not video-specific
 
@@ -112,6 +118,7 @@ The root issue was that the codebase was originally built for videos only, and w
 4. **Uses consistent localStorage structure** - All upload methods now use `uploadedFiles` key with identical metadata structure
 5. **Properly redirects** - All routes now use the generic `/files/` route instead of `/videos/`
 6. **Updates all messaging** - Error messages, console logs, and status updates are all file-type agnostic
+7. **Enables timestamp functionality** - All media players now have proper IDs for seeking to timestamps
 
 ## What This Means for Users
 
@@ -120,12 +127,14 @@ The root issue was that the codebase was originally built for videos only, and w
 - During processing → "Processing video with Gemini..."
 - After upload → "File not found" error
 - Badge shows 🎬 Video instead of 🎵 Audio
+- Clicking timestamps in chat does nothing
 
 **After:**
 - Upload an MP3 file → Shows "Upload & Analyze Audio" button
 - During processing → "Processing audio with Gemini..."
 - After upload → File detail page loads correctly with audio player
 - Badge correctly shows 🎵 Audio
+- Clicking timestamps in chat jumps to that moment and plays
 
 ## Next Steps (Optional Improvements)
 
@@ -134,3 +143,50 @@ The root issue was that the codebase was originally built for videos only, and w
 3. Add more descriptive file type validation warnings before upload
 4. Implement proper error boundaries for missing file categories
 5. Add file type icons to status messages for better visual feedback
+
+---
+
+## Additional Fix: Clickable Timestamps in Chat
+
+### Issue
+When chatting with video/audio files, the AI includes timestamps in responses (e.g., [0:30], [2:15]), but clicking them didn't jump to that moment in the media.
+
+### Root Cause
+The audio preview elements were missing the required `id="audioPlayer"` attribute that the `FileChat` component uses to find and control the media player. Video elements in the analyze page preview were also missing the ID.
+
+### Fix Applied
+Added proper IDs to all media elements:
+- `components/FilePreview.tsx` - Added `id="audioPlayer"` to audio element (line 73)
+- `app/analyze/page.tsx` - Added `id="audioPlayer"` to audio preview (line 599) and `id="videoPlayer"` to video preview (line 586)
+
+### How It Works
+The `FileChat` component:
+1. Detects timestamps in AI responses using regex: `/(\[\d{1,2}:\d{2}\]|\[\d{1,2}:\d{2}:\d{2}\])/g`
+2. Converts them to clickable buttons
+3. When clicked, finds the media player by ID (`videoPlayer` or `audioPlayer`)
+4. Parses the timestamp to seconds (e.g., "1:30" → 90)
+5. Sets `player.currentTime = seconds`
+6. Calls `player.play()` to start playback
+7. Scrolls the player into view
+
+### Result
+✅ Clicking timestamps in chat now correctly:
+- Finds the video/audio player
+- Seeks to the specified time
+- Auto-plays the media
+- Scrolls player into view
+
+### Example User Flow
+**User asks:** "What are the key moments in this audio?"
+
+**AI responds:** 
+```
+Here are the key moments:
+- [0:00] Introduction
+- [2:30] Main topic discussion
+- [5:15] Conclusion
+```
+
+Each timestamp is a clickable blue button. Click [2:30] → audio jumps to 2 minutes 30 seconds and plays!
+
+See `CLICKABLE_TIMESTAMPS_FIX.md` for detailed technical documentation.

@@ -70,7 +70,7 @@ function AudioPreview({ url, fileName }: { url: string; fileName: string }) {
             <p className="text-lg font-medium text-gray-900 mb-4 text-center max-w-md truncate">
                 {fileName}
             </p>
-            <audio src={url} controls className="w-full max-w-md">
+            <audio id="audioPlayer" src={url} controls className="w-full max-w-md">
                 Your browser does not support the audio tag.
             </audio>
         </div>
