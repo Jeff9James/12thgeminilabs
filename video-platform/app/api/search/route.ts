@@ -18,6 +18,7 @@ interface SearchResult {
   timestamp: number;
   snippet: string;
   relevance: number;
+  category?: string;
 }
 
 // Note: Using responseMimeType alone forces JSON output
@@ -26,17 +27,17 @@ interface SearchResult {
 export async function POST(request: NextRequest) {
   try {
     const { query, videos } = await request.json();
-    
+
     if (!query || !videos || videos.length === 0) {
-      return NextResponse.json({ 
-        error: 'Query and videos are required' 
+      return NextResponse.json({
+        error: 'Query and videos are required'
       }, { status: 400 });
     }
 
     // Check cache first
     const cacheKey = createCacheKey(query, videos.map((v: any) => v.id));
     const cachedResults = await getSearchResults(cacheKey);
-    
+
     if (cachedResults) {
       console.log('Returning cached search results');
       return NextResponse.json({
@@ -53,7 +54,7 @@ export async function POST(request: NextRequest) {
 
       try {
         // Use Gemini 3 Flash for fastest response
-        const model = genAI.getGenerativeModel({ 
+        const model = genAI.getGenerativeModel({
           model: 'gemini-3-flash-preview',
           generationConfig: {
             temperature: 1.0,
@@ -61,16 +62,20 @@ export async function POST(request: NextRequest) {
           },
         });
 
+        // Determine file category for appropriate search prompt
+        const category = video.category || 'video';
+        const isVideoOrAudio = category === 'video' || category === 'audio';
+
         // Shortened, optimized prompt with explicit JSON format
         const prompt = `Search for: "${query}"
 
-Find matching moments and return as JSON array.
+Find matching content and return as JSON array.
 
 Format:
 [
   {
-    "timestamp": "MM:SS",
-    "description": "1-2 sentences",
+    ${isVideoOrAudio ? '"timestamp": "MM:SS",' : ''}
+    "description": "1-2 sentences describing the match",
     "relevance": 0-100
   }
 ]
@@ -88,7 +93,7 @@ Return empty array [] if no matches.`;
         ]);
 
         const response = result.response.text();
-        
+
         // Parse JSON response (guaranteed by responseSchema)
         let matches = [];
         try {
@@ -100,12 +105,13 @@ Return empty array [] if no matches.`;
 
         // Add video info to each match
         return matches.map((match: any) => ({
-          id: `${video.id}-${match.timestamp}`,
+          id: `${video.id}-${match.timestamp || '0'}`,
           videoId: video.id,
           videoTitle: video.filename || video.title,
           timestamp: parseTimestamp(match.timestamp),
           snippet: match.description,
           relevance: match.relevance / 100, // Convert to 0-1 scale
+          category: video.category || 'video',
         }));
 
       } catch (videoError) {
@@ -116,7 +122,7 @@ Return empty array [] if no matches.`;
 
     // Wait for ALL searches to complete in parallel
     const allResults = await Promise.all(searchPromises);
-    
+
     // Flatten results and sort by relevance
     const results = allResults
       .flat()
@@ -134,21 +140,23 @@ Return empty array [] if no matches.`;
 
   } catch (error: any) {
     console.error('Search error:', error);
-    return NextResponse.json({ 
-      error: error.message || 'Search failed' 
+    return NextResponse.json({
+      error: error.message || 'Search failed'
     }, { status: 500 });
   }
 }
 
 // Helper function to convert timestamp string to seconds
-function parseTimestamp(timestamp: string): number {
+function parseTimestamp(timestamp: string | undefined): number {
+  if (!timestamp) return 0;
+
   const parts = timestamp.replace(/[\[\]]/g, '').split(':');
-  
+
   if (parts.length === 2) {
     return parseInt(parts[0]) * 60 + parseInt(parts[1]);
   } else if (parts.length === 3) {
     return parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseInt(parts[2]);
   }
-  
+
   return 0;
 }

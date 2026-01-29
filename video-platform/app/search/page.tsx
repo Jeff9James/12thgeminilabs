@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search as SearchIcon, Sparkles, Clock, Video as VideoIcon } from 'lucide-react';
+import { Search as SearchIcon, Sparkles, Clock, Video as VideoIcon, Music, Image as ImageIcon, FileText, FileSpreadsheet, File } from 'lucide-react';
 
 interface SearchResult {
   id: string;
@@ -13,6 +13,7 @@ interface SearchResult {
   snippet: string;
   thumbnail?: string;
   relevance: number;
+  category?: string;
 }
 
 export default function SearchPage() {
@@ -32,26 +33,44 @@ export default function SearchPage() {
     setSearchStatus('Preparing search...');
 
     try {
-      // Get all videos from localStorage
+      // Get all files from localStorage (both new 'uploadedFiles' and legacy 'uploadedVideos')
+      const storedFiles = localStorage.getItem('uploadedFiles');
       const storedVideos = localStorage.getItem('uploadedVideos');
-      if (!storedVideos) {
-        alert('No videos found. Please upload some videos first.');
+
+      let allFiles: any[] = [];
+
+      if (storedFiles) {
+        const parsedFiles = JSON.parse(storedFiles);
+        allFiles = [...parsedFiles];
+      }
+
+      if (storedVideos) {
+        const parsedVideos = JSON.parse(storedVideos);
+        // Convert legacy video format to generic file format
+        const convertedVideos = parsedVideos.map((v: any) => ({
+          ...v,
+          category: v.category || 'video',
+          filename: v.filename || v.title || 'Unknown',
+        }));
+        allFiles = [...allFiles, ...convertedVideos];
+      }
+
+      if (allFiles.length === 0) {
+        alert('No files found. Please upload some files first.');
         setIsSearching(false);
         return;
       }
 
-      const videos = JSON.parse(storedVideos);
-      
-      // Filter videos that have been uploaded to Gemini
-      const searchableVideos = videos.filter((v: any) => v.geminiFileUri);
-      
-      if (searchableVideos.length === 0) {
-        alert('No videos available for search. Please upload and analyze videos first.');
+      // Filter files that have been uploaded to Gemini (all file types supported by Gemini)
+      const searchableFiles = allFiles.filter((f: any) => f.geminiFileUri);
+
+      if (searchableFiles.length === 0) {
+        alert('No files available for search. Please upload and analyze files first.');
         setIsSearching(false);
         return;
       }
 
-      setSearchStatus(`Searching ${searchableVideos.length} video${searchableVideos.length > 1 ? 's' : ''}...`);
+      setSearchStatus(`Searching ${searchableFiles.length} file${searchableFiles.length > 1 ? 's' : ''}...`);
 
       // Call search API
       const response = await fetch('/api/search', {
@@ -61,12 +80,13 @@ export default function SearchPage() {
         },
         body: JSON.stringify({
           query: query.trim(),
-          videos: searchableVideos.map((v: any) => ({
-            id: v.id,
-            filename: v.filename,
-            title: v.filename,
-            geminiFileUri: v.geminiFileUri,
-            mimeType: 'video/mp4',
+          videos: searchableFiles.map((f: any) => ({
+            id: f.id,
+            filename: f.filename,
+            title: f.filename,
+            geminiFileUri: f.geminiFileUri,
+            mimeType: f.mimeType || 'video/mp4',
+            category: f.category || 'video',
           }))
         })
       });
@@ -76,7 +96,7 @@ export default function SearchPage() {
       }
 
       const data = await response.json();
-      
+
       if (data.success) {
         setResults(data.results || []);
         if (data.cached) {
@@ -117,14 +137,14 @@ export default function SearchPage() {
           >
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-full mb-6">
               <Sparkles className="w-4 h-4 text-yellow-300" />
-              <span className="text-sm font-medium text-white">Natural Language Video Search</span>
+              <span className="text-sm font-medium text-white">Natural Language File Search</span>
             </div>
-            
+
             <h1 className="text-4xl lg:text-5xl font-bold text-white mb-4">
               Find moments that matter
             </h1>
             <p className="text-xl text-blue-100 max-w-2xl mx-auto">
-              Search across all your videos using natural language
+              Search across all your files using natural language - videos, images, audio, PDFs & more
             </p>
           </motion.div>
 
@@ -142,7 +162,7 @@ export default function SearchPage() {
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Find moments where a red-nosed reindeer appears"
+                placeholder="Search across videos, images, audio, PDFs, and documents..."
                 className="w-full pl-16 pr-32 py-6 text-lg rounded-2xl border-0 shadow-2xl focus:ring-4 focus:ring-blue-300 transition-all"
               />
               <button
@@ -164,9 +184,9 @@ export default function SearchPage() {
           >
             {[
               'Show me action scenes',
-              'Find dialogue about love',
-              'When does the car chase happen?',
-              'Scenes with outdoor settings',
+              'Find images with mountains',
+              'What does the PDF say about budget?',
+              'Audio clips about meetings',
             ].map((example) => (
               <button
                 key={example}
@@ -191,7 +211,7 @@ export default function SearchPage() {
               className="flex flex-col items-center justify-center py-20"
             >
               <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4" />
-              <p className="text-gray-600 text-lg">{searchStatus || 'Searching your videos...'}</p>
+              <p className="text-gray-600 text-lg">{searchStatus || 'Searching your files...'}</p>
               <p className="text-gray-500 text-sm mt-2">Using parallel AI search for faster results</p>
             </motion.div>
           )}
@@ -213,48 +233,102 @@ export default function SearchPage() {
 
               {/* Masonry Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {results.map((result, index) => (
-                  <motion.div
-                    key={result.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                    className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg transition-all cursor-pointer group"
-                    onClick={() => router.push(`/videos/${result.videoId}#t=${result.timestamp}`)}
-                  >
-                    {/* Thumbnail */}
-                    <div className="relative aspect-video bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center">
-                      <VideoIcon className="w-12 h-12 text-gray-400" />
-                      
-                      {/* Timestamp Badge */}
-                      <div className="absolute bottom-3 right-3 px-3 py-1 bg-black/80 text-white rounded-lg text-sm font-medium flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        {formatTimestamp(result.timestamp)}
+                {results.map((result, index) => {
+                  // Get icon and styling based on file category
+                  const isVideo = result.category === 'video' || !result.category;
+                  const isAudio = result.category === 'audio';
+                  const isImage = result.category === 'image';
+                  const isPDF = result.category === 'pdf';
+                  const isDocument = result.category === 'document' || result.category === 'text';
+                  const isSpreadsheet = result.category === 'spreadsheet';
+
+                  // Get gradient based on category
+                  let gradient = 'from-gray-200 to-gray-300';
+                  let iconColor = 'text-gray-400';
+                  let icon = <VideoIcon className="w-12 h-12 text-gray-400" />;
+                  let actionText = 'View Details';
+
+                  if (isVideo) {
+                    gradient = 'from-blue-100 to-blue-200';
+                    iconColor = 'text-blue-500';
+                    icon = <VideoIcon className={`w-12 h-12 ${iconColor}`} />;
+                    actionText = 'Play from ' + formatTimestamp(result.timestamp);
+                  } else if (isAudio) {
+                    gradient = 'from-purple-100 to-purple-200';
+                    iconColor = 'text-purple-500';
+                    icon = <Music className={`w-12 h-12 ${iconColor}`} />;
+                    actionText = 'Play from ' + formatTimestamp(result.timestamp);
+                  } else if (isImage) {
+                    gradient = 'from-green-100 to-green-200';
+                    iconColor = 'text-green-500';
+                    icon = <ImageIcon className={`w-12 h-12 ${iconColor}`} />;
+                    actionText = 'View Image';
+                  } else if (isPDF) {
+                    gradient = 'from-red-100 to-red-200';
+                    iconColor = 'text-red-500';
+                    icon = <FileText className={`w-12 h-12 ${iconColor}`} />;
+                    actionText = 'View PDF';
+                  } else if (isDocument) {
+                    gradient = 'from-orange-100 to-orange-200';
+                    iconColor = 'text-orange-500';
+                    icon = <FileText className={`w-12 h-12 ${iconColor}`} />;
+                    actionText = 'View Document';
+                  } else if (isSpreadsheet) {
+                    gradient = 'from-pink-100 to-pink-200';
+                    iconColor = 'text-pink-500';
+                    icon = <FileSpreadsheet className={`w-12 h-12 ${iconColor}`} />;
+                    actionText = 'View Spreadsheet';
+                  }
+
+                  return (
+                    <motion.div
+                      key={result.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg transition-all cursor-pointer group"
+                      onClick={() => router.push(`/files/${result.videoId}`)}
+                    >
+                      {/* Thumbnail */}
+                      <div className={`relative aspect-video bg-gradient-to-br ${gradient} flex items-center justify-center`}>
+                        {icon}
+
+                        {/* Timestamp Badge - only for video/audio */}
+                        {(isVideo || isAudio) && result.timestamp > 0 && (
+                          <div className="absolute bottom-3 right-3 px-3 py-1 bg-black/80 text-white rounded-lg text-sm font-medium flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {formatTimestamp(result.timestamp)}
+                          </div>
+                        )}
+
+                        {/* Relevance Badge */}
+                        <div className="absolute top-3 right-3 px-2 py-1 bg-green-500 text-white rounded text-xs font-bold">
+                          {Math.round(result.relevance * 100)}%
+                        </div>
                       </div>
 
-                      {/* Relevance Badge */}
-                      <div className="absolute top-3 right-3 px-2 py-1 bg-green-500 text-white rounded text-xs font-bold">
-                        {Math.round(result.relevance * 100)}%
-                      </div>
-                    </div>
+                      {/* Content */}
+                      <div className="p-5">
+                        <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
+                          {isVideo && <VideoIcon className="w-4 h-4" />}
+                          {isAudio && <Music className="w-4 h-4" />}
+                          {isImage && <ImageIcon className="w-4 h-4" />}
+                          {(isPDF || isDocument) && <FileText className="w-4 h-4" />}
+                          {isSpreadsheet && <FileSpreadsheet className="w-4 h-4" />}
+                          <span className="font-medium">{result.videoTitle}</span>
+                        </div>
 
-                    {/* Content */}
-                    <div className="p-5">
-                      <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
-                        <VideoIcon className="w-4 h-4" />
-                        <span className="font-medium">{result.videoTitle}</span>
-                      </div>
-                      
-                      <p className="text-gray-700 leading-relaxed line-clamp-3">
-                        {result.snippet}
-                      </p>
+                        <p className="text-gray-700 leading-relaxed line-clamp-3">
+                          {result.snippet}
+                        </p>
 
-                      <button className="mt-4 w-full px-4 py-2 bg-blue-50 text-blue-600 rounded-lg font-medium group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                        Play from {formatTimestamp(result.timestamp)}
-                      </button>
-                    </div>
-                  </motion.div>
-                ))}
+                        <button className="mt-4 w-full px-4 py-2 bg-blue-50 text-blue-600 rounded-lg font-medium group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                          {actionText}
+                        </button>
+                      </div>
+                    </motion.div>
+                  );
+                })}
               </div>
             </motion.div>
           )}
@@ -271,7 +345,7 @@ export default function SearchPage() {
                 No results found
               </h3>
               <p className="text-gray-600">
-                Try a different search query or upload more videos
+                Try a different search query or upload more files
               </p>
             </motion.div>
           )}
