@@ -48,6 +48,7 @@ export function FilePreview({ file, previewUrl, category, fileName, fileSize }: 
 function VideoPreview({ url }: { url: string }) {
     return (
         <video
+            id="videoPlayer"
             src={url}
             controls
             className="w-full"

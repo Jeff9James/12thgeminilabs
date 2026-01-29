@@ -41,12 +41,14 @@ export default function AnalyzePage() {
     const url = URL.createObjectURL(selectedFile);
     setPreviewUrl(url);
 
-    // Save to localStorage immediately
+    // Save to localStorage immediately (this is just temporary until actual upload)
     const fileId = Date.now().toString();
     const fileMetadata = {
       id: fileId,
       filename: selectedFile.name,
       category: category,
+      mimeType: selectedFile.type,
+      size: selectedFile.size,
       uploadedAt: new Date().toISOString(),
       analyzed: false,
       localUrl: url,
@@ -94,8 +96,8 @@ export default function AnalyzePage() {
       let fileSize: number;
 
       if (uploadMode === 'url') {
-        // Use server-side API to fetch and upload video from URL
-        setUploadStatus('Importing video from URL...');
+        // Use server-side API to fetch and upload file from URL
+        setUploadStatus('Importing file from URL...');
 
         const response = await fetch('/api/import-url', {
           method: 'POST',
@@ -109,7 +111,7 @@ export default function AnalyzePage() {
         });
 
         if (!response.ok) {
-          throw new Error(`Failed to import video: ${response.status} ${response.statusText}`);
+          throw new Error(`Failed to import file: ${response.status} ${response.statusText}`);
         }
 
         // Handle streaming response
@@ -164,11 +166,14 @@ export default function AnalyzePage() {
         // Use the metadata from the server
         const { metadata } = result;
 
-        // Update localStorage with the imported video
-        const existingVideos = JSON.parse(localStorage.getItem('uploadedVideos') || '[]');
-        const videoData = {
+        // Update localStorage with the imported file
+        const existingFiles = JSON.parse(localStorage.getItem('uploadedFiles') || '[]');
+        const fileData = {
           id: metadata.id,
           filename: metadata.title,
+          category: metadata.category || 'video',
+          mimeType: metadata.mimeType,
+          size: metadata.size,
           uploadedAt: metadata.createdAt,
           analyzed: false,
           geminiFileUri: metadata.geminiFileUri,
@@ -177,13 +182,13 @@ export default function AnalyzePage() {
           sourceUrl: metadata.sourceUrl,
           sourceType: metadata.sourceType,
         };
-        existingVideos.push(videoData);
-        localStorage.setItem('uploadedVideos', JSON.stringify(existingVideos));
+        existingFiles.push(fileData);
+        localStorage.setItem('uploadedFiles', JSON.stringify(existingFiles));
 
         setUploadProgress(100);
 
-        // Redirect to video detail page
-        router.push(`/videos/${metadata.id}`);
+        // Redirect to file detail page
+        router.push(`/files/${metadata.id}`);
         return; // Exit early since we've handled everything
       } else {
         fileData = file!;
@@ -248,8 +253,8 @@ export default function AnalyzePage() {
       setUploadProgress(60);
 
       // Step 3: Wait for Gemini processing
-      console.log('Waiting for Gemini to process video...');
-      setUploadStatus('Processing video with Gemini...');
+      console.log('Waiting for Gemini to process file...');
+      setUploadStatus('Processing file with Gemini...');
       let fileInfo = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/${geminiFileName}`,
         {
@@ -280,33 +285,35 @@ export default function AnalyzePage() {
       }
 
       if (fileInfo.state === 'FAILED') {
-        throw new Error('Video processing failed on Gemini servers');
+        throw new Error('File processing failed on Gemini servers');
       }
 
       if (fileInfo.state === 'PROCESSING') {
-        throw new Error('Video processing timeout. The video may still complete - check "My Videos" later.');
+        throw new Error('File processing timeout. The file may still complete - check "My Files" later.');
       }
 
       setUploadProgress(95);
       setUploadStatus('Saving metadata...');
 
       // Step 4: Save file to IndexedDB for playback/preview (video, audio, images, and PDFs)
-      const videoId = Date.now().toString();
+      const fileId = Date.now().toString();
+
+      // Determine file category from MIME type (do this once at the top)
+      const fileCat = getFileCategory(fileType);
 
       if (uploadMode === 'file' && file) {
-        const fileCategory = getFileCategory(fileType);
         // Save video, audio, image, and PDF files to IndexedDB for local preview
-        if (fileCategory === 'video' || fileCategory === 'audio' || fileCategory === 'image') {
-          console.log(`Saving ${fileCategory} file to IndexedDB...`);
+        if (fileCat === 'video' || fileCat === 'audio' || fileCat === 'image') {
+          console.log(`Saving ${fileCat} file to IndexedDB...`);
           try {
-            await saveVideoFile(videoId, file);
+            await saveVideoFile(fileId, file);
           } catch (err) {
-            console.warn(`Failed to save ${fileCategory} file to IndexedDB:`, err);
+            console.warn(`Failed to save ${fileCat} file to IndexedDB:`, err);
           }
-        } else if (fileCategory === 'pdf') {
+        } else if (fileCat === 'pdf') {
           console.log('Saving PDF file to IndexedDB...');
           try {
-            await savePDFFile(videoId, file);
+            await savePDFFile(fileId, file);
           } catch (err) {
             console.warn('Failed to save PDF file to IndexedDB:', err);
           }
@@ -316,9 +323,6 @@ export default function AnalyzePage() {
       // Step 5: Save metadata to our database
       console.log('Saving metadata...');
 
-      // Determine file category from MIME type
-      const fileCategory = getFileCategory(fileType);
-
       try {
         await fetch('/api/files', {
           method: 'POST',
@@ -326,13 +330,13 @@ export default function AnalyzePage() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            id: videoId,
+            id: fileId,
             title: fileName,
             geminiFileUri: fileInfo.uri,
             geminiFileName: geminiFileName,
             mimeType: fileType,
             size: fileSize,
-            category: fileCategory,
+            category: fileCat,
             playbackUrl: undefined,
             sourceUrl: undefined,
             sourceType: 'file-upload',
@@ -344,13 +348,14 @@ export default function AnalyzePage() {
 
       // Update localStorage with new 'uploadedFiles' format
       const existingFiles = JSON.parse(localStorage.getItem('uploadedFiles') || '[]');
-      const fileIndex = existingFiles.findIndex((f: any) => f.id === videoId);
+      const fileIndex = existingFiles.findIndex((f: any) => f.id === fileId);
 
       const fileMetadata = {
-        id: videoId,
+        id: fileId,
         filename: fileName,
-        category: fileCategory,
+        category: fileCat,
         mimeType: fileType,
+        size: fileSize,
         uploadedAt: new Date().toISOString(),
         analyzed: false,
         geminiFileUri: fileInfo.uri,
@@ -370,10 +375,10 @@ export default function AnalyzePage() {
       setUploadProgress(100);
 
       // Redirect to file detail page
-      router.push(`/files/${videoId}`);
+      router.push(`/files/${fileId}`);
     } catch (error) {
       console.error('Upload error:', error);
-      alert(`Upload failed: ${(error as Error).message}\n\nPlease try again or use a smaller video file.`);
+      alert(`Upload failed: ${(error as Error).message}\n\nPlease try again or use a smaller file.`);
     } finally {
       setIsUploading(false);
       setUploadStatus('');
@@ -642,7 +647,9 @@ export default function AnalyzePage() {
                   className="w-full px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl font-semibold hover:from-blue-600 hover:to-indigo-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Sparkles className="w-5 h-5" />
-                  {isUploading ? 'Uploading...' : `Upload & Analyze ${fileCategory ? getCategoryDisplayName(fileCategory) : 'File'}`}
+                  {isUploading 
+                    ? `Uploading ${fileCategory ? getCategoryDisplayName(fileCategory) : 'File'}...` 
+                    : `Upload & Analyze ${fileCategory ? getCategoryDisplayName(fileCategory) : 'File'}`}
                 </button>
                 <p className="text-sm text-gray-500 text-center mt-3">
                   File will be saved to "My Files" and analyzed with Gemini 3 Flash

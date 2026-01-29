@@ -142,7 +142,22 @@ export async function POST(request: NextRequest) {
           status: 'ready'
         });
 
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ success: true, fileId, category })}\n\n`));
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
+          success: true, 
+          fileId, 
+          category,
+          metadata: {
+            id: fileId,
+            title: file.name,
+            category: category,
+            mimeType: file.type,
+            size: fileData.length,
+            geminiFileUri: fileInfo.uri,
+            geminiFileName: geminiFileName,
+            createdAt: new Date().toISOString(),
+            sourceType: 'file-upload'
+          }
+        })}\n\n`));
         controller.close();
       } catch (error: any) {
         console.error('Upload error:', error);

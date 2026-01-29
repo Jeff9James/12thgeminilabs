@@ -19,13 +19,13 @@ export default function VideoUpload() {
     const file = formData.get('video') as File;
 
     if (!file) {
-      alert('Please select a video file');
+      alert('Please select a file');
       return;
     }
 
     // Vercel Hobby plan has 4.5MB function payload limit
     if (file.size > 4.5 * 1024 * 1024) {
-      alert('File too large. Maximum: 4.5MB on Vercel Hobby plan.\n\nFor larger files, please:\n1. Use a smaller/compressed video, OR\n2. Import from URL, OR\n3. Upgrade to Vercel Pro ($20/month)');
+      alert('File too large. Maximum: 4.5MB on Vercel Hobby plan.\n\nFor larger files, please:\n1. Use a smaller/compressed file, OR\n2. Import from URL, OR\n3. Upgrade to Vercel Pro ($20/month)');
       return;
     }
 
@@ -62,8 +62,27 @@ export default function VideoUpload() {
                 throw new Error(data.error);
               } else if (data.progress) {
                 setProgress(data.progress);
-              } else if (data.success && data.videoId) {
-                router.push(`/videos/${data.videoId}`);
+              } else if (data.success && data.fileId) {
+                // Save to localStorage
+                if (data.metadata) {
+                  const existingFiles = JSON.parse(localStorage.getItem('uploadedFiles') || '[]');
+                  const fileData = {
+                    id: data.fileId,
+                    filename: data.metadata.title,
+                    category: data.metadata.category || 'video',
+                    mimeType: data.metadata.mimeType,
+                    size: data.metadata.size,
+                    uploadedAt: data.metadata.createdAt,
+                    analyzed: false,
+                    geminiFileUri: data.metadata.geminiFileUri,
+                    geminiFileName: data.metadata.geminiFileName,
+                    sourceType: data.metadata.sourceType,
+                    hasLocalFile: true,
+                  };
+                  existingFiles.push(fileData);
+                  localStorage.setItem('uploadedFiles', JSON.stringify(existingFiles));
+                }
+                router.push(`/files/${data.fileId}`);
                 return;
               }
             } catch (e) {
@@ -85,7 +104,7 @@ export default function VideoUpload() {
     e.preventDefault();
 
     if (!urlInput.trim()) {
-      alert('Please enter a video URL');
+      alert('Please enter a file URL');
       return;
     }
 
@@ -131,10 +150,13 @@ export default function VideoUpload() {
               } else if (data.success && data.videoId) {
                 // Save to localStorage for parity with file uploads
                 if (data.metadata) {
-                  const existingVideos = JSON.parse(localStorage.getItem('uploadedVideos') || '[]');
-                  const videoData = {
+                  const existingFiles = JSON.parse(localStorage.getItem('uploadedFiles') || '[]');
+                  const fileData = {
                     id: data.videoId,
                     filename: data.metadata.title,
+                    category: data.metadata.category || 'video',
+                    mimeType: data.metadata.mimeType,
+                    size: data.metadata.size,
                     uploadedAt: data.metadata.createdAt,
                     analyzed: false,
                     geminiFileUri: data.metadata.geminiFileUri,
@@ -143,10 +165,10 @@ export default function VideoUpload() {
                     sourceType: data.metadata.sourceType,
                     hasLocalFile: false, // URL imports don't have local file
                   };
-                  existingVideos.push(videoData);
-                  localStorage.setItem('uploadedVideos', JSON.stringify(existingVideos));
+                  existingFiles.push(fileData);
+                  localStorage.setItem('uploadedFiles', JSON.stringify(existingFiles));
                 }
-                router.push(`/videos/${data.videoId}`);
+                router.push(`/files/${data.videoId}`);
                 return;
               }
             } catch (e) {
@@ -196,19 +218,19 @@ export default function VideoUpload() {
         <form onSubmit={handleFileUpload}>
           <div className="mb-4">
             <label htmlFor="video" className="block text-sm font-medium text-gray-700 mb-2">
-              Select Video File
+              Select File
             </label>
             <input
               id="video"
               type="file"
               name="video"
-              accept="video/*"
+              accept="video/*,audio/*,image/*,application/pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.md"
               required
               disabled={uploading}
               className="block w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
             />
-            <p className="mt-2 text-sm text-gray-500">Maximum: 4.5MB (Vercel Hobby limit)</p>
-            <p className="mt-1 text-xs text-gray-400">For larger files, use Import from URL or upgrade to Vercel Pro</p>
+            <p className="mt-2 text-sm text-gray-500">Supports: Video, Audio, Images, PDFs, Documents</p>
+            <p className="mt-1 text-xs text-gray-400">Maximum: 4.5MB (Vercel Hobby limit). For larger files, use Import from URL</p>
           </div>
 
           {progress && (
@@ -222,30 +244,30 @@ export default function VideoUpload() {
             disabled={uploading}
             className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold p-3 rounded-lg disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
           >
-            {uploading ? progress || 'Uploading...' : 'Upload Video'}
+            {uploading ? progress || 'Uploading...' : 'Upload & Analyze File'}
           </button>
         </form>
       ) : (
         <form onSubmit={handleUrlImport}>
           <div className="mb-4">
             <label htmlFor="video-url" className="block text-sm font-medium text-gray-700 mb-2">
-              Video URL
+              File URL
             </label>
             <input
               id="video-url"
               type="url"
               value={urlInput}
               onChange={(e) => setUrlInput(e.target.value)}
-              placeholder="https://example.com/video.mp4"
+              placeholder="https://example.com/file.mp4"
               required
               disabled={uploading}
               className="block w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
             />
             <p className="mt-2 text-sm text-gray-500">
-              Supported: Direct video URLs (.mp4, .mov, .webm, etc.) from S3, Cloudinary, Google Cloud Storage, Azure Blob, or any public storage.
+              Supported: Direct file URLs (videos, audio, images, PDFs, etc.) from S3, Cloudinary, Google Cloud Storage, Azure Blob, or any public storage.
             </p>
             <p className="mt-1 text-xs text-orange-500">
-              <strong>Note:</strong> YouTube, Vimeo, and similar platforms block direct downloads. Use direct video links only.
+              <strong>Note:</strong> YouTube, Vimeo, and similar platforms block direct downloads. Use direct file links only.
             </p>
             <p className="mt-1 text-xs text-gray-400">Maximum: 100MB for URL imports</p>
           </div>
@@ -259,7 +281,7 @@ export default function VideoUpload() {
               type="text"
               value={titleInput}
               onChange={(e) => setTitleInput(e.target.value)}
-              placeholder="My Video"
+              placeholder="My File"
               disabled={uploading}
               className="block w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
             />
@@ -277,7 +299,7 @@ export default function VideoUpload() {
             disabled={uploading}
             className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold p-3 rounded-lg disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
           >
-            {uploading ? progress || 'Importing...' : 'Import Video'}
+            {uploading ? progress || 'Importing...' : 'Import & Analyze File'}
           </button>
         </form>
       )}
