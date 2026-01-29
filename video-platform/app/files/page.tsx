@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { File, Clock, Calendar, Trash2, Play, Music, Image as LucideImageIcon, FileText, FileSpreadsheet } from 'lucide-react';
+import { File, Clock, Calendar, Trash2, Play, Music, Image as LucideImageIcon, FileText, FileSpreadsheet, Eye } from 'lucide-react';
 import Link from 'next/link';
 import { deleteVideoFile } from '@/lib/indexeddb';
 import { FileCategory, getFileIcon, getCategoryDisplayName } from '@/lib/fileTypes';
@@ -223,7 +223,11 @@ export default function FilesPage() {
                                                 className="opacity-0 group-hover:opacity-100 transition-opacity"
                                             >
                                                 <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center">
-                                                    <Play className="w-6 h-6 text-gray-900" />
+                                                    {file.category === 'video' || file.category === 'audio' ? (
+                                                        <Play className="w-6 h-6 text-gray-900" />
+                                                    ) : (
+                                                        <Eye className="w-6 h-6 text-gray-900" />
+                                                    )}
                                                 </div>
                                             </Link>
                                         </div>

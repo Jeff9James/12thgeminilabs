@@ -3,7 +3,8 @@ import { chatWithFile } from '@/lib/fileAnalysis';
 import { getFile, getChatHistory, saveChatMessage } from '@/lib/kv';
 import { getFileCategory } from '@/lib/fileTypes';
 
-export const runtime = 'edge';
+export const runtime = 'nodejs';
+export const maxDuration = 60; // 60 seconds timeout for chat
 
 export async function POST(
     request: NextRequest,

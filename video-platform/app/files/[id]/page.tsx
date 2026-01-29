@@ -102,7 +102,7 @@ export default function FilePage({ params }: { params: Promise<{ id: string }> }
                             geminiFileUri: localFile.geminiFileUri,
                             mimeType: localFile.mimeType || 'video/mp4',
                             size: localFile.size,
-                            createdAt: localFile.uploadedAt || localFile.createdAt,
+                            createdAt: localFile.uploadedAt || localFile.createdAt || new Date().toISOString(),
                         });
                         setActiveSection('chat');
                     }
@@ -216,13 +216,16 @@ export default function FilePage({ params }: { params: Promise<{ id: string }> }
                         <div className="flex flex-wrap gap-4 text-sm text-gray-600">
                             <div className="flex items-center gap-2">
                                 <Calendar className="w-4 h-4" />
-                                {new Date(file.createdAt).toLocaleDateString('en-US', {
-                                    month: 'short',
-                                    day: 'numeric',
-                                    year: 'numeric',
-                                    hour: '2-digit',
-                                    minute: '2-digit'
-                                })}
+                                {file.createdAt && !isNaN(new Date(file.createdAt).getTime())
+                                    ? new Date(file.createdAt).toLocaleDateString('en-US', {
+                                        month: 'short',
+                                        day: 'numeric',
+                                        year: 'numeric',
+                                        hour: '2-digit',
+                                        minute: '2-digit'
+                                    })
+                                    : 'Date not available'
+                                }
                             </div>
                             {analysis && (
                                 <div className="flex items-center gap-2 text-green-600">

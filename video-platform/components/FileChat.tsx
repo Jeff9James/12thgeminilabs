@@ -339,8 +339,8 @@ export default function FileChat({ fileId, fileCategory, fileName }: FileChatPro
                     >
                         <div
                             className={`max-w-[80%] rounded-lg px-4 py-3 ${msg.role === 'user'
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-gray-100 text-gray-900'
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-gray-100 text-gray-900'
                                 }`}
                         >
                             <div className="text-sm leading-relaxed whitespace-pre-wrap">
@@ -397,7 +397,7 @@ export default function FileChat({ fileId, fileCategory, fileName }: FileChatPro
                                     <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
                                     <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                                 </div>
-                                <span className="text-sm text-gray-600">Thinking...</span>
+                                <span className="text-sm text-gray-600">Analyzing... (this may take a moment)</span>
                             </div>
                         </div>
                     </div>
