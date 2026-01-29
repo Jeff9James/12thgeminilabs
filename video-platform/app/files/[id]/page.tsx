@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import StreamingAnalysis from '@/components/StreamingAnalysis';
-import VideoChat from '@/components/VideoChat';
+import FileChat from '@/components/FileChat';
 import { FilePreview, FileTypeBadge, FileInfoCard } from '@/components/FilePreview';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -247,8 +247,8 @@ export default function FilePage({ params }: { params: Promise<{ id: string }> }
                     <button
                         onClick={() => setActiveSection('analysis')}
                         className={`flex-1 py-4 px-6 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${activeSection === 'analysis'
-                                ? 'bg-blue-600 text-white shadow-lg'
-                                : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+                            ? 'bg-blue-600 text-white shadow-lg'
+                            : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
                             }`}
                     >
                         <Sparkles className="w-5 h-5" />
@@ -258,8 +258,8 @@ export default function FilePage({ params }: { params: Promise<{ id: string }> }
                     <button
                         onClick={() => setActiveSection('chat')}
                         className={`flex-1 py-4 px-6 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${activeSection === 'chat'
-                                ? 'bg-blue-600 text-white shadow-lg'
-                                : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+                            ? 'bg-blue-600 text-white shadow-lg'
+                            : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
                             }`}
                     >
                         <MessageSquare className="w-5 h-5" />
@@ -277,8 +277,8 @@ export default function FilePage({ params }: { params: Promise<{ id: string }> }
                             exit={{ opacity: 0, y: -20 }}
                             transition={{ duration: 0.2 }}
                         >
-                            <VideoChat
-                                videoId={id}
+                            <FileChat
+                                fileId={id}
                                 fileCategory={file.category}
                                 fileName={file.fileName}
                             />
@@ -400,8 +400,8 @@ export default function FilePage({ params }: { params: Promise<{ id: string }> }
                                 </div>
                             ) : (
                                 <StreamingAnalysis
-                                    videoId={id}
-                                    fileCategory={file.category}
+                                    fileId={id}
+                                    category={file.category}
                                     onAnalysisComplete={(completedAnalysis) => {
                                         setAnalysis(completedAnalysis);
                                     }}

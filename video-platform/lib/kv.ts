@@ -99,20 +99,28 @@ export async function listVideos(userId: string) {
   return videos.filter(v => v && (v as any).userId === userId);
 }
 
-// Chat history management (optional - for future use)
+// Chat history management (updated for generic files)
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: string;
   thoughtSignature?: string;
+  timestamps?: string[]; // For video/audio files
 }
 
-export async function saveChatHistory(videoId: string, messages: ChatMessage[]) {
-  await kv.set(`chat:${videoId}`, messages, { ex: 172800 }); // 48 hours
+export async function saveChatHistory(fileId: string, messages: ChatMessage[]) {
+  await kv.set(`chat:${fileId}`, messages, { ex: 172800 }); // 48 hours
 }
 
-export async function getChatHistory(videoId: string): Promise<ChatMessage[] | null> {
-  return await kv.get(`chat:${videoId}`);
+export async function getChatHistory(fileId: string): Promise<ChatMessage[] | null> {
+  return await kv.get(`chat:${fileId}`);
+}
+
+// Append a single chat message to history
+export async function saveChatMessage(fileId: string, message: ChatMessage) {
+  const history = await getChatHistory(fileId) || [];
+  history.push(message);
+  await saveChatHistory(fileId, history);
 }
 
 // Search cache management
