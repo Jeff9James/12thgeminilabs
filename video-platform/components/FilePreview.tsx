@@ -1,7 +1,9 @@
 'use client';
 
 import { FileCategory, getFileIcon, getCategoryDisplayName, formatFileSize } from '@/lib/fileTypes';
-import { VideoIcon, Music, Image as ImageIcon, FileText, FileSpreadsheet, File } from 'lucide-react';
+import { VideoIcon, Music, Image as ImageIcon, FileText, FileSpreadsheet, File, Download, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import * as XLSX from 'xlsx';
 
 interface FilePreviewProps {
     file: File | null;
@@ -35,8 +37,9 @@ export function FilePreview({ file, previewUrl, category, fileName, fileSize }: 
             return <ImagePreview url={previewUrl} alt={displayName} />;
         case 'pdf':
             return <PDFPreview url={previewUrl} fileName={displayName} />;
-        case 'document':
         case 'spreadsheet':
+            return <SpreadsheetPreview url={previewUrl} fileName={displayName} />;
+        case 'document':
         case 'text':
             return <DocumentPreview fileName={displayName} fileSize={displaySize} category={category} />;
         default:
@@ -124,7 +127,206 @@ function PDFPreview({ url, fileName }: { url: string; fileName: string }) {
     );
 }
 
-// Document Preview Component
+// Spreadsheet Preview Component
+function SpreadsheetPreview({ url, fileName }: { url: string; fileName: string }) {
+    const [workbook, setWorkbook] = useState<XLSX.WorkBook | null>(null);
+    const [currentSheet, setCurrentSheet] = useState<string>('');
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        async function loadSpreadsheet() {
+            try {
+                setLoading(true);
+                setError(null);
+
+                // Fetch the file
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error('Failed to load spreadsheet');
+                }
+
+                const arrayBuffer = await response.arrayBuffer();
+                
+                // Parse with xlsx
+                const wb = XLSX.read(arrayBuffer, { type: 'array' });
+                setWorkbook(wb);
+                
+                // Set first sheet as current
+                if (wb.SheetNames.length > 0) {
+                    setCurrentSheet(wb.SheetNames[0]);
+                }
+            } catch (err) {
+                console.error('Error loading spreadsheet:', err);
+                setError(err instanceof Error ? err.message : 'Failed to load spreadsheet');
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        loadSpreadsheet();
+    }, [url]);
+
+    if (loading) {
+        return (
+            <div className="w-full flex flex-col">
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-4 border-b border-green-200">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                            <FileSpreadsheet className="w-5 h-5 text-green-600" />
+                        </div>
+                        <div>
+                            <p className="font-medium text-gray-900 truncate max-w-md">{fileName}</p>
+                            <p className="text-sm text-gray-500">Loading spreadsheet...</p>
+                        </div>
+                    </div>
+                </div>
+                <div className="w-full h-[500px] bg-white flex items-center justify-center">
+                    <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-3"></div>
+                        <p className="text-gray-600">Parsing spreadsheet...</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="w-full flex flex-col">
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-4 border-b border-green-200">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                            <FileSpreadsheet className="w-5 h-5 text-green-600" />
+                        </div>
+                        <div>
+                            <p className="font-medium text-gray-900 truncate max-w-md">{fileName}</p>
+                            <p className="text-sm text-red-500">Error loading spreadsheet</p>
+                        </div>
+                    </div>
+                </div>
+                <div className="w-full h-[500px] bg-white flex items-center justify-center">
+                    <div className="text-center max-w-md">
+                        <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <FileSpreadsheet className="w-8 h-8 text-red-600" />
+                        </div>
+                        <p className="text-gray-900 font-medium mb-2">Unable to preview spreadsheet</p>
+                        <p className="text-gray-600 text-sm">{error}</p>
+                        <a
+                            href={url}
+                            download={fileName}
+                            className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                        >
+                            <Download className="w-4 h-4" />
+                            Download File
+                        </a>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (!workbook || !currentSheet) {
+        return (
+            <div className="w-full p-8 bg-gray-50 flex items-center justify-center min-h-[300px]">
+                <p className="text-gray-500">No data available</p>
+            </div>
+        );
+    }
+
+    const sheet = workbook.Sheets[currentSheet];
+    const htmlTable = XLSX.utils.sheet_to_html(sheet, { editable: false });
+
+    return (
+        <div className="w-full flex flex-col">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-4 border-b border-green-200">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                            <FileSpreadsheet className="w-5 h-5 text-green-600" />
+                        </div>
+                        <div>
+                            <p className="font-medium text-gray-900 truncate max-w-md">{fileName}</p>
+                            <p className="text-sm text-gray-500">Spreadsheet • {workbook.SheetNames.length} sheet{workbook.SheetNames.length !== 1 ? 's' : ''}</p>
+                        </div>
+                    </div>
+                    <a
+                        href={url}
+                        download={fileName}
+                        className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                        <Download className="w-4 h-4" />
+                        Download
+                    </a>
+                </div>
+
+                {/* Sheet tabs */}
+                {workbook.SheetNames.length > 1 && (
+                    <div className="flex items-center gap-2 mt-4 overflow-x-auto">
+                        {workbook.SheetNames.map((sheetName) => (
+                            <button
+                                key={sheetName}
+                                onClick={() => setCurrentSheet(sheetName)}
+                                className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+                                    currentSheet === sheetName
+                                        ? 'bg-green-600 text-white shadow-sm'
+                                        : 'bg-white text-gray-700 hover:bg-green-50 border border-gray-200'
+                                }`}
+                            >
+                                {sheetName}
+                            </button>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {/* Spreadsheet content */}
+            <div className="w-full h-[600px] bg-white overflow-auto">
+                <div 
+                    className="spreadsheet-preview p-4"
+                    dangerouslySetInnerHTML={{ __html: htmlTable }}
+                />
+            </div>
+
+            {/* Add custom styles for the table */}
+            <style jsx>{`
+                .spreadsheet-preview :global(table) {
+                    border-collapse: collapse;
+                    width: 100%;
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                    font-size: 13px;
+                }
+                .spreadsheet-preview :global(th),
+                .spreadsheet-preview :global(td) {
+                    border: 1px solid #e5e7eb;
+                    padding: 8px 12px;
+                    text-align: left;
+                    min-width: 100px;
+                }
+                .spreadsheet-preview :global(th) {
+                    background-color: #f9fafb;
+                    font-weight: 600;
+                    color: #374151;
+                    position: sticky;
+                    top: 0;
+                    z-index: 10;
+                }
+                .spreadsheet-preview :global(tr:hover) {
+                    background-color: #f9fafb;
+                }
+                .spreadsheet-preview :global(td) {
+                    color: #1f2937;
+                }
+                .spreadsheet-preview :global(tr:nth-child(even)) {
+                    background-color: #fafafa;
+                }
+            `}</style>
+        </div>
+    );
+}
+
+// Document Preview Component (for non-spreadsheet documents)
 function DocumentPreview({
     fileName,
     fileSize,
@@ -136,13 +338,11 @@ function DocumentPreview({
 }) {
     const icons: Record<string, typeof FileText> = {
         document: FileText,
-        spreadsheet: FileSpreadsheet,
         text: FileText,
     };
 
     const colors: Record<string, { bg: string; icon: string }> = {
         document: { bg: 'bg-orange-100', icon: 'text-orange-600' },
-        spreadsheet: { bg: 'bg-green-100', icon: 'text-green-600' },
         text: { bg: 'bg-blue-100', icon: 'text-blue-600' },
     };
 

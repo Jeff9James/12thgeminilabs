@@ -4,7 +4,7 @@ import { useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Upload, Sparkles, Video as VideoIcon, X, Link as LinkIcon, FileText, Image as ImageIcon, Music, FileSpreadsheet } from 'lucide-react';
-import { saveVideoFile, savePDFFile } from '@/lib/indexeddb';
+import { saveVideoFile, savePDFFile, saveFile } from '@/lib/indexeddb';
 import { validateFile, getFileCategory, formatFileSize, FILE_INPUT_ACCEPT, FileCategory, getFileIcon, getCategoryDisplayName } from '@/lib/fileTypes';
 
 type UploadMode = 'file' | 'url';
@@ -302,7 +302,7 @@ export default function AnalyzePage() {
       const fileCat = getFileCategory(fileType);
 
       if (uploadMode === 'file' && file) {
-        // Save video, audio, image, and PDF files to IndexedDB for local preview
+        // Save files to IndexedDB for local preview
         if (fileCat === 'video' || fileCat === 'audio' || fileCat === 'image') {
           console.log(`Saving ${fileCat} file to IndexedDB...`);
           try {
@@ -316,6 +316,14 @@ export default function AnalyzePage() {
             await savePDFFile(fileId, file);
           } catch (err) {
             console.warn('Failed to save PDF file to IndexedDB:', err);
+          }
+        } else if (fileCat === 'spreadsheet' || fileCat === 'document' || fileCat === 'text') {
+          // Use universal file storage for spreadsheets, documents, and text files
+          console.log(`Saving ${fileCat} file to IndexedDB...`);
+          try {
+            await saveFile(fileId, file);
+          } catch (err) {
+            console.warn(`Failed to save ${fileCat} file to IndexedDB:`, err);
           }
         }
       }

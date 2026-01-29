@@ -1,8 +1,9 @@
 // IndexedDB wrapper for storing files locally
 const DB_NAME = 'gemini-video-storage';
-const DB_VERSION = 2; // Increment version for schema update
+const DB_VERSION = 3; // Increment version for schema update
 const STORE_NAME = 'videos';
-const PDF_STORE_NAME = 'pdfs'; // Separate store for PDFs
+const PDF_STORE_NAME = 'pdfs';
+const FILES_STORE_NAME = 'files'; // Universal store for all file types
 
 interface VideoFile {
   id: string;
@@ -13,6 +14,14 @@ interface VideoFile {
 }
 
 interface PDFFile {
+  id: string;
+  file: Blob;
+  filename: string;
+  mimeType: string;
+  uploadedAt: string;
+}
+
+interface StoredFile {
   id: string;
   file: Blob;
   filename: string;
@@ -34,6 +43,9 @@ function openDB(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(PDF_STORE_NAME)) {
         db.createObjectStore(PDF_STORE_NAME, { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains(FILES_STORE_NAME)) {
+        db.createObjectStore(FILES_STORE_NAME, { keyPath: 'id' });
       }
     };
   });
@@ -142,6 +154,60 @@ export async function deletePDFFile(id: string): Promise<void> {
 
 export async function createPDFBlobUrl(id: string): Promise<string | null> {
   const blob = await getPDFFile(id);
+  if (!blob) return null;
+  return URL.createObjectURL(blob);
+}
+
+// Universal file operations (for all file types: spreadsheets, documents, images, audio, etc.)
+export async function saveFile(id: string, file: File): Promise<void> {
+  const db = await openDB();
+  const transaction = db.transaction(FILES_STORE_NAME, 'readwrite');
+  const store = transaction.objectStore(FILES_STORE_NAME);
+
+  const storedFile: StoredFile = {
+    id,
+    file,
+    filename: file.name,
+    mimeType: file.type,
+    uploadedAt: new Date().toISOString(),
+  };
+
+  return new Promise((resolve, reject) => {
+    const request = store.put(storedFile);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function getFile(id: string): Promise<Blob | null> {
+  const db = await openDB();
+  const transaction = db.transaction(FILES_STORE_NAME, 'readonly');
+  const store = transaction.objectStore(FILES_STORE_NAME);
+
+  return new Promise((resolve, reject) => {
+    const request = store.get(id);
+    request.onsuccess = () => {
+      const result = request.result as StoredFile | undefined;
+      resolve(result ? result.file : null);
+    };
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function deleteFile(id: string): Promise<void> {
+  const db = await openDB();
+  const transaction = db.transaction(FILES_STORE_NAME, 'readwrite');
+  const store = transaction.objectStore(FILES_STORE_NAME);
+
+  return new Promise((resolve, reject) => {
+    const request = store.delete(id);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function createFileBlobUrl(id: string): Promise<string | null> {
+  const blob = await getFile(id);
   if (!blob) return null;
   return URL.createObjectURL(blob);
 }

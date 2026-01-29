@@ -7,7 +7,7 @@ import { FilePreview, FileTypeBadge, FileInfoCard } from '@/components/FilePrevi
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Play, Clock, Calendar, Sparkles, MessageSquare, FileText } from 'lucide-react';
-import { createBlobUrl, createPDFBlobUrl } from '@/lib/indexeddb';
+import { createBlobUrl, createPDFBlobUrl, createFileBlobUrl } from '@/lib/indexeddb';
 import { FileCategory, getCategoryDisplayName, getFileIcon } from '@/lib/fileTypes';
 
 // Helper function to parse timestamps like "0:05" or "1:23" to seconds
@@ -50,13 +50,16 @@ export default function FilePage({ params }: { params: Promise<{ id: string }> }
                 .then(async res => {
                     const data = await res.json();
                     if (data.success) {
-                        // Try to get local file from IndexedDB for playback/preview (video/audio/image/pdf)
+                        // Try to get local file from IndexedDB for playback/preview
                         let playbackUrl = data.data.file.playbackUrl;
                         if (!playbackUrl) {
                             if (data.data.file.category === 'video' || data.data.file.category === 'audio' || data.data.file.category === 'image') {
                                 playbackUrl = await createBlobUrl(p.id) || undefined;
                             } else if (data.data.file.category === 'pdf') {
                                 playbackUrl = await createPDFBlobUrl(p.id) || undefined;
+                            } else if (data.data.file.category === 'spreadsheet' || data.data.file.category === 'document' || data.data.file.category === 'text') {
+                                // Use universal file blob URL for spreadsheets and documents
+                                playbackUrl = await createFileBlobUrl(p.id) || undefined;
                             }
                         }
 
@@ -102,6 +105,8 @@ export default function FilePage({ params }: { params: Promise<{ id: string }> }
                             playbackUrl = await createBlobUrl(p.id) || undefined;
                         } else if (fileCategory === 'pdf') {
                             playbackUrl = await createPDFBlobUrl(p.id) || undefined;
+                        } else if (fileCategory === 'spreadsheet' || fileCategory === 'document' || fileCategory === 'text') {
+                            playbackUrl = await createFileBlobUrl(p.id) || undefined;
                         }
 
                         // Use uploadedAt from localStorage (set during upload) for correct date
