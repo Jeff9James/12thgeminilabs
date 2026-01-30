@@ -109,12 +109,17 @@ export async function indexFile(file: LocalFile, directoryName: string, director
     }
   }
 
-  const tx = db.transaction(FILES_STORE, 'readwrite');
-  const store = tx.objectStore(FILES_STORE);
-  await store.put(indexedFile);
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(FILES_STORE, 'readwrite');
+    const store = tx.objectStore(FILES_STORE);
+    const request = store.put(indexedFile);
 
-  console.log('[LocalFileIndex] Indexed file:', indexedFile.name);
-  return indexedFile;
+    request.onsuccess = () => {
+      console.log('[LocalFileIndex] Indexed file:', indexedFile.name);
+      resolve(indexedFile);
+    };
+    request.onerror = () => reject(request.error);
+  });
 }
 
 // Index multiple files
@@ -144,28 +149,45 @@ export async function indexFiles(
 
 // Get all indexed files
 export async function getAllIndexedFiles(): Promise<IndexedFile[]> {
-  const db = await openDatabase();
-  const tx = db.transaction(FILES_STORE, 'readonly');
-  const store = tx.objectStore(FILES_STORE);
-  return await store.getAll();
+  return new Promise((resolve, reject) => {
+    openDatabase().then((db) => {
+      const tx = db.transaction(FILES_STORE, 'readonly');
+      const store = tx.objectStore(FILES_STORE);
+      const request = store.getAll();
+      
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = () => reject(request.error);
+    }).catch(reject);
+  });
 }
 
 // Get indexed files by directory
 export async function getIndexedFilesByDirectory(directoryName: string): Promise<IndexedFile[]> {
-  const db = await openDatabase();
-  const tx = db.transaction(FILES_STORE, 'readonly');
-  const store = tx.objectStore(FILES_STORE);
-  const index = store.index('directoryName');
-  return await index.getAll(directoryName);
+  return new Promise((resolve, reject) => {
+    openDatabase().then((db) => {
+      const tx = db.transaction(FILES_STORE, 'readonly');
+      const store = tx.objectStore(FILES_STORE);
+      const index = store.index('directoryName');
+      const request = index.getAll(directoryName);
+      
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = () => reject(request.error);
+    }).catch(reject);
+  });
 }
 
 // Get file by ID
 export async function getIndexedFile(id: string): Promise<IndexedFile | null> {
-  const db = await openDatabase();
-  const tx = db.transaction(FILES_STORE, 'readonly');
-  const store = tx.objectStore(FILES_STORE);
-  const result = await store.get(id);
-  return result || null;
+  return new Promise((resolve, reject) => {
+    openDatabase().then((db) => {
+      const tx = db.transaction(FILES_STORE, 'readonly');
+      const store = tx.objectStore(FILES_STORE);
+      const request = store.get(id);
+      
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = () => reject(request.error);
+    }).catch(reject);
+  });
 }
 
 // Update file analysis result
@@ -175,30 +197,44 @@ export async function updateFileAnalysis(
 ): Promise<void> {
   const db = await openDatabase();
 
-  // Update file
-  const fileTx = db.transaction(FILES_STORE, 'readwrite');
-  const fileStore = fileTx.objectStore(FILES_STORE);
-  const file = await fileStore.get(fileId);
+  return new Promise((resolve, reject) => {
+    // Update file
+    const fileTx = db.transaction(FILES_STORE, 'readwrite');
+    const fileStore = fileTx.objectStore(FILES_STORE);
+    const getRequest = fileStore.get(fileId);
 
-  if (file) {
-    file.analyzed = true;
-    file.analyzedAt = Date.now();
-    file.analysisResult = analysis;
-    file.aiSummary = analysis.summary;
-    file.tags = analysis.keywords || [];
-    await fileStore.put(file);
-  }
+    getRequest.onsuccess = () => {
+      const file = getRequest.result;
+      
+      if (file) {
+        file.analyzed = true;
+        file.analyzedAt = Date.now();
+        file.analysisResult = analysis;
+        file.aiSummary = analysis.summary;
+        file.tags = analysis.keywords || [];
+        
+        const putRequest = fileStore.put(file);
+        putRequest.onerror = () => reject(putRequest.error);
+      }
 
-  // Cache analysis
-  const cacheTx = db.transaction(ANALYSIS_STORE, 'readwrite');
-  const cacheStore = cacheTx.objectStore(ANALYSIS_STORE);
-  await cacheStore.put({
-    fileId,
-    analysis,
-    analyzedAt: Date.now(),
+      // Cache analysis
+      const cacheTx = db.transaction(ANALYSIS_STORE, 'readwrite');
+      const cacheStore = cacheTx.objectStore(ANALYSIS_STORE);
+      const cacheRequest = cacheStore.put({
+        fileId,
+        analysis,
+        analyzedAt: Date.now(),
+      });
+
+      cacheRequest.onsuccess = () => {
+        console.log('[LocalFileIndex] Updated analysis for:', fileId);
+        resolve();
+      };
+      cacheRequest.onerror = () => reject(cacheRequest.error);
+    };
+    
+    getRequest.onerror = () => reject(getRequest.error);
   });
-
-  console.log('[LocalFileIndex] Updated analysis for:', fileId);
 }
 
 // Search indexed files
@@ -358,17 +394,27 @@ export async function searchIndexedFiles(options: SearchOptions): Promise<Search
 export async function removeIndexedFile(id: string): Promise<void> {
   const db = await openDatabase();
 
-  // Remove from files store
-  const fileTx = db.transaction(FILES_STORE, 'readwrite');
-  const fileStore = fileTx.objectStore(FILES_STORE);
-  await fileStore.delete(id);
+  return new Promise((resolve, reject) => {
+    // Remove from files store
+    const fileTx = db.transaction(FILES_STORE, 'readwrite');
+    const fileStore = fileTx.objectStore(FILES_STORE);
+    const fileRequest = fileStore.delete(id);
 
-  // Remove from analysis cache
-  const cacheTx = db.transaction(ANALYSIS_STORE, 'readwrite');
-  const cacheStore = cacheTx.objectStore(ANALYSIS_STORE);
-  await cacheStore.delete(id);
+    fileRequest.onsuccess = () => {
+      // Remove from analysis cache
+      const cacheTx = db.transaction(ANALYSIS_STORE, 'readwrite');
+      const cacheStore = cacheTx.objectStore(ANALYSIS_STORE);
+      const cacheRequest = cacheStore.delete(id);
 
-  console.log('[LocalFileIndex] Removed file from index:', id);
+      cacheRequest.onsuccess = () => {
+        console.log('[LocalFileIndex] Removed file from index:', id);
+        resolve();
+      };
+      cacheRequest.onerror = () => reject(cacheRequest.error);
+    };
+    
+    fileRequest.onerror = () => reject(fileRequest.error);
+  });
 }
 
 // Delete all indexed files for a directory
@@ -384,15 +430,25 @@ export async function removeDirectoryFromIndex(directoryName: string): Promise<v
 export async function clearIndex(): Promise<void> {
   const db = await openDatabase();
 
-  const filesTx = db.transaction(FILES_STORE, 'readwrite');
-  const filesStore = filesTx.objectStore(FILES_STORE);
-  await filesStore.clear();
+  return new Promise((resolve, reject) => {
+    const filesTx = db.transaction(FILES_STORE, 'readwrite');
+    const filesStore = filesTx.objectStore(FILES_STORE);
+    const filesRequest = filesStore.clear();
 
-  const analysisTx = db.transaction(ANALYSIS_STORE, 'readwrite');
-  const analysisStore = analysisTx.objectStore(ANALYSIS_STORE);
-  await analysisStore.clear();
+    filesRequest.onsuccess = () => {
+      const analysisTx = db.transaction(ANALYSIS_STORE, 'readwrite');
+      const analysisStore = analysisTx.objectStore(ANALYSIS_STORE);
+      const analysisRequest = analysisStore.clear();
 
-  console.log('[LocalFileIndex] Cleared entire index');
+      analysisRequest.onsuccess = () => {
+        console.log('[LocalFileIndex] Cleared entire index');
+        resolve();
+      };
+      analysisRequest.onerror = () => reject(analysisRequest.error);
+    };
+    
+    filesRequest.onerror = () => reject(filesRequest.error);
+  });
 }
 
 // Get index statistics
@@ -425,12 +481,17 @@ export async function getIndexStats(): Promise<{
 
 // Check if file is already indexed
 export async function isFileIndexed(path: string): Promise<boolean> {
-  const db = await openDatabase();
-  const tx = db.transaction(FILES_STORE, 'readonly');
-  const store = tx.objectStore(FILES_STORE);
-  const index = store.index('path');
-  const result = await index.get(path);
-  return !!result;
+  return new Promise((resolve, reject) => {
+    openDatabase().then((db) => {
+      const tx = db.transaction(FILES_STORE, 'readonly');
+      const store = tx.objectStore(FILES_STORE);
+      const index = store.index('path');
+      const request = index.get(path);
+      
+      request.onsuccess = () => resolve(!!request.result);
+      request.onerror = () => reject(request.error);
+    }).catch(reject);
+  });
 }
 
 // Batch operations for performance
