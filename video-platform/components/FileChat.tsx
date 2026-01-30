@@ -161,6 +161,34 @@ function getPlaceholderText(category: FileCategory): string {
     }
 }
 
+// Helper function to update lastUsedAt in localStorage
+function updateFileLastUsed(fileId: string) {
+    try {
+        const storedFiles = localStorage.getItem('uploadedFiles');
+        if (storedFiles) {
+            const files = JSON.parse(storedFiles);
+            const fileIndex = files.findIndex((f: any) => f.id === fileId);
+            if (fileIndex !== -1) {
+                files[fileIndex].lastUsedAt = new Date().toISOString();
+                localStorage.setItem('uploadedFiles', JSON.stringify(files));
+            }
+        }
+        
+        // Also check legacy uploadedVideos
+        const storedVideos = localStorage.getItem('uploadedVideos');
+        if (storedVideos) {
+            const videos = JSON.parse(storedVideos);
+            const videoIndex = videos.findIndex((v: any) => v.id === fileId);
+            if (videoIndex !== -1) {
+                videos[videoIndex].lastUsedAt = new Date().toISOString();
+                localStorage.setItem('uploadedVideos', JSON.stringify(videos));
+            }
+        }
+    } catch (error) {
+        console.error('Error updating lastUsedAt:', error);
+    }
+}
+
 export default function FileChat({ fileId, fileCategory, fileName }: FileChatProps) {
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
@@ -247,6 +275,9 @@ export default function FileChat({ fileId, fileCategory, fileName }: FileChatPro
             };
 
             setMessages(prev => [...prev, assistantMessage]);
+
+            // Update lastUsedAt timestamp in localStorage
+            updateFileLastUsed(fileId);
 
         } catch (error: any) {
             console.error('Chat error:', error);

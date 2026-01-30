@@ -60,6 +60,34 @@ interface StreamingAnalysisProps {
   onAnalysisComplete?: (analysis: any) => void;
 }
 
+// Helper function to update lastUsedAt in localStorage
+function updateFileLastUsed(fileId: string) {
+  try {
+    const storedFiles = localStorage.getItem('uploadedFiles');
+    if (storedFiles) {
+      const files = JSON.parse(storedFiles);
+      const fileIndex = files.findIndex((f: any) => f.id === fileId);
+      if (fileIndex !== -1) {
+        files[fileIndex].lastUsedAt = new Date().toISOString();
+        localStorage.setItem('uploadedFiles', JSON.stringify(files));
+      }
+    }
+    
+    // Also check legacy uploadedVideos
+    const storedVideos = localStorage.getItem('uploadedVideos');
+    if (storedVideos) {
+      const videos = JSON.parse(storedVideos);
+      const videoIndex = videos.findIndex((v: any) => v.id === fileId);
+      if (videoIndex !== -1) {
+        videos[videoIndex].lastUsedAt = new Date().toISOString();
+        localStorage.setItem('uploadedVideos', JSON.stringify(videos));
+      }
+    }
+  } catch (error) {
+    console.error('Error updating lastUsedAt:', error);
+  }
+}
+
 export default function StreamingAnalysis({ fileId, category, onAnalysisComplete }: StreamingAnalysisProps) {
   const [analyzing, setAnalyzing] = useState(false);
   const [rawAnalysis, setRawAnalysis] = useState('');
@@ -150,6 +178,9 @@ export default function StreamingAnalysis({ fileId, category, onAnalysisComplete
                   const parsed = JSON.parse(cleanText);
                   setParsedAnalysis(parsed);
                   setRawAnalysis(''); // Clear raw text once parsed
+
+                  // Update lastUsedAt timestamp in localStorage
+                  updateFileLastUsed(fileId);
 
                   // Call the callback with the completed analysis
                   if (onAnalysisComplete) {

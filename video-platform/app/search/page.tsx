@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search as SearchIcon, Sparkles, Clock, Video as VideoIcon, Music, Image as ImageIcon, FileText, FileSpreadsheet, File } from 'lucide-react';
+import { Search as SearchIcon, Sparkles, Clock, Video as VideoIcon, Music, Image as ImageIcon, FileText, FileSpreadsheet, File, Filter, SortAsc, X, ChevronDown } from 'lucide-react';
 
 interface SearchResult {
   id: string;
@@ -14,22 +14,96 @@ interface SearchResult {
   thumbnail?: string;
   relevance: number;
   category?: string;
+  uploadedAt?: string;
+  lastUsedAt?: string;
+}
+
+type SortOption = 'relevance' | 'uploadedAsc' | 'uploadedDesc' | 'usedAsc' | 'usedDesc' | 'nameAsc' | 'nameDesc';
+
+interface FileFilters {
+  excludeFiles: string[];
+  includeFiles: string[];
+  excludeTypes: string[];
+  includeTypes: string[];
 }
 
 export default function SearchPage() {
   const router = useRouter();
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<SearchResult[]>([]);
+  const [rawResults, setRawResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
   const [searchStatus, setSearchStatus] = useState<string>('');
+  
+  // Filter and sort state
+  const [sortBy, setSortBy] = useState<SortOption>('relevance');
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState<FileFilters>({
+    excludeFiles: [],
+    includeFiles: [],
+    excludeTypes: [],
+    includeTypes: [],
+  });
+  const [allFiles, setAllFiles] = useState<any[]>([]);
+  
+  // Available file types
+  const fileTypes = ['video', 'audio', 'image', 'pdf', 'document', 'spreadsheet', 'text'];
+
+  // Apply filters and sort to results
+  const results = useMemo(() => {
+    let filtered = [...rawResults];
+    
+    // Apply file type filters
+    if (filters.includeTypes.length > 0) {
+      filtered = filtered.filter(r => filters.includeTypes.includes(r.category || 'video'));
+    }
+    if (filters.excludeTypes.length > 0) {
+      filtered = filtered.filter(r => !filters.excludeTypes.includes(r.category || 'video'));
+    }
+    
+    // Apply file name filters
+    if (filters.includeFiles.length > 0) {
+      filtered = filtered.filter(r => filters.includeFiles.includes(r.videoId));
+    }
+    if (filters.excludeFiles.length > 0) {
+      filtered = filtered.filter(r => !filters.excludeFiles.includes(r.videoId));
+    }
+    
+    // Apply sorting
+    switch (sortBy) {
+      case 'relevance':
+        return filtered.sort((a, b) => b.relevance - a.relevance);
+      case 'uploadedAsc':
+        return filtered.sort((a, b) => 
+          new Date(a.uploadedAt || 0).getTime() - new Date(b.uploadedAt || 0).getTime()
+        );
+      case 'uploadedDesc':
+        return filtered.sort((a, b) => 
+          new Date(b.uploadedAt || 0).getTime() - new Date(a.uploadedAt || 0).getTime()
+        );
+      case 'usedAsc':
+        return filtered.sort((a, b) => 
+          new Date(a.lastUsedAt || 0).getTime() - new Date(b.lastUsedAt || 0).getTime()
+        );
+      case 'usedDesc':
+        return filtered.sort((a, b) => 
+          new Date(b.lastUsedAt || 0).getTime() - new Date(a.lastUsedAt || 0).getTime()
+        );
+      case 'nameAsc':
+        return filtered.sort((a, b) => a.videoTitle.localeCompare(b.videoTitle));
+      case 'nameDesc':
+        return filtered.sort((a, b) => b.videoTitle.localeCompare(a.videoTitle));
+      default:
+        return filtered;
+    }
+  }, [rawResults, filters, sortBy]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!query.trim()) return;
 
     setIsSearching(true);
-    setResults([]);
+    setRawResults([]);
     setSearchStatus('Preparing search...');
 
     try {
@@ -37,11 +111,11 @@ export default function SearchPage() {
       const storedFiles = localStorage.getItem('uploadedFiles');
       const storedVideos = localStorage.getItem('uploadedVideos');
 
-      let allFiles: any[] = [];
+      let loadedFiles: any[] = [];
 
       if (storedFiles) {
         const parsedFiles = JSON.parse(storedFiles);
-        allFiles = [...parsedFiles];
+        loadedFiles = [...parsedFiles];
       }
 
       if (storedVideos) {
@@ -52,17 +126,20 @@ export default function SearchPage() {
           category: v.category || 'video',
           filename: v.filename || v.title || 'Unknown',
         }));
-        allFiles = [...allFiles, ...convertedVideos];
+        loadedFiles = [...loadedFiles, ...convertedVideos];
       }
 
-      if (allFiles.length === 0) {
+      if (loadedFiles.length === 0) {
         alert('No files found. Please upload some files first.');
         setIsSearching(false);
         return;
       }
 
+      // Store all files for filter dropdown
+      setAllFiles(loadedFiles);
+
       // Filter files that have been uploaded to Gemini (all file types supported by Gemini)
-      const searchableFiles = allFiles.filter((f: any) => f.geminiFileUri);
+      const searchableFiles = loadedFiles.filter((f: any) => f.geminiFileUri);
 
       if (searchableFiles.length === 0) {
         alert('No files available for search. Please upload and analyze files first.');
@@ -98,7 +175,17 @@ export default function SearchPage() {
       const data = await response.json();
 
       if (data.success) {
-        setResults(data.results || []);
+        // Enrich results with upload and usage timestamps
+        const enrichedResults = (data.results || []).map((result: SearchResult) => {
+          const file = loadedFiles.find(f => f.id === result.videoId);
+          return {
+            ...result,
+            uploadedAt: file?.uploadedAt || file?.createdAt,
+            lastUsedAt: file?.lastUsedAt || file?.lastAnalyzedAt,
+          };
+        });
+        
+        setRawResults(enrichedResults);
         if (data.cached) {
           setSearchStatus('Results from cache');
         } else {
@@ -124,6 +211,32 @@ export default function SearchPage() {
     const secs = Math.floor(seconds % 60);
     return `${mins}:${String(secs).padStart(2, '0')}`;
   };
+
+  const toggleFilter = (type: 'excludeFiles' | 'includeFiles' | 'excludeTypes' | 'includeTypes', value: string) => {
+    setFilters(prev => {
+      const current = prev[type];
+      if (current.includes(value)) {
+        return { ...prev, [type]: current.filter(v => v !== value) };
+      } else {
+        return { ...prev, [type]: [...current, value] };
+      }
+    });
+  };
+
+  const clearFilters = () => {
+    setFilters({
+      excludeFiles: [],
+      includeFiles: [],
+      excludeTypes: [],
+      includeTypes: [],
+    });
+  };
+
+  const hasActiveFilters = 
+    filters.excludeFiles.length > 0 ||
+    filters.includeFiles.length > 0 ||
+    filters.excludeTypes.length > 0 ||
+    filters.includeTypes.length > 0;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -199,6 +312,196 @@ export default function SearchPage() {
           </motion.div>
         </div>
       </div>
+
+      {/* Filter and Sort Controls */}
+      {rawResults.length > 0 && (
+        <div className="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
+          <div className="max-w-7xl mx-auto px-6 py-4">
+            <div className="flex flex-wrap items-center gap-4">
+              {/* Sort Dropdown */}
+              <div className="flex items-center gap-2">
+                <SortAsc className="w-5 h-5 text-gray-500" />
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as SortOption)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                >
+                  <option value="relevance">Sort by Relevance</option>
+                  <option value="uploadedDesc">Recently Uploaded (Newest First)</option>
+                  <option value="uploadedAsc">Recently Uploaded (Oldest First)</option>
+                  <option value="usedDesc">Recently Used (Newest First)</option>
+                  <option value="usedAsc">Recently Used (Oldest First)</option>
+                  <option value="nameAsc">Name (A-Z)</option>
+                  <option value="nameDesc">Name (Z-A)</option>
+                </select>
+              </div>
+
+              {/* Filter Toggle Button */}
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+                  showFilters || hasActiveFilters
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                <Filter className="w-5 h-5" />
+                Filter
+                {hasActiveFilters && (
+                  <span className="px-2 py-0.5 bg-white text-blue-600 rounded-full text-xs font-bold">
+                    {filters.excludeFiles.length + filters.includeFiles.length + 
+                     filters.excludeTypes.length + filters.includeTypes.length}
+                  </span>
+                )}
+                <ChevronDown className={`w-4 h-4 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
+              </button>
+
+              {/* Clear Filters */}
+              {hasActiveFilters && (
+                <button
+                  onClick={clearFilters}
+                  className="flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg font-medium transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                  Clear Filters
+                </button>
+              )}
+
+              {/* Results Count */}
+              <div className="ml-auto text-sm text-gray-600">
+                Showing {results.length} of {rawResults.length} results
+              </div>
+            </div>
+
+            {/* Filter Panel */}
+            <AnimatePresence>
+              {showFilters && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* File Type Filters */}
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-700 mb-3">File Types</h3>
+                      <div className="space-y-3">
+                        {/* Include Types */}
+                        <div>
+                          <label className="text-xs text-gray-600 mb-2 block">Include Only:</label>
+                          <div className="flex flex-wrap gap-2">
+                            {fileTypes.map((type) => (
+                              <button
+                                key={`include-${type}`}
+                                onClick={() => toggleFilter('includeTypes', type)}
+                                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                                  filters.includeTypes.includes(type)
+                                    ? 'bg-green-600 text-white'
+                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                }`}
+                              >
+                                {type.charAt(0).toUpperCase() + type.slice(1)}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Exclude Types */}
+                        <div>
+                          <label className="text-xs text-gray-600 mb-2 block">Exclude:</label>
+                          <div className="flex flex-wrap gap-2">
+                            {fileTypes.map((type) => (
+                              <button
+                                key={`exclude-${type}`}
+                                onClick={() => toggleFilter('excludeTypes', type)}
+                                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                                  filters.excludeTypes.includes(type)
+                                    ? 'bg-red-600 text-white'
+                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                }`}
+                              >
+                                {type.charAt(0).toUpperCase() + type.slice(1)}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Specific Files Filters */}
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-700 mb-3">Specific Files</h3>
+                      <div className="space-y-3">
+                        {/* Include Files */}
+                        <div>
+                          <label className="text-xs text-gray-600 mb-2 block">Include Only:</label>
+                          <div className="max-h-32 overflow-y-auto space-y-1 bg-gray-50 rounded-lg p-2">
+                            {allFiles.length > 0 ? (
+                              allFiles.map((file) => (
+                                <label
+                                  key={`include-file-${file.id}`}
+                                  className="flex items-center gap-2 px-2 py-1 hover:bg-white rounded cursor-pointer"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={filters.includeFiles.includes(file.id)}
+                                    onChange={() => toggleFilter('includeFiles', file.id)}
+                                    className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                                  />
+                                  <span className="text-sm text-gray-700 truncate flex-1">
+                                    {file.filename || file.title || 'Unknown'}
+                                  </span>
+                                  <span className="text-xs text-gray-500 uppercase">
+                                    {file.category || 'file'}
+                                  </span>
+                                </label>
+                              ))
+                            ) : (
+                              <p className="text-sm text-gray-500 text-center py-2">No files available</p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Exclude Files */}
+                        <div>
+                          <label className="text-xs text-gray-600 mb-2 block">Exclude:</label>
+                          <div className="max-h-32 overflow-y-auto space-y-1 bg-gray-50 rounded-lg p-2">
+                            {allFiles.length > 0 ? (
+                              allFiles.map((file) => (
+                                <label
+                                  key={`exclude-file-${file.id}`}
+                                  className="flex items-center gap-2 px-2 py-1 hover:bg-white rounded cursor-pointer"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={filters.excludeFiles.includes(file.id)}
+                                    onChange={() => toggleFilter('excludeFiles', file.id)}
+                                    className="rounded border-gray-300 text-red-600 focus:ring-red-500"
+                                  />
+                                  <span className="text-sm text-gray-700 truncate flex-1">
+                                    {file.filename || file.title || 'Unknown'}
+                                  </span>
+                                  <span className="text-xs text-gray-500 uppercase">
+                                    {file.category || 'file'}
+                                  </span>
+                                </label>
+                              ))
+                            ) : (
+                              <p className="text-sm text-gray-500 text-center py-2">No files available</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+      )}
 
       {/* Results Section */}
       <div className="max-w-7xl mx-auto px-6 py-12">
