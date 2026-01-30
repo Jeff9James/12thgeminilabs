@@ -1,6 +1,8 @@
 /**
  * File type utilities for multi-modal file support
  * Supports video, image, audio, PDF, documents, and spreadsheets
+ * 
+ * This module is isomorphic - can be used in both server and client components
  */
 
 export type FileCategory = 'video' | 'image' | 'audio' | 'pdf' | 'document' | 'spreadsheet' | 'text' | 'unknown';
@@ -74,8 +76,6 @@ export const FILE_TYPE_CONFIGS: Record<FileCategory, FileTypeConfig> = {
         geminiSupported: true, // CSV is supported, others need conversion
         description: 'Spreadsheets (XLS, XLSX, ODS, CSV)',
     },
-=======
-=======
     text: {
         category: 'text',
         mimeTypes: ['text/plain', 'text/markdown', 'text/html', 'text/xml', 'application/json'],
