@@ -10,9 +10,7 @@ import { convertSpreadsheetToCSV } from '@/lib/spreadsheetConverter';
 import { FilePreview } from '@/components/FilePreview';
 import LocalFilePicker from '@/components/LocalFilePicker';
 
-  const [file, setFile] = useState<File | null>(null);
 export default function AnalyzePage() {
-  const [file, setFile] = useState<File | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [fileCategory, setFileCategory] = useState<FileCategory | null>(null);
