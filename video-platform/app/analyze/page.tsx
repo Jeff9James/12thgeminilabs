@@ -386,13 +386,10 @@ export default function AnalyzePage() {
           >
             <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
               <Upload className="w-10 h-10 text-white" />
-
-            <p className="text-sm text-gray-500 mt-4">
             </div>
 
-            <p className="text-sm text-gray-500 mt-4">
-
             <h3 className="text-2xl font-bold text-gray-900 mb-2">
+=======
               Upload your file
             </h3>
             <p className="text-gray-600 mb-4">
