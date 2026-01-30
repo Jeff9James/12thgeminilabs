@@ -1,12 +1,60 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function VideoUpload() {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+
+  // Handle drag events
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      setSelectedFile(file);
+      
+      // Update the file input
+      if (fileInputRef.current) {
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(file);
+        fileInputRef.current.files = dataTransfer.files;
+      }
+    }
+  };
+
+  // Handle file input change
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      setSelectedFile(files[0]);
+    }
+  };
+
+  // Handle click on drop zone to trigger file input
+  const handleDropZoneClick = () => {
+    fileInputRef.current?.click();
+  };
 
   async function handleFileUpload(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -95,35 +143,117 @@ export default function VideoUpload() {
     }
   }
 
+  // Format file size
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+  };
+
   return (
     <div className="max-w-md mx-auto p-6 bg-white rounded-lg shadow-lg">
       <form onSubmit={handleFileUpload}>
-        <div className="mb-4">
-          <label htmlFor="video" className="block text-sm font-medium text-gray-700 mb-2">
-            Select File
-          </label>
-          <input
-            id="video"
-            type="file"
-            name="video"
-            accept="video/*,audio/*,image/*,application/pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.md"
-            required
-            disabled={uploading}
-            className="block w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-          />
-          <p className="mt-2 text-sm text-gray-500">Supports: Video, Audio, Images, PDFs, Documents</p>
-          <p className="mt-1 text-xs text-gray-400">Maximum: 4.5MB (Vercel Hobby limit)</p>
+        {/* Drag and Drop Zone */}
+        <div
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          onClick={handleDropZoneClick}
+          className={`mb-4 p-8 border-2 border-dashed rounded-lg transition-all cursor-pointer ${
+            isDragging
+              ? 'border-blue-500 bg-blue-50'
+              : selectedFile
+              ? 'border-green-500 bg-green-50'
+              : 'border-gray-300 bg-gray-50 hover:border-blue-400 hover:bg-blue-50'
+          } ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+        >
+          <div className="text-center">
+            {/* Upload Icon */}
+            <svg
+              className={`mx-auto h-12 w-12 ${
+                isDragging
+                  ? 'text-blue-500'
+                  : selectedFile
+                  ? 'text-green-500'
+                  : 'text-gray-400'
+              }`}
+              stroke="currentColor"
+              fill="none"
+              viewBox="0 0 48 48"
+              aria-hidden="true"
+            >
+              <path
+                d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+
+            {/* Text */}
+            <div className="mt-4">
+              {selectedFile ? (
+                <>
+                  <p className="text-sm font-medium text-green-700">
+                    {selectedFile.name}
+                  </p>
+                  <p className="text-xs text-green-600 mt-1">
+                    {formatFileSize(selectedFile.size)}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Click to change file
+                  </p>
+                </>
+              ) : isDragging ? (
+                <>
+                  <p className="text-sm font-medium text-blue-700">
+                    Drop your file here
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-medium text-gray-700">
+                    Drag & drop your file here
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    or click to browse
+                  </p>
+                </>
+              )}
+            </div>
+
+            {/* Hidden file input */}
+            <input
+              ref={fileInputRef}
+              id="video"
+              type="file"
+              name="video"
+              accept="video/*,audio/*,image/*,application/pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.md"
+              required
+              disabled={uploading}
+              onChange={handleFileChange}
+              className="hidden"
+            />
+          </div>
         </div>
 
+        {/* File info and limits */}
+        <div className="mb-4 text-center">
+          <p className="text-sm text-gray-500">Supports: Video, Audio, Images, PDFs, Documents</p>
+          <p className="text-xs text-gray-400 mt-1">Maximum: 4.5MB (Vercel Hobby limit)</p>
+        </div>
+
+        {/* Progress indicator */}
         {progress && (
           <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
             <p className="text-sm text-blue-700">{progress}</p>
           </div>
         )}
 
+        {/* Upload button */}
         <button
           type="submit"
-          disabled={uploading}
+          disabled={uploading || !selectedFile}
           className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold p-3 rounded-lg disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
         >
           {uploading ? progress || 'Uploading...' : 'Upload & Analyze File'}
