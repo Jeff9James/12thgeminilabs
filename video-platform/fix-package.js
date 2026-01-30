@@ -1,4 +1,6 @@
-{
+const fs = require('fs');
+
+const packageJson = {
   "name": "video-platform",
   "version": "0.1.0",
   "private": true,
@@ -37,4 +39,8 @@
     "tailwindcss": "^4",
     "typescript": "^5"
   }
-}
+};
+
+// Write without BOM
+fs.writeFileSync('package.json', JSON.stringify(packageJson, null, 2) + '\n', { encoding: 'utf8' });
+console.log('✅ package.json fixed (removed BOM)');
