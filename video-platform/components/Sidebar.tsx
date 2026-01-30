@@ -7,7 +7,12 @@ import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const navItems = [
+const navItems: Array<{
+  name: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  badge?: string;
+}> = [
   {
     name: 'My Files',
     href: '/files',
