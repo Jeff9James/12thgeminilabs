@@ -3,20 +3,15 @@
 import { useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, Sparkles, Video as VideoIcon, X, Link as LinkIcon, FileText, Image as ImageIcon, Music, FileSpreadsheet } from 'lucide-react';
+import { Upload, Sparkles, Video as VideoIcon, X, FileText, Image as ImageIcon, Music, FileSpreadsheet } from 'lucide-react';
 import { saveVideoFile, savePDFFile, saveFile } from '@/lib/indexeddb';
 import { validateFile, getFileCategory, formatFileSize, FILE_INPUT_ACCEPT, FileCategory, getFileIcon, getCategoryDisplayName, needsConversionForGemini } from '@/lib/fileTypes';
 import { convertSpreadsheetToCSV } from '@/lib/spreadsheetConverter';
 
-type UploadMode = 'file' | 'url';
-
 export default function AnalyzePage() {
-  const [uploadMode, setUploadMode] = useState<UploadMode>('file');
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [fileCategory, setFileCategory] = useState<FileCategory | null>(null);
-  const [urlInput, setUrlInput] = useState('');
-  const [titleInput, setTitleInput] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState('');
@@ -68,18 +63,8 @@ export default function AnalyzePage() {
     }
   }, []);
 
-  const handleUrlPreview = () => {
-    if (!urlInput.trim()) {
-      alert('Please enter a video URL');
-      return;
-    }
-    // Set the video URL for preview
-    setPreviewUrl(urlInput.trim());
-  };
-
   const handleUploadAndAnalyze = async () => {
-    if (!file && uploadMode === 'file') return;
-    if (!previewUrl && uploadMode === 'url') return;
+    if (!file) return;
 
     setIsUploading(true);
     setUploadProgress(0);
@@ -91,112 +76,10 @@ export default function AnalyzePage() {
 
       setUploadProgress(5);
 
-      let fileData: Buffer | Blob;
-      let fileName: string;
-      let fileType: string;
-      let fileSize: number;
-
-      if (uploadMode === 'url') {
-        // Use server-side API to fetch and upload file from URL
-        setUploadStatus('Importing file from URL...');
-
-        const response = await fetch('/api/import-url', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            url: urlInput.trim(),
-            title: titleInput.trim() || undefined
-          })
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to import file: ${response.status} ${response.statusText}`);
-        }
-
-        // Handle streaming response
-        const reader = response.body?.getReader();
-        if (!reader) {
-          throw new Error('Failed to read response stream');
-        }
-
-        const decoder = new TextDecoder();
-        let result: any = null;
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          const chunk = decoder.decode(value);
-          const lines = chunk.split('\n\n');
-
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              try {
-                const data = JSON.parse(line.slice(6));
-
-                if (data.error) {
-                  throw new Error(data.error);
-                }
-
-                if (data.progress) {
-                  setUploadStatus(data.progress);
-                  // Map progress messages to percentage
-                  if (data.progress.includes('Fetching')) setUploadProgress(10);
-                  else if (data.progress.includes('Downloading')) setUploadProgress(20);
-                  else if (data.progress.includes('uploading')) setUploadProgress(40);
-                  else if (data.progress.includes('Processing')) setUploadProgress(60 + Math.min(30, (data.progress.match(/\d+/)?.[0] || 0) as number));
-                  else if (data.progress.includes('Saving')) setUploadProgress(95);
-                }
-
-                if (data.success) {
-                  result = data;
-                }
-              } catch (e) {
-                // Ignore parse errors for incomplete chunks
-              }
-            }
-          }
-        }
-
-        if (!result || !result.success) {
-          throw new Error('Import failed: No success response from server');
-        }
-
-        // Use the metadata from the server
-        const { metadata } = result;
-
-        // Update localStorage with the imported file
-        const existingFiles = JSON.parse(localStorage.getItem('uploadedFiles') || '[]');
-        const fileData = {
-          id: metadata.id,
-          filename: metadata.title,
-          category: metadata.category || 'video',
-          mimeType: metadata.mimeType,
-          size: metadata.size,
-          uploadedAt: metadata.createdAt,
-          analyzed: false,
-          geminiFileUri: metadata.geminiFileUri,
-          geminiFileName: metadata.geminiFileName,
-          hasLocalFile: false,
-          sourceUrl: metadata.sourceUrl,
-          sourceType: metadata.sourceType,
-        };
-        existingFiles.push(fileData);
-        localStorage.setItem('uploadedFiles', JSON.stringify(existingFiles));
-
-        setUploadProgress(100);
-
-        // Redirect to file detail page
-        router.push(`/files/${metadata.id}`);
-        return; // Exit early since we've handled everything
-      } else {
-        fileData = file!;
-        fileName = file!.name;
-        fileType = file!.type;
-        fileSize = file!.size;
-      }
+      let fileData: Buffer | Blob = file!;
+      let fileName: string = file!.name;
+      let fileType: string = file!.type;
+      let fileSize: number = file!.size;
 
       // Convert spreadsheet files to CSV before uploading to Gemini
       if (needsConversionForGemini(fileType)) {
@@ -425,41 +308,6 @@ export default function AnalyzePage() {
       </div>
 
       <div className="max-w-7xl mx-auto p-6">
-        {/* Upload Mode Toggle */}
-        {!previewUrl && (
-          <div className="flex mb-6 bg-white rounded-xl shadow-sm p-1 max-w-md mx-auto">
-            <button
-              type="button"
-              onClick={() => {
-                setUploadMode('file');
-                setPreviewUrl(null);
-                setUrlInput('');
-              }}
-              className={`flex-1 py-3 px-4 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 ${uploadMode === 'file'
-                ? 'bg-blue-50 text-blue-600'
-                : 'text-gray-600 hover:text-gray-800'
-                }`}
-            >
-              <Upload className="w-4 h-4" />
-              Upload File
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setUploadMode('url');
-                setPreviewUrl(null);
-                setFile(null);
-              }}
-              className={`flex-1 py-3 px-4 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 ${uploadMode === 'url'
-                ? 'bg-blue-50 text-blue-600'
-                : 'text-gray-600 hover:text-gray-800'
-                }`}
-            >
-              <LinkIcon className="w-4 h-4" />
-              Import from URL
-            </button>
-          </div>
-        )}
 
         {/* Validation Error */}
         {validationError && (
@@ -478,105 +326,57 @@ export default function AnalyzePage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="bg-white rounded-2xl shadow-sm border-2 border-dashed border-gray-300 p-12 text-center hover:border-blue-400 transition-colors"
-            onDrop={uploadMode === 'file' ? handleDrop : undefined}
-            onDragOver={uploadMode === 'file' ? (e) => e.preventDefault() : undefined}
+            onDrop={handleDrop}
+            onDragOver={(e) => e.preventDefault()}
           >
-            {uploadMode === 'file' ? (
-              <>
-                <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                  <Upload className="w-10 h-10 text-white" />
-                </div>
+            <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+              <Upload className="w-10 h-10 text-white" />
+            </div>
 
-                <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                  Upload your file
-                </h3>
-                <p className="text-gray-600 mb-4">
-                  Drag and drop or click to select a file
-                </p>
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">
+              Upload your file
+            </h3>
+            <p className="text-gray-600 mb-4">
+              Drag and drop or click to select a file
+            </p>
 
-                {/* Supported file types */}
-                <div className="flex flex-wrap justify-center gap-2 mb-6 max-w-lg mx-auto">
-                  <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium flex items-center gap-1">
-                    <VideoIcon className="w-3 h-3" /> Video
-                  </span>
-                  <span className="px-3 py-1 bg-green-50 text-green-700 rounded-full text-xs font-medium flex items-center gap-1">
-                    <ImageIcon className="w-3 h-3" /> Images
-                  </span>
-                  <span className="px-3 py-1 bg-purple-50 text-purple-700 rounded-full text-xs font-medium flex items-center gap-1">
-                    <Music className="w-3 h-3" /> Audio
-                  </span>
-                  <span className="px-3 py-1 bg-orange-50 text-orange-700 rounded-full text-xs font-medium flex items-center gap-1">
-                    <FileText className="w-3 h-3" /> PDF
-                  </span>
-                  <span className="px-3 py-1 bg-pink-50 text-pink-700 rounded-full text-xs font-medium flex items-center gap-1">
-                    <FileSpreadsheet className="w-3 h-3" /> Documents
-                  </span>
-                </div>
+            {/* Supported file types */}
+            <div className="flex flex-wrap justify-center gap-2 mb-6 max-w-lg mx-auto">
+              <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium flex items-center gap-1">
+                <VideoIcon className="w-3 h-3" /> Video
+              </span>
+              <span className="px-3 py-1 bg-green-50 text-green-700 rounded-full text-xs font-medium flex items-center gap-1">
+                <ImageIcon className="w-3 h-3" /> Images
+              </span>
+              <span className="px-3 py-1 bg-purple-50 text-purple-700 rounded-full text-xs font-medium flex items-center gap-1">
+                <Music className="w-3 h-3" /> Audio
+              </span>
+              <span className="px-3 py-1 bg-orange-50 text-orange-700 rounded-full text-xs font-medium flex items-center gap-1">
+                <FileText className="w-3 h-3" /> PDF
+              </span>
+              <span className="px-3 py-1 bg-pink-50 text-pink-700 rounded-full text-xs font-medium flex items-center gap-1">
+                <FileSpreadsheet className="w-3 h-3" /> Documents
+              </span>
+            </div>
 
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept={FILE_INPUT_ACCEPT}
-                  onChange={(e) => e.target.files && handleFileSelect(e.target.files[0])}
-                  className="hidden"
-                />
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={FILE_INPUT_ACCEPT}
+              onChange={(e) => e.target.files && handleFileSelect(e.target.files[0])}
+              className="hidden"
+            />
 
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="px-8 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors"
-                >
-                  Select File
-                </button>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="px-8 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors"
+            >
+              Select File
+            </button>
 
-                <p className="text-sm text-gray-500 mt-4">
-                  Max sizes: Video/Audio 2GB, Images 20MB, PDFs/Documents 50MB
-                </p>
-              </>
-            ) : (
-              <>
-                <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-teal-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                  <LinkIcon className="w-10 h-10 text-white" />
-                </div>
-
-                <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                  Import from URL
-                </h3>
-                <p className="text-gray-600 mb-6">
-                  Paste a direct video URL from S3, Cloudinary, Google Cloud Storage, Azure Blob, or any public storage
-                </p>
-                <p className="text-xs text-orange-500 mb-4">
-                  <strong>Note:</strong> YouTube, Vimeo, and similar platforms block direct downloads. Use direct video links only (ending in .mp4, .mov, .webm, etc.)
-                </p>
-
-                <div className="max-w-md mx-auto space-y-4">
-                  <input
-                    type="url"
-                    value={urlInput}
-                    onChange={(e) => setUrlInput(e.target.value)}
-                    placeholder="https://example.com/video.mp4"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                  <input
-                    type="text"
-                    value={titleInput}
-                    onChange={(e) => setTitleInput(e.target.value)}
-                    placeholder="Title (optional)"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                  <button
-                    onClick={handleUrlPreview}
-                    disabled={!urlInput.trim()}
-                    className="w-full px-8 py-3 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Preview Video
-                  </button>
-                </div>
-
-                <p className="text-sm text-gray-500 mt-4">
-                  Maximum size: 100MB for URL imports
-                </p>
-              </>
-            )}
+            <p className="text-sm text-gray-500 mt-4">
+              Max sizes: Video/Audio 2GB, Images 20MB, PDFs/Documents 50MB
+            </p>
           </motion.div>
         ) : (
           <div className="space-y-6">
@@ -592,7 +392,6 @@ export default function AnalyzePage() {
                   onClick={() => {
                     setPreviewUrl(null);
                     setFile(null);
-                    setUrlInput('');
                     setFileCategory(null);
                   }}
                   className="absolute top-4 right-4 z-10 p-2 bg-black/50 hover:bg-black/70 rounded-lg transition-colors"
