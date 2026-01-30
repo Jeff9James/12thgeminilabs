@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search as SearchIcon, Sparkles, Clock, Video as VideoIcon, Music, Image as ImageIcon, FileText, FileSpreadsheet, File, Filter, SortAsc, X, ChevronDown } from 'lucide-react';
@@ -48,6 +48,32 @@ export default function SearchPage() {
   
   // Available file types
   const fileTypes = ['video', 'audio', 'image', 'pdf', 'document', 'spreadsheet', 'text'];
+
+  // Load all files on mount so filters are available before search
+  React.useEffect(() => {
+    const storedFiles = localStorage.getItem('uploadedFiles');
+    const storedVideos = localStorage.getItem('uploadedVideos');
+
+    let loadedFiles: any[] = [];
+
+    if (storedFiles) {
+      const parsedFiles = JSON.parse(storedFiles);
+      loadedFiles = [...parsedFiles];
+    }
+
+    if (storedVideos) {
+      const parsedVideos = JSON.parse(storedVideos);
+      // Convert legacy video format to generic file format
+      const convertedVideos = parsedVideos.map((v: any) => ({
+        ...v,
+        category: v.category || 'video',
+        filename: v.filename || v.title || 'Unknown',
+      }));
+      loadedFiles = [...loadedFiles, ...convertedVideos];
+    }
+
+    setAllFiles(loadedFiles);
+  }, []);
 
   // Apply filters and sort to results
   const results = useMemo(() => {
@@ -107,42 +133,32 @@ export default function SearchPage() {
     setSearchStatus('Preparing search...');
 
     try {
-      // Get all files from localStorage (both new 'uploadedFiles' and legacy 'uploadedVideos')
-      const storedFiles = localStorage.getItem('uploadedFiles');
-      const storedVideos = localStorage.getItem('uploadedVideos');
-
-      let loadedFiles: any[] = [];
-
-      if (storedFiles) {
-        const parsedFiles = JSON.parse(storedFiles);
-        loadedFiles = [...parsedFiles];
-      }
-
-      if (storedVideos) {
-        const parsedVideos = JSON.parse(storedVideos);
-        // Convert legacy video format to generic file format
-        const convertedVideos = parsedVideos.map((v: any) => ({
-          ...v,
-          category: v.category || 'video',
-          filename: v.filename || v.title || 'Unknown',
-        }));
-        loadedFiles = [...loadedFiles, ...convertedVideos];
-      }
-
-      if (loadedFiles.length === 0) {
+      if (allFiles.length === 0) {
         alert('No files found. Please upload some files first.');
         setIsSearching(false);
         return;
       }
 
-      // Store all files for filter dropdown
-      setAllFiles(loadedFiles);
-
       // Filter files that have been uploaded to Gemini (all file types supported by Gemini)
-      const searchableFiles = loadedFiles.filter((f: any) => f.geminiFileUri);
+      // Also apply pre-search filters
+      let searchableFiles = allFiles.filter((f: any) => f.geminiFileUri);
+
+      // Apply filters to searchable files before searching
+      if (filters.includeTypes.length > 0) {
+        searchableFiles = searchableFiles.filter(f => filters.includeTypes.includes(f.category || 'video'));
+      }
+      if (filters.excludeTypes.length > 0) {
+        searchableFiles = searchableFiles.filter(f => !filters.excludeTypes.includes(f.category || 'video'));
+      }
+      if (filters.includeFiles.length > 0) {
+        searchableFiles = searchableFiles.filter(f => filters.includeFiles.includes(f.id));
+      }
+      if (filters.excludeFiles.length > 0) {
+        searchableFiles = searchableFiles.filter(f => !filters.excludeFiles.includes(f.id));
+      }
 
       if (searchableFiles.length === 0) {
-        alert('No files available for search. Please upload and analyze files first.');
+        alert('No files available for search with current filters. Please adjust your filters or upload more files.');
         setIsSearching(false);
         return;
       }
@@ -177,7 +193,7 @@ export default function SearchPage() {
       if (data.success) {
         // Enrich results with upload and usage timestamps
         const enrichedResults = (data.results || []).map((result: SearchResult) => {
-          const file = loadedFiles.find(f => f.id === result.videoId);
+          const file = allFiles.find(f => f.id === result.videoId);
           return {
             ...result,
             uploadedAt: file?.uploadedAt || file?.createdAt,
@@ -288,12 +304,200 @@ export default function SearchPage() {
             </div>
           </motion.form>
 
-          {/* Example Queries */}
+          {/* Filter and Sort Controls - BEFORE Search */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.2 }}
-            className="mt-6 flex flex-wrap gap-3 justify-center"
+            className="mt-6"
+          >
+            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 mb-4">
+              <div className="flex flex-wrap items-center gap-4 justify-center">
+                {/* Sort Dropdown */}
+                <div className="flex items-center gap-2">
+                  <SortAsc className="w-5 h-5 text-white" />
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as SortOption)}
+                    className="px-4 py-2 border border-white/20 rounded-lg focus:ring-2 focus:ring-white bg-white/10 text-white backdrop-blur-sm"
+                  >
+                    <option value="relevance" className="text-gray-900">Sort by Relevance</option>
+                    <option value="uploadedDesc" className="text-gray-900">Recently Uploaded (Newest First)</option>
+                    <option value="uploadedAsc" className="text-gray-900">Recently Uploaded (Oldest First)</option>
+                    <option value="usedDesc" className="text-gray-900">Recently Used (Newest First)</option>
+                    <option value="usedAsc" className="text-gray-900">Recently Used (Oldest First)</option>
+                    <option value="nameAsc" className="text-gray-900">Name (A-Z)</option>
+                    <option value="nameDesc" className="text-gray-900">Name (Z-A)</option>
+                  </select>
+                </div>
+
+                {/* Filter Toggle Button */}
+                <button
+                  onClick={() => setShowFilters(!showFilters)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+                    showFilters || hasActiveFilters
+                      ? 'bg-white text-blue-600'
+                      : 'bg-white/10 text-white hover:bg-white/20 border border-white/20'
+                  }`}
+                >
+                  <Filter className="w-5 h-5" />
+                  Configure Filters
+                  {hasActiveFilters && (
+                    <span className="px-2 py-0.5 bg-blue-600 text-white rounded-full text-xs font-bold">
+                      {filters.excludeFiles.length + filters.includeFiles.length + 
+                       filters.excludeTypes.length + filters.includeTypes.length}
+                    </span>
+                  )}
+                  <ChevronDown className={`w-4 h-4 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
+                </button>
+
+                {/* Clear Filters */}
+                {hasActiveFilters && (
+                  <button
+                    onClick={clearFilters}
+                    className="flex items-center gap-2 px-4 py-2 bg-red-500/90 text-white hover:bg-red-600 rounded-lg font-medium transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                    Clear Filters
+                  </button>
+                )}
+              </div>
+
+              {/* Filter Panel */}
+              <AnimatePresence>
+                {showFilters && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* File Type Filters */}
+                      <div>
+                        <h3 className="text-sm font-semibold text-white mb-3">File Types</h3>
+                        <div className="space-y-3">
+                          {/* Include Types */}
+                          <div>
+                            <label className="text-xs text-blue-100 mb-2 block">Include Only:</label>
+                            <div className="flex flex-wrap gap-2">
+                              {fileTypes.map((type) => (
+                                <button
+                                  key={`include-${type}`}
+                                  onClick={() => toggleFilter('includeTypes', type)}
+                                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                                    filters.includeTypes.includes(type)
+                                      ? 'bg-green-500 text-white'
+                                      : 'bg-white/20 text-white hover:bg-white/30'
+                                  }`}
+                                >
+                                  {type.charAt(0).toUpperCase() + type.slice(1)}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Exclude Types */}
+                          <div>
+                            <label className="text-xs text-blue-100 mb-2 block">Exclude:</label>
+                            <div className="flex flex-wrap gap-2">
+                              {fileTypes.map((type) => (
+                                <button
+                                  key={`exclude-${type}`}
+                                  onClick={() => toggleFilter('excludeTypes', type)}
+                                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                                    filters.excludeTypes.includes(type)
+                                      ? 'bg-red-500 text-white'
+                                      : 'bg-white/20 text-white hover:bg-white/30'
+                                  }`}
+                                >
+                                  {type.charAt(0).toUpperCase() + type.slice(1)}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Specific Files Filters */}
+                      <div>
+                        <h3 className="text-sm font-semibold text-white mb-3">Specific Files</h3>
+                        <div className="space-y-3">
+                          {/* Include Files */}
+                          <div>
+                            <label className="text-xs text-blue-100 mb-2 block">Include Only:</label>
+                            <div className="max-h-32 overflow-y-auto space-y-1 bg-white/10 backdrop-blur-sm rounded-lg p-2">
+                              {allFiles.length > 0 ? (
+                                allFiles.map((file) => (
+                                  <label
+                                    key={`include-file-${file.id}`}
+                                    className="flex items-center gap-2 px-2 py-1 hover:bg-white/20 rounded cursor-pointer"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={filters.includeFiles.includes(file.id)}
+                                      onChange={() => toggleFilter('includeFiles', file.id)}
+                                      className="rounded border-white/30 text-green-500 focus:ring-green-500"
+                                    />
+                                    <span className="text-sm text-white truncate flex-1">
+                                      {file.filename || file.title || 'Unknown'}
+                                    </span>
+                                    <span className="text-xs text-blue-200 uppercase">
+                                      {file.category || 'file'}
+                                    </span>
+                                  </label>
+                                ))
+                              ) : (
+                                <p className="text-sm text-blue-200 text-center py-2">No files available. Upload files to search!</p>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Exclude Files */}
+                          <div>
+                            <label className="text-xs text-blue-100 mb-2 block">Exclude:</label>
+                            <div className="max-h-32 overflow-y-auto space-y-1 bg-white/10 backdrop-blur-sm rounded-lg p-2">
+                              {allFiles.length > 0 ? (
+                                allFiles.map((file) => (
+                                  <label
+                                    key={`exclude-file-${file.id}`}
+                                    className="flex items-center gap-2 px-2 py-1 hover:bg-white/20 rounded cursor-pointer"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={filters.excludeFiles.includes(file.id)}
+                                      onChange={() => toggleFilter('excludeFiles', file.id)}
+                                      className="rounded border-white/30 text-red-500 focus:ring-red-500"
+                                    />
+                                    <span className="text-sm text-white truncate flex-1">
+                                      {file.filename || file.title || 'Unknown'}
+                                    </span>
+                                    <span className="text-xs text-blue-200 uppercase">
+                                      {file.category || 'file'}
+                                    </span>
+                                  </label>
+                                ))
+                              ) : (
+                                <p className="text-sm text-blue-200 text-center py-2">No files available</p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </motion.div>
+
+          {/* Example Queries */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3 }}
+            className="mt-4 flex flex-wrap gap-3 justify-center"
           >
             {[
               'Show me action scenes',
@@ -313,192 +517,29 @@ export default function SearchPage() {
         </div>
       </div>
 
-      {/* Filter and Sort Controls */}
+      {/* Results Info Bar - Only show after search */}
       {rawResults.length > 0 && (
-        <div className="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
-          <div className="max-w-7xl mx-auto px-6 py-4">
-            <div className="flex flex-wrap items-center gap-4">
-              {/* Sort Dropdown */}
-              <div className="flex items-center gap-2">
-                <SortAsc className="w-5 h-5 text-gray-500" />
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as SortOption)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-                >
-                  <option value="relevance">Sort by Relevance</option>
-                  <option value="uploadedDesc">Recently Uploaded (Newest First)</option>
-                  <option value="uploadedAsc">Recently Uploaded (Oldest First)</option>
-                  <option value="usedDesc">Recently Used (Newest First)</option>
-                  <option value="usedAsc">Recently Used (Oldest First)</option>
-                  <option value="nameAsc">Name (A-Z)</option>
-                  <option value="nameDesc">Name (Z-A)</option>
-                </select>
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100">
+          <div className="max-w-7xl mx-auto px-6 py-3">
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-4">
+                <Sparkles className="w-4 h-4 text-blue-600" />
+                <span className="font-semibold text-gray-900">
+                  Search Results
+                </span>
               </div>
-
-              {/* Filter Toggle Button */}
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-                  showFilters || hasActiveFilters
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                <Filter className="w-5 h-5" />
-                Filter
+              <div className="flex items-center gap-4">
                 {hasActiveFilters && (
-                  <span className="px-2 py-0.5 bg-white text-blue-600 rounded-full text-xs font-bold">
+                  <span className="text-blue-600 font-medium">
                     {filters.excludeFiles.length + filters.includeFiles.length + 
-                     filters.excludeTypes.length + filters.includeTypes.length}
+                     filters.excludeTypes.length + filters.includeTypes.length} filters active
                   </span>
                 )}
-                <ChevronDown className={`w-4 h-4 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
-              </button>
-
-              {/* Clear Filters */}
-              {hasActiveFilters && (
-                <button
-                  onClick={clearFilters}
-                  className="flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg font-medium transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                  Clear Filters
-                </button>
-              )}
-
-              {/* Results Count */}
-              <div className="ml-auto text-sm text-gray-600">
-                Showing {results.length} of {rawResults.length} results
+                <span className="text-gray-600">
+                  Showing <span className="font-bold text-gray-900">{results.length}</span> of <span className="font-bold text-gray-900">{rawResults.length}</span> results
+                </span>
               </div>
             </div>
-
-            {/* Filter Panel */}
-            <AnimatePresence>
-              {showFilters && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="overflow-hidden"
-                >
-                  <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* File Type Filters */}
-                    <div>
-                      <h3 className="text-sm font-semibold text-gray-700 mb-3">File Types</h3>
-                      <div className="space-y-3">
-                        {/* Include Types */}
-                        <div>
-                          <label className="text-xs text-gray-600 mb-2 block">Include Only:</label>
-                          <div className="flex flex-wrap gap-2">
-                            {fileTypes.map((type) => (
-                              <button
-                                key={`include-${type}`}
-                                onClick={() => toggleFilter('includeTypes', type)}
-                                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                                  filters.includeTypes.includes(type)
-                                    ? 'bg-green-600 text-white'
-                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                }`}
-                              >
-                                {type.charAt(0).toUpperCase() + type.slice(1)}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Exclude Types */}
-                        <div>
-                          <label className="text-xs text-gray-600 mb-2 block">Exclude:</label>
-                          <div className="flex flex-wrap gap-2">
-                            {fileTypes.map((type) => (
-                              <button
-                                key={`exclude-${type}`}
-                                onClick={() => toggleFilter('excludeTypes', type)}
-                                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                                  filters.excludeTypes.includes(type)
-                                    ? 'bg-red-600 text-white'
-                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                }`}
-                              >
-                                {type.charAt(0).toUpperCase() + type.slice(1)}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Specific Files Filters */}
-                    <div>
-                      <h3 className="text-sm font-semibold text-gray-700 mb-3">Specific Files</h3>
-                      <div className="space-y-3">
-                        {/* Include Files */}
-                        <div>
-                          <label className="text-xs text-gray-600 mb-2 block">Include Only:</label>
-                          <div className="max-h-32 overflow-y-auto space-y-1 bg-gray-50 rounded-lg p-2">
-                            {allFiles.length > 0 ? (
-                              allFiles.map((file) => (
-                                <label
-                                  key={`include-file-${file.id}`}
-                                  className="flex items-center gap-2 px-2 py-1 hover:bg-white rounded cursor-pointer"
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={filters.includeFiles.includes(file.id)}
-                                    onChange={() => toggleFilter('includeFiles', file.id)}
-                                    className="rounded border-gray-300 text-green-600 focus:ring-green-500"
-                                  />
-                                  <span className="text-sm text-gray-700 truncate flex-1">
-                                    {file.filename || file.title || 'Unknown'}
-                                  </span>
-                                  <span className="text-xs text-gray-500 uppercase">
-                                    {file.category || 'file'}
-                                  </span>
-                                </label>
-                              ))
-                            ) : (
-                              <p className="text-sm text-gray-500 text-center py-2">No files available</p>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Exclude Files */}
-                        <div>
-                          <label className="text-xs text-gray-600 mb-2 block">Exclude:</label>
-                          <div className="max-h-32 overflow-y-auto space-y-1 bg-gray-50 rounded-lg p-2">
-                            {allFiles.length > 0 ? (
-                              allFiles.map((file) => (
-                                <label
-                                  key={`exclude-file-${file.id}`}
-                                  className="flex items-center gap-2 px-2 py-1 hover:bg-white rounded cursor-pointer"
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={filters.excludeFiles.includes(file.id)}
-                                    onChange={() => toggleFilter('excludeFiles', file.id)}
-                                    className="rounded border-gray-300 text-red-600 focus:ring-red-500"
-                                  />
-                                  <span className="text-sm text-gray-700 truncate flex-1">
-                                    {file.filename || file.title || 'Unknown'}
-                                  </span>
-                                  <span className="text-xs text-gray-500 uppercase">
-                                    {file.category || 'file'}
-                                  </span>
-                                </label>
-                              ))
-                            ) : (
-                              <p className="text-sm text-gray-500 text-center py-2">No files available</p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
           </div>
         </div>
       )}
