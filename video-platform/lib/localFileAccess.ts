@@ -389,12 +389,12 @@ export async function verifyPermission(
   };
 
   // Check if permission was already granted
-  if ((await handle.queryPermission(options)) === 'granted') {
+  if ((await (handle as any).queryPermission(options)) === 'granted') {
     return true;
   }
 
   // Request permission
-  if ((await handle.requestPermission(options)) === 'granted') {
+  if ((await (handle as any).requestPermission(options)) === 'granted') {
     return true;
   }
 
