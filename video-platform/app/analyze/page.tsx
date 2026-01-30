@@ -387,7 +387,6 @@ export default function AnalyzePage() {
             </div>
 
             <h3 className="text-2xl font-bold text-gray-900 mb-2">
-=======
               Upload your file
             </h3>
             <p className="text-gray-600 mb-4">
