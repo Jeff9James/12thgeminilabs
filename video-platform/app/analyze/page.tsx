@@ -7,6 +7,7 @@ import { Upload, Sparkles, Video as VideoIcon, X, FileText, Image as ImageIcon, 
 import { saveVideoFile, savePDFFile, saveFile } from '@/lib/indexeddb';
 import { validateFile, getFileCategory, formatFileSize, FILE_INPUT_ACCEPT, FileCategory, getFileIcon, getCategoryDisplayName, needsConversionForGemini } from '@/lib/fileTypes';
 import { convertSpreadsheetToCSV } from '@/lib/spreadsheetConverter';
+import { FilePreview } from '@/components/FilePreview';
 
 export default function AnalyzePage() {
   const [file, setFile] = useState<File | null>(null);
@@ -442,29 +443,14 @@ export default function AnalyzePage() {
                   </div>
                 )}
 
-                {fileCategory === 'pdf' && (
-                  <div className="w-full h-[500px] bg-gray-100">
-                    <iframe
-                      src={previewUrl}
-                      className="w-full h-full"
-                      title={file?.name || 'PDF Preview'}
-                    />
-                  </div>
-                )}
-
-                {(fileCategory === 'document' || fileCategory === 'spreadsheet' || fileCategory === 'text') && (
-                  <div className="w-full p-8 bg-gradient-to-br from-orange-50 to-yellow-50 flex flex-col items-center justify-center min-h-[300px]">
-                    <div className="w-24 h-24 bg-orange-100 rounded-2xl flex items-center justify-center mb-4">
-                      <FileText className="w-12 h-12 text-orange-600" />
-                    </div>
-                    <p className="text-lg font-medium text-gray-900">{file?.name}</p>
-                    <p className="text-gray-600 mt-2">
-                      {file ? formatFileSize(file.size) : ''}
-                    </p>
-                    <p className="text-sm text-gray-500 mt-4 text-center max-w-md">
-                      Document preview not available. The file will be analyzed by Gemini 3 Flash.
-                    </p>
-                  </div>
+                {(fileCategory === 'pdf' || fileCategory === 'document' || fileCategory === 'spreadsheet' || fileCategory === 'text') && (
+                  <FilePreview
+                    file={file}
+                    previewUrl={previewUrl}
+                    category={fileCategory}
+                    fileName={file?.name}
+                    fileSize={file?.size}
+                  />
                 )}
               </div>
 

@@ -38,7 +38,7 @@ export function FilePreview({ file, previewUrl, category, fileName, fileSize }: 
         case 'pdf':
             return <PDFPreview url={previewUrl} fileName={displayName} />;
         case 'spreadsheet':
-            return <SpreadsheetPreview url={previewUrl} fileName={displayName} />;
+            return <SpreadsheetPreview url={previewUrl} fileName={displayName} file={file} />;
         case 'document':
         case 'text':
             return <DocumentPreview fileName={displayName} fileSize={displaySize} category={category} />;
@@ -128,7 +128,7 @@ function PDFPreview({ url, fileName }: { url: string; fileName: string }) {
 }
 
 // Spreadsheet Preview Component
-function SpreadsheetPreview({ url, fileName }: { url: string; fileName: string }) {
+function SpreadsheetPreview({ url, fileName, file }: { url: string; fileName: string; file?: File | null }) {
     const [workbook, setWorkbook] = useState<XLSX.WorkBook | null>(null);
     const [currentSheet, setCurrentSheet] = useState<string>('');
     const [loading, setLoading] = useState(true);
@@ -140,13 +140,19 @@ function SpreadsheetPreview({ url, fileName }: { url: string; fileName: string }
                 setLoading(true);
                 setError(null);
 
-                // Fetch the file
-                const response = await fetch(url);
-                if (!response.ok) {
-                    throw new Error('Failed to load spreadsheet');
-                }
+                let arrayBuffer: ArrayBuffer;
 
-                const arrayBuffer = await response.arrayBuffer();
+                // If we have the File object directly (during upload preview), use it
+                if (file) {
+                    arrayBuffer = await file.arrayBuffer();
+                } else {
+                    // Otherwise fetch from URL (after upload is complete)
+                    const response = await fetch(url);
+                    if (!response.ok) {
+                        throw new Error('Failed to load spreadsheet');
+                    }
+                    arrayBuffer = await response.arrayBuffer();
+                }
                 
                 // Parse with xlsx
                 const wb = XLSX.read(arrayBuffer, { type: 'array' });
@@ -165,7 +171,7 @@ function SpreadsheetPreview({ url, fileName }: { url: string; fileName: string }
         }
 
         loadSpreadsheet();
-    }, [url]);
+    }, [url, file]);
 
     if (loading) {
         return (
