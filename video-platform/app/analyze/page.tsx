@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, Sparkles, Video as VideoIcon, X, FileText, Image as ImageIcon, Music, FileSpreadsheet } from 'lucide-react';
+import { Upload, Sparkles, Video as VideoIcon, X, FileText, Image as ImageIcon, Music, FileSpreadsheet, Link as LinkIcon } from 'lucide-react';
 import { saveVideoFile, savePDFFile, saveFile } from '@/lib/indexeddb';
 import { validateFile, getFileCategory, formatFileSize, FILE_INPUT_ACCEPT, FileCategory, getFileIcon, getCategoryDisplayName, needsConversionForGemini } from '@/lib/fileTypes';
 import { convertSpreadsheetToCSV } from '@/lib/spreadsheetConverter';
@@ -17,11 +17,13 @@ export default function AnalyzePage() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [showUrlModal, setShowUrlModal] = useState(false);
+  const [fileUrl, setFileUrl] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
-  const handleFileSelect = async (selectedFile: File) => {
+  const handleFileSelect = async (selectedFile: File, fromUrl: boolean = false) => {
     // Validate file
     const validation = validateFile(selectedFile);
     if (!validation.valid) {
@@ -49,6 +51,7 @@ export default function AnalyzePage() {
       uploadedAt: new Date().toISOString(),
       analyzed: false,
       localUrl: url,
+      sourceType: fromUrl ? 'url-import' : 'file-upload',
     };
 
     const existingFiles = JSON.parse(localStorage.getItem('uploadedFiles') || '[]');
@@ -56,11 +59,59 @@ export default function AnalyzePage() {
     localStorage.setItem('uploadedFiles', JSON.stringify(existingFiles));
   };
 
+  const handleUrlImport = async () => {
+    if (!fileUrl.trim()) {
+      setValidationError('Please enter a valid URL');
+      return;
+    }
+
+    setValidationError(null);
+    setIsUploading(true);
+    setUploadProgress(0);
+    setUploadStatus('Fetching file from URL...');
+
+    try {
+      // Fetch file from URL
+      const response = await fetch(fileUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch file: ${response.statusText}`);
+      }
+
+      // Get the blob data
+      const blob = await response.blob();
+      
+      // Extract filename from URL or use a default name
+      const urlPath = new URL(fileUrl).pathname;
+      const fileName = urlPath.split('/').pop() || 'imported-file';
+      
+      // Create a File object from the blob
+      const file = new File([blob], fileName, { type: blob.type });
+      
+      setUploadProgress(10);
+      setUploadStatus('File fetched successfully');
+      
+      // Close modal and continue with normal upload flow
+      setShowUrlModal(false);
+      setFileUrl('');
+      
+      // Use the same file selection handler but mark as URL import
+      await handleFileSelect(file, true);
+      
+      setIsUploading(false);
+      setUploadStatus('');
+    } catch (error) {
+      console.error('URL import error:', error);
+      setValidationError(`Failed to import from URL: ${(error as Error).message}`);
+      setIsUploading(false);
+      setUploadStatus('');
+    }
+  };
+
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     const droppedFile = e.dataTransfer.files[0];
     if (droppedFile) {
-      handleFileSelect(droppedFile);
+      handleFileSelect(droppedFile, false);
     }
   }, []);
 
@@ -364,16 +415,27 @@ export default function AnalyzePage() {
               ref={fileInputRef}
               type="file"
               accept={FILE_INPUT_ACCEPT}
-              onChange={(e) => e.target.files && handleFileSelect(e.target.files[0])}
+              onChange={(e) => e.target.files && handleFileSelect(e.target.files[0], false)}
               className="hidden"
             />
 
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="px-8 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors"
-            >
-              Select File
-            </button>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="px-8 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors inline-flex items-center justify-center gap-2"
+              >
+                <Upload className="w-5 h-5" />
+                Select File
+              </button>
+              
+              <button
+                onClick={() => setShowUrlModal(true)}
+                className="px-8 py-3 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition-colors inline-flex items-center justify-center gap-2"
+              >
+                <LinkIcon className="w-5 h-5" />
+                Import from URL
+              </button>
+            </div>
 
             <p className="text-sm text-gray-500 mt-4">
               Max sizes: Video/Audio 2GB, Images 20MB, PDFs/Documents 50MB
@@ -506,6 +568,88 @@ export default function AnalyzePage() {
             </AnimatePresence>
           </div>
         )}
+
+        {/* URL Import Modal */}
+        <AnimatePresence>
+          {showUrlModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+              onClick={() => setShowUrlModal(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6"
+              >
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                    <LinkIcon className="w-6 h-6 text-indigo-600" />
+                    Import from URL
+                  </h2>
+                  <button
+                    onClick={() => setShowUrlModal(false)}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    <X className="w-5 h-5 text-gray-500" />
+                  </button>
+                </div>
+
+                <div className="mb-6">
+                  <label htmlFor="fileUrl" className="block text-sm font-medium text-gray-700 mb-2">
+                    File URL
+                  </label>
+                  <input
+                    id="fileUrl"
+                    type="url"
+                    value={fileUrl}
+                    onChange={(e) => setFileUrl(e.target.value)}
+                    placeholder="https://example.com/video.mp4"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleUrlImport();
+                      }
+                    }}
+                  />
+                  <p className="text-sm text-gray-500 mt-2">
+                    Enter a direct URL to a video, image, audio file, PDF, or document
+                  </p>
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowUrlModal(false)}
+                    className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleUrlImport}
+                    disabled={isUploading || !fileUrl.trim()}
+                    className="flex-1 px-6 py-3 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
+                  >
+                    {isUploading ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Importing...
+                      </>
+                    ) : (
+                      <>
+                        <LinkIcon className="w-5 h-5" />
+                        Import
+                      </>
+                    )}
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
