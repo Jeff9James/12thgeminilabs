@@ -310,36 +310,57 @@ export async function saveDirectoryHandle(
   name: string,
   handle: FileSystemDirectoryHandle
 ): Promise<void> {
-  const db = await openDB();
-  const tx = db.transaction(STORE_NAME, 'readwrite');
-  const store = tx.objectStore(STORE_NAME);
-  await store.put({ name, handle });
-  await tx.done;
+  return new Promise((resolve, reject) => {
+    openDB().then((db) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      const request = store.put({ name, handle });
+      
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    }).catch(reject);
+  });
 }
 
 export async function getDirectoryHandle(name: string): Promise<FileSystemDirectoryHandle | null> {
-  const db = await openDB();
-  const tx = db.transaction(STORE_NAME, 'readonly');
-  const store = tx.objectStore(STORE_NAME);
-  const result = await store.get(name);
-  return result?.handle || null;
+  return new Promise((resolve, reject) => {
+    openDB().then((db) => {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const store = tx.objectStore(STORE_NAME);
+      const request = store.get(name);
+      
+      request.onsuccess = () => resolve(request.result?.handle || null);
+      request.onerror = () => reject(request.error);
+    }).catch(reject);
+  });
 }
 
 export async function getAllDirectoryHandles(): Promise<
   Array<{ name: string; handle: FileSystemDirectoryHandle }>
 > {
-  const db = await openDB();
-  const tx = db.transaction(STORE_NAME, 'readonly');
-  const store = tx.objectStore(STORE_NAME);
-  return await store.getAll();
+  return new Promise((resolve, reject) => {
+    openDB().then((db) => {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const store = tx.objectStore(STORE_NAME);
+      const request = store.getAll();
+      
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = () => reject(request.error);
+    }).catch(reject);
+  });
 }
 
 export async function removeDirectoryHandle(name: string): Promise<void> {
-  const db = await openDB();
-  const tx = db.transaction(STORE_NAME, 'readwrite');
-  const store = tx.objectStore(STORE_NAME);
-  await store.delete(name);
-  await tx.done;
+  return new Promise((resolve, reject) => {
+    openDB().then((db) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      const request = store.delete(name);
+      
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    }).catch(reject);
+  });
 }
 
 function openDB(): Promise<IDBDatabase> {
