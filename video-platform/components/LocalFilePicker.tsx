@@ -34,7 +34,6 @@ import {
   type FileSystemDirectoryHandle,
 } from '@/lib/localFileAccess';
 import { indexFiles, getIndexStats } from '@/lib/localFileIndex';
-=======
 
 interface LocalFilePickerProps {
   onFileSelect?: (file: File, localFile: LocalFile) => void;
@@ -140,7 +139,6 @@ export default function LocalFilePicker({
         indexFiles(allFiles, dirHandle.name, dirHandle.name).catch((err) => {
           console.error('[LocalFilePicker] Error indexing files:', err);
         });
-=======
       }
     } catch (error) {
       setError((error as Error).message);

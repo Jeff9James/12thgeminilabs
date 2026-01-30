@@ -39,7 +39,6 @@ export const viewport: Viewport = {
   maximumScale: 5,
   userScalable: true,
 };
-=======
 
 export default function RootLayout({
   children,
@@ -74,4 +73,3 @@ export default function RootLayout({
     </html>
   );
 }
-=======

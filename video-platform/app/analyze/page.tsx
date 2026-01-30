@@ -10,8 +10,9 @@ import { convertSpreadsheetToCSV } from '@/lib/spreadsheetConverter';
 import { FilePreview } from '@/components/FilePreview';
 import LocalFilePicker from '@/components/LocalFilePicker';
 
+  const [file, setFile] = useState<File | null>(null);
 export default function AnalyzePage() {
-=======
+  const [file, setFile] = useState<File | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [fileCategory, setFileCategory] = useState<FileCategory | null>(null);
@@ -385,7 +386,11 @@ export default function AnalyzePage() {
           >
             <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
               <Upload className="w-10 h-10 text-white" />
+
+            <p className="text-sm text-gray-500 mt-4">
             </div>
+
+            <p className="text-sm text-gray-500 mt-4">
 
             <h3 className="text-2xl font-bold text-gray-900 mb-2">
               Upload your file
@@ -446,7 +451,6 @@ export default function AnalyzePage() {
                 Import from URL
               </button>
             </div>
-=======
 
             <p className="text-sm text-gray-500 mt-4">
               Max sizes: Video/Audio 2GB, Images 20MB, PDFs/Documents 50MB

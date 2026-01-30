@@ -66,7 +66,6 @@ export default function Sidebar() {
             </Link>
           );
         })}
-=======
       </nav>
 
       <div className="px-6 py-4 border-t border-gray-200">
