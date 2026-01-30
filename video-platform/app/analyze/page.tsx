@@ -205,7 +205,7 @@ export default function AnalyzePage() {
       // Determine file category from MIME type (do this once at the top)
       const fileCat = getFileCategory(fileType);
 
-      if (uploadMode === 'file' && file) {
+      if (file) {
         // Save files to IndexedDB for local preview
         if (fileCat === 'video' || fileCat === 'audio' || fileCat === 'image') {
           console.log(`Saving ${fileCat} file to IndexedDB...`);

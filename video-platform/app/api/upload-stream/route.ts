@@ -123,18 +123,18 @@ export async function POST(request: NextRequest) {
         }
 
         const uploadResult = await uploadResponse.json();
-        const geminiFileName = uploadResult.file.name;
+        const geminiFileUri = uploadResult.file.name; // This is the file URI from Gemini
 
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: 'Processing with Gemini...' })}\n\n`));
 
         // Step 3: Wait for processing
-        let fileInfo = await fetch(`https://generativelanguage.googleapis.com/v1beta/${geminiFileName}?key=${apiKey}`)
+        let fileInfo = await fetch(`https://generativelanguage.googleapis.com/v1beta/${geminiFileUri}?key=${apiKey}`)
           .then(r => r.json());
 
         let attempts = 0;
         while (fileInfo.state === 'PROCESSING' && attempts < 60) {
           await new Promise(resolve => setTimeout(resolve, 3000));
-          fileInfo = await fetch(`https://generativelanguage.googleapis.com/v1beta/${geminiFileName}?key=${apiKey}`)
+          fileInfo = await fetch(`https://generativelanguage.googleapis.com/v1beta/${geminiFileUri}?key=${apiKey}`)
             .then(r => r.json());
           attempts++;
 
@@ -159,6 +159,7 @@ export async function POST(request: NextRequest) {
           category: category,
           size: fileData.length,
           geminiFileUri: fileInfo.uri,
+          geminiFileName: geminiFileUri,
           playbackUrl: playbackUrl,
           uploadedAt: new Date().toISOString(),
           status: 'ready'
@@ -175,7 +176,7 @@ export async function POST(request: NextRequest) {
             mimeType: file.type,
             size: fileData.length,
             geminiFileUri: fileInfo.uri,
-            geminiFileName: geminiFileName,
+            geminiFileName: geminiFileUri,
             createdAt: new Date().toISOString(),
             sourceType: 'file-upload'
           }
