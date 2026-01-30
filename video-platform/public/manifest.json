@@ -1,0 +1,94 @@
+﻿{
+  "name": "Gemini Files - AI Multi-Modal Analysis",
+  "short_name": "Gemini Files",
+  "description": "Search and analyze videos, images, audio, PDFs, and documents with Gemini AI. Access local files with AI-powered search.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1e40af",
+  "theme_color": "#2563eb",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshot-wide.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide"
+    },
+    {
+      "src": "/screenshot-narrow.png",
+      "sizes": "750x1334",
+      "type": "image/png",
+      "form_factor": "narrow"
+    }
+  ],
+  "categories": ["productivity", "utilities", "education"],
+  "file_handlers": [
+    {
+      "action": "/analyze",
+      "accept": {
+        "video/*": [".mp4", ".webm", ".mov", ".avi", ".mkv"],
+        "image/*": [".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"],
+        "audio/*": [".mp3", ".wav", ".ogg", ".m4a", ".flac"],
+        "application/pdf": [".pdf"],
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation": [".pptx"],
+        "text/plain": [".txt"],
+        "text/csv": [".csv"],
+        "application/json": [".json"]
+      }
+    }
+  ],
+  "share_target": {
+    "action": "/analyze",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "files": [
+        {
+          "name": "file",
+          "accept": ["image/*", "video/*", "audio/*", "application/pdf", "text/*"]
+        }
+      ]
+    }
+  },
+  "shortcuts": [
+    {
+      "name": "Upload & Analyze",
+      "short_name": "Analyze",
+      "description": "Upload and analyze a file with AI",
+      "url": "/analyze",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Search Files",
+      "short_name": "Search",
+      "description": "Search through your files",
+      "url": "/search",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "My Files",
+      "short_name": "Files",
+      "description": "View all your files",
+      "url": "/files",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "prefer_related_applications": false
+}

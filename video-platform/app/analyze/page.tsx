@@ -8,8 +8,10 @@ import { saveVideoFile, savePDFFile, saveFile } from '@/lib/indexeddb';
 import { validateFile, getFileCategory, formatFileSize, FILE_INPUT_ACCEPT, FileCategory, getFileIcon, getCategoryDisplayName, needsConversionForGemini } from '@/lib/fileTypes';
 import { convertSpreadsheetToCSV } from '@/lib/spreadsheetConverter';
 import { FilePreview } from '@/components/FilePreview';
+import LocalFilePicker from '@/components/LocalFilePicker';
 
 export default function AnalyzePage() {
+=======
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [fileCategory, setFileCategory] = useState<FileCategory | null>(null);
@@ -419,7 +421,7 @@ export default function AnalyzePage() {
               className="hidden"
             />
 
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
               <button
                 onClick={() => fileInputRef.current?.click()}
                 className="px-8 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors inline-flex items-center justify-center gap-2"
@@ -427,6 +429,14 @@ export default function AnalyzePage() {
                 <Upload className="w-5 h-5" />
                 Select File
               </button>
+              
+              <LocalFilePicker
+                allowMultiple={false}
+                onFileSelect={(file, localFile) => {
+                  console.log('[AnalyzePage] Local file selected:', localFile);
+                  handleFileSelect(file, false);
+                }}
+              />
               
               <button
                 onClick={() => setShowUrlModal(true)}
@@ -436,6 +446,7 @@ export default function AnalyzePage() {
                 Import from URL
               </button>
             </div>
+=======
 
             <p className="text-sm text-gray-500 mt-4">
               Max sizes: Video/Audio 2GB, Images 20MB, PDFs/Documents 50MB

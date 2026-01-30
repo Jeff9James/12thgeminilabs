@@ -57,10 +57,16 @@ export default function Sidebar() {
               )}
             >
               <Icon className={cn('w-5 h-5', isActive && 'text-blue-600')} />
-              {item.name}
+              <span className="flex-1">{item.name}</span>
+              {item.badge && (
+                <span className="px-2 py-0.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-xs font-bold rounded-full">
+                  {item.badge}
+                </span>
+              )}
             </Link>
           );
         })}
+=======
       </nav>
 
       <div className="px-6 py-4 border-t border-gray-200">
