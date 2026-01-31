@@ -81,12 +81,27 @@ export async function POST(request: Request) {
       ];
 
       const supportedFiles = files.filter((file: FileData) => {
-        const isSupported = supportedMimeTypes.some(mime => 
-          file.mimeType.toLowerCase().includes(mime.toLowerCase())
-        );
-        if (!isSupported) {
-          console.log(`[Unified Chat] Skipping unsupported file: ${file.filename} (${file.mimeType})`);
+        const fileMimeType = (file.mimeType || '').toLowerCase();
+        
+        // Explicitly reject Excel files
+        if (fileMimeType.includes('excel') || 
+            fileMimeType.includes('spreadsheet') ||
+            fileMimeType.includes('vnd.ms-excel') ||
+            fileMimeType.includes('vnd.openxmlformats')) {
+          console.log(`[Unified Chat] ❌ Skipping Excel file: ${file.filename} (${file.mimeType})`);
+          return false;
         }
+        
+        const isSupported = supportedMimeTypes.some(mime => 
+          fileMimeType.includes(mime.toLowerCase())
+        );
+        
+        if (!isSupported) {
+          console.log(`[Unified Chat] ❌ Skipping unsupported file: ${file.filename} (${file.mimeType})`);
+        } else {
+          console.log(`[Unified Chat] ✅ Accepting file: ${file.filename} (${file.mimeType})`);
+        }
+        
         return isSupported;
       });
 
