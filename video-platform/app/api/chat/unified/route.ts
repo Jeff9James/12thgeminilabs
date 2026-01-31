@@ -40,26 +40,32 @@ export async function POST(request: Request) {
       );
     }
 
-    // Use Gemini 1.5 Flash (stable) or Pro instead of preview
-    // gemini-3-flash-preview may not be available yet
+    // Use Gemini 3 Flash as per user confirmation
     const model = genAI.getGenerativeModel({
-      model: 'gemini-1.5-flash-latest', // Use stable model
+      model: 'gemini-3-flash-preview',
       generationConfig: {
         temperature: 1.0,
       },
     });
 
-    console.log('[Unified Chat] Model initialized');
+    console.log('[Unified Chat] Model initialized: gemini-3-flash-preview');
 
     // Build conversation contents array with thought signatures
     const contents: any[] = [];
 
     // First, add the system context with all files (if any)
     if (files && files.length > 0) {
+      console.log('[Unified Chat] Processing files:', files.map(f => ({ 
+        filename: f.filename, 
+        mimeType: f.mimeType, 
+        uri: f.uri?.substring(0, 30) + '...' 
+      })));
+
       const fileParts: any[] = [];
 
       // Add all files to the context
-      files.forEach((file: FileData) => {
+      files.forEach((file: FileData, index: number) => {
+        console.log(`[Unified Chat] Adding file ${index + 1}/${files.length}: ${file.filename}`);
         fileParts.push({
           fileData: {
             mimeType: file.mimeType,
@@ -135,13 +141,24 @@ Now, please answer the user's questions about these files.`,
     });
 
     console.log('[Unified Chat] Generating content with', contents.length, 'content blocks');
+    console.log('[Unified Chat] Contents structure:', JSON.stringify(contents, null, 2).substring(0, 500) + '...');
 
     // Generate response
-    const result = await model.generateContent({
-      contents,
-    });
-
-    console.log('[Unified Chat] Response received');
+    let result;
+    try {
+      // For SDK, pass contents directly or use the correct format
+      result = await model.generateContent({
+        contents: contents,
+        generationConfig: {
+          temperature: 1.0,
+        },
+      });
+      console.log('[Unified Chat] Response received successfully');
+    } catch (genError: any) {
+      console.error('[Unified Chat] Generation error:', genError);
+      console.error('[Unified Chat] Generation error full:', JSON.stringify(genError, null, 2));
+      throw new Error(`Gemini API error: ${genError.message || JSON.stringify(genError)}`);
+    }
 
     const response = result.response;
     const text = response.text();
