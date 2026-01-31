@@ -40,7 +40,133 @@ export async function POST(request: Request) {
       );
     }
 
-    // Use Gemini 3 Flash as per user confirmation
+    // Filter out unsupported files
+    const supportedMimeTypes = [
+      'video/mp4', 'video/mpeg', 'video/mov', 'video/avi', 'video/webm',
+      'audio/mp3', 'audio/mpeg', 'audio/wav', 'audio/aac', 'audio/ogg',
+      'image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif',
+      'application/pdf', 'text/plain', 'text/csv', 'application/csv',
+    ];
+
+    let relevantFiles = files || [];
+    
+    if (relevantFiles.length > 0) {
+      relevantFiles = relevantFiles.filter((file: FileData) => {
+        const fileMimeType = (file.mimeType || '').toLowerCase();
+        
+        // Reject Excel files
+        if (fileMimeType.includes('excel') || fileMimeType.includes('spreadsheet')) {
+          return false;
+        }
+        
+        return supportedMimeTypes.some(mime => fileMimeType.includes(mime.toLowerCase()));
+      });
+
+      console.log(`[Unified Chat] Using ${relevantFiles.length}/${files.length} supported files`);
+    }
+
+    // FAST PATH: Use parallel search approach for multi-file queries
+    if (relevantFiles.length > 1) {
+      console.log('[Unified Chat] Using FAST parallel search mode for', relevantFiles.length, 'files');
+      
+      // Step 1: Query each file in PARALLEL with minimal thinking
+      const fileQueryPromises = relevantFiles.map(async (file: FileData) => {
+        try {
+          const model = genAI.getGenerativeModel({
+            model: 'gemini-3-flash-preview',
+            generationConfig: {
+              temperature: 1.0,
+              responseMimeType: 'application/json',
+            },
+          });
+
+          // Fast, focused query for this specific file
+          const quickPrompt = `Based on this file, answer: "${message}"
+
+Return JSON:
+{
+  "hasRelevantInfo": true/false,
+  "answer": "1-2 sentence answer if relevant, or empty string",
+  "confidence": 0-100
+}`;
+
+          const result = await model.generateContent([
+            {
+              fileData: {
+                mimeType: file.mimeType,
+                fileUri: file.uri,
+              }
+            },
+            { text: quickPrompt }
+          ]);
+
+          const response = JSON.parse(result.response.text());
+          
+          return {
+            filename: file.filename,
+            ...response
+          };
+        } catch (error) {
+          console.error(`[Unified Chat] Error querying ${file.filename}:`, error);
+          return { filename: file.filename, hasRelevantInfo: false, answer: '', confidence: 0 };
+        }
+      });
+
+      // Wait for all parallel queries
+      const fileResults = await Promise.all(fileQueryPromises);
+      
+      console.log('[Unified Chat] Parallel queries complete');
+
+      // Filter to relevant files only
+      const relevantResults = fileResults
+        .filter(r => r.hasRelevantInfo && r.confidence > 30)
+        .sort((a, b) => b.confidence - a.confidence);
+
+      if (relevantResults.length === 0) {
+        return NextResponse.json({
+          success: true,
+          response: "I couldn't find relevant information about that in your files. Could you rephrase your question or ask about something else?",
+          thoughtSignature: null,
+        });
+      }
+
+      // Step 2: Synthesize final answer from relevant results
+      const synthesisModel = genAI.getGenerativeModel({
+        model: 'gemini-3-flash-preview',
+        generationConfig: {
+          temperature: 1.0,
+        },
+      });
+
+      const synthesisPrompt = `User asked: "${message}"
+
+I found relevant information from ${relevantResults.length} file(s):
+
+${relevantResults.map((r, i) => `${i + 1}. ${r.filename}: ${r.answer}`).join('\n\n')}
+
+Synthesize a comprehensive answer that:
+- Combines information from all sources
+- Mentions which files contain what information
+- Is clear and well-organized
+- Cites sources by filename
+
+Answer:`;
+
+      const finalResult = await synthesisModel.generateContent(synthesisPrompt);
+      const finalAnswer = finalResult.response.text();
+
+      console.log('[Unified Chat] Fast mode complete, answer length:', finalAnswer.length);
+
+      return NextResponse.json({
+        success: true,
+        response: finalAnswer,
+        thoughtSignature: null,
+      });
+    }
+
+    // STANDARD PATH: Single file or no files - use normal chat
+    console.log('[Unified Chat] Using standard mode');
+
     const model = genAI.getGenerativeModel({
       model: 'gemini-3-flash-preview',
       generationConfig: {
@@ -48,80 +174,13 @@ export async function POST(request: Request) {
       },
     });
 
-    console.log('[Unified Chat] Model initialized: gemini-3-flash-preview');
-
-    // Build conversation contents array with thought signatures
     const contents: any[] = [];
 
-    // First, add the system context with all files (if any)
-    if (files && files.length > 0) {
-      console.log('[Unified Chat] Processing files:', files.map((f: FileData) => ({ 
-        filename: f.filename, 
-        mimeType: f.mimeType, 
-        uri: f.uri?.substring(0, 30) + '...' 
-      })));
-
-      // Filter out unsupported MIME types
-      const supportedMimeTypes = [
-        // Video
-        'video/mp4', 'video/mpeg', 'video/mov', 'video/avi', 'video/x-flv',
-        'video/mpg', 'video/webm', 'video/wmv', 'video/3gpp', 'video/quicktime',
-        // Audio
-        'audio/mp3', 'audio/mpeg', 'audio/wav', 'audio/aac', 'audio/ogg',
-        'audio/flac', 'audio/webm', 'audio/x-m4a', 'audio/mp4',
-        // Image
-        'image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/heic',
-        'image/heif', 'image/gif',
-        // Document
-        'application/pdf',
-        'text/plain', 'text/html', 'text/css', 'text/javascript',
-        'text/x-typescript', 'text/x-python', 'application/json',
-        // CSV (supported)
-        'text/csv', 'application/csv',
-      ];
-
-      const supportedFiles = files.filter((file: FileData) => {
-        const fileMimeType = (file.mimeType || '').toLowerCase();
-        
-        // Explicitly reject Excel files
-        if (fileMimeType.includes('excel') || 
-            fileMimeType.includes('spreadsheet') ||
-            fileMimeType.includes('vnd.ms-excel') ||
-            fileMimeType.includes('vnd.openxmlformats')) {
-          console.log(`[Unified Chat] ❌ Skipping Excel file: ${file.filename} (${file.mimeType})`);
-          return false;
-        }
-        
-        const isSupported = supportedMimeTypes.some(mime => 
-          fileMimeType.includes(mime.toLowerCase())
-        );
-        
-        if (!isSupported) {
-          console.log(`[Unified Chat] ❌ Skipping unsupported file: ${file.filename} (${file.mimeType})`);
-        } else {
-          console.log(`[Unified Chat] ✅ Accepting file: ${file.filename} (${file.mimeType})`);
-        }
-        
-        return isSupported;
-      });
-
-      if (supportedFiles.length === 0) {
-        return NextResponse.json(
-          { 
-            success: false, 
-            error: 'No supported files selected. Excel files (.xls, .xlsx) are not supported. Please convert to CSV or select other file types.' 
-          },
-          { status: 400 }
-        );
-      }
-
-      console.log(`[Unified Chat] Using ${supportedFiles.length}/${files.length} supported files`);
-
+    // Add file context if present
+    if (relevantFiles.length > 0) {
       const fileParts: any[] = [];
 
-      // Add all supported files to the context
-      supportedFiles.forEach((file: FileData, index: number) => {
-        console.log(`[Unified Chat] Adding file ${index + 1}/${supportedFiles.length}: ${file.filename}`);
+      relevantFiles.forEach((file: FileData) => {
         fileParts.push({
           fileData: {
             mimeType: file.mimeType,
@@ -130,30 +189,8 @@ export async function POST(request: Request) {
         });
       });
 
-      // Add system instruction
       fileParts.push({
-        text: `You are a helpful AI assistant with access to ${supportedFiles.length} file(s) uploaded by the user:
-
-${supportedFiles.map((f: FileData, i: number) => `${i + 1}. ${f.filename} (${f.mimeType})`).join('\n')}
-
-Your capabilities:
-- Analyze and answer questions about ANY of these files
-- Compare and find connections across multiple files
-- Summarize content from one or all files
-- Extract specific information when requested
-- Provide detailed analysis of multimedia content (videos, images, audio)
-- Read and interpret documents (PDFs, text files, spreadsheets)
-
-IMPORTANT INSTRUCTIONS:
-1. Always base your answers on the actual content of the files
-2. When referencing specific files, mention them by name
-3. For videos/audio: Include timestamps in format [MM:SS] or [HH:MM:SS] when mentioning specific moments
-4. For documents: Reference specific sections or pages when available
-5. Be specific and cite evidence from the files
-6. If information isn't in the files, clearly state that
-7. You can analyze across multiple files to find patterns or make comparisons
-
-Now, please answer the user's questions about these files.`,
+        text: `You are a helpful AI assistant. Answer the user's question about ${relevantFiles.length === 1 ? 'this file' : 'these files'}.`
       });
 
       contents.push({
@@ -161,14 +198,13 @@ Now, please answer the user's questions about these files.`,
         parts: fileParts,
       });
 
-      // Model acknowledges the file context
       contents.push({
         role: 'model',
-        parts: [{ text: `I understand. I have access to ${supportedFiles.length} file(s) and I'm ready to answer your questions about them. What would you like to know?` }],
+        parts: [{ text: `I understand. I'm ready to answer your questions.` }],
       });
     }
 
-    // Add conversation history with thought signatures (per Gemini 3 docs)
+    // Add conversation history
     if (history && Array.isArray(history) && history.length > 0) {
       history.forEach((msg: HistoryMessage) => {
         if (msg.role === 'user') {
@@ -177,77 +213,48 @@ Now, please answer the user's questions about these files.`,
             parts: [{ text: msg.content }],
           });
         } else if (msg.role === 'assistant') {
-          // Include thought signature if present (for Gemini 3 continuity)
-          const parts: any[] = [{ text: msg.content }];
-          if (msg.thoughtSignature) {
-            parts[0].thoughtSignature = msg.thoughtSignature;
-          }
           contents.push({
             role: 'model',
-            parts,
+            parts: [{ text: msg.content }],
           });
         }
       });
     }
 
-    // Add the current user message
+    // Add current message
     contents.push({
       role: 'user',
       parts: [{ text: message }],
     });
 
-    console.log('[Unified Chat] Generating content with', contents.length, 'content blocks');
-    console.log('[Unified Chat] Contents structure:', JSON.stringify(contents, null, 2).substring(0, 500) + '...');
+    console.log('[Unified Chat] Generating response...');
 
-    // Generate response
-    let result;
-    try {
-      // For SDK, pass contents directly or use the correct format
-      result = await model.generateContent({
-        contents: contents,
-        generationConfig: {
-          temperature: 1.0,
-        },
-      });
-      console.log('[Unified Chat] Response received successfully');
-    } catch (genError: any) {
-      console.error('[Unified Chat] Generation error:', genError);
-      console.error('[Unified Chat] Generation error full:', JSON.stringify(genError, null, 2));
-      throw new Error(`Gemini API error: ${genError.message || JSON.stringify(genError)}`);
-    }
+    const result = await model.generateContent({
+      contents,
+      generationConfig: {
+        temperature: 1.0,
+      },
+    });
 
     const response = result.response;
     const text = response.text();
 
-    console.log('[Unified Chat] Response text extracted, length:', text.length);
-
-    // Extract thought signature for Gemini 3 continuity (if present)
-    let thoughtSignature: string | null = null;
-    if (response.candidates && response.candidates[0]?.content?.parts) {
-      const parts = response.candidates[0].content.parts;
-      for (const part of parts) {
-        if ((part as any).thoughtSignature) {
-          thoughtSignature = (part as any).thoughtSignature;
-          break;
-        }
-      }
-    }
+    console.log('[Unified Chat] Response received, length:', text.length);
 
     return NextResponse.json({
       success: true,
       response: text,
-      thoughtSignature,
+      thoughtSignature: null,
     });
 
   } catch (error: any) {
     console.error('[Unified Chat] Error:', error);
     console.error('[Unified Chat] Error details:', {
       message: error.message,
-      stack: error.stack,
-      name: error.name,
+      stack: error.stack?.substring(0, 500),
     });
     
-    // Handle specific Gemini API errors
+    // Handle specific errors
     if (error.message?.includes('API key') || error.message?.includes('API_KEY')) {
       return NextResponse.json(
         { success: false, error: 'API key configuration error. Please check your .env.local file.' },
@@ -262,16 +269,18 @@ Now, please answer the user's questions about these files.`,
       );
     }
 
-    if (error.message?.includes('not found') || error.message?.includes('404')) {
+    if (error.message?.includes('403') || error.message?.includes('Forbidden')) {
       return NextResponse.json(
-        { success: false, error: 'Model not found. The AI model may not be available.' },
-        { status: 500 }
+        { 
+          success: false, 
+          error: 'File access error: One or more files have expired (files are kept for 48 hours). Please re-upload files and try again.' 
+        },
+        { status: 403 }
       );
     }
 
-    // Return detailed error in development
     const errorMessage = process.env.NODE_ENV === 'development' 
-      ? `${error.message}\n\nStack: ${error.stack}`
+      ? `${error.message}\n\n${error.stack?.substring(0, 500)}`
       : error.message || 'Failed to generate response';
 
     return NextResponse.json(
