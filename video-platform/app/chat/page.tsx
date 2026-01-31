@@ -91,6 +91,28 @@ export default function UnifiedChatPage() {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
 
+    // Get selected file URIs
+    const selectedFileData = files.filter(f => selectedFiles.includes(f.id));
+
+    // Check for unsupported file types (Excel files)
+    const unsupportedFiles = selectedFileData.filter(f => 
+      f.mimeType?.includes('vnd.ms-excel') || 
+      f.mimeType?.includes('vnd.openxmlformats-officedocument.spreadsheetml') ||
+      f.filename?.endsWith('.xls') ||
+      f.filename?.endsWith('.xlsx')
+    );
+
+    if (unsupportedFiles.length > 0) {
+      const errorMessage: Message = {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: `⚠️ Sorry, I cannot process these files:\n\n${unsupportedFiles.map(f => `• ${f.filename}`).join('\n')}\n\nExcel files (.xls, .xlsx) are not supported by Gemini API. Please:\n1. Convert them to CSV format, or\n2. Deselect them from the sidebar\n\nSupported formats: Videos, Audio, Images, PDFs, Text files, and CSV.`,
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, errorMessage]);
+      return;
+    }
+
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
@@ -103,8 +125,6 @@ export default function UnifiedChatPage() {
     setIsLoading(true);
 
     try {
-      // Get selected file URIs
-      const selectedFileData = files.filter(f => selectedFiles.includes(f.id));
 
       const response = await fetch('/api/chat/unified', {
         method: 'POST',

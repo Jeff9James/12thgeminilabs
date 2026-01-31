@@ -61,11 +61,52 @@ export async function POST(request: Request) {
         uri: f.uri?.substring(0, 30) + '...' 
       })));
 
+      // Filter out unsupported MIME types
+      const supportedMimeTypes = [
+        // Video
+        'video/mp4', 'video/mpeg', 'video/mov', 'video/avi', 'video/x-flv',
+        'video/mpg', 'video/webm', 'video/wmv', 'video/3gpp', 'video/quicktime',
+        // Audio
+        'audio/mp3', 'audio/mpeg', 'audio/wav', 'audio/aac', 'audio/ogg',
+        'audio/flac', 'audio/webm', 'audio/x-m4a', 'audio/mp4',
+        // Image
+        'image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/heic',
+        'image/heif', 'image/gif',
+        // Document
+        'application/pdf',
+        'text/plain', 'text/html', 'text/css', 'text/javascript',
+        'text/x-typescript', 'text/x-python', 'application/json',
+        // CSV (supported)
+        'text/csv', 'application/csv',
+      ];
+
+      const supportedFiles = files.filter((file: FileData) => {
+        const isSupported = supportedMimeTypes.some(mime => 
+          file.mimeType.toLowerCase().includes(mime.toLowerCase())
+        );
+        if (!isSupported) {
+          console.log(`[Unified Chat] Skipping unsupported file: ${file.filename} (${file.mimeType})`);
+        }
+        return isSupported;
+      });
+
+      if (supportedFiles.length === 0) {
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: 'No supported files selected. Excel files (.xls, .xlsx) are not supported. Please convert to CSV or select other file types.' 
+          },
+          { status: 400 }
+        );
+      }
+
+      console.log(`[Unified Chat] Using ${supportedFiles.length}/${files.length} supported files`);
+
       const fileParts: any[] = [];
 
-      // Add all files to the context
-      files.forEach((file: FileData, index: number) => {
-        console.log(`[Unified Chat] Adding file ${index + 1}/${files.length}: ${file.filename}`);
+      // Add all supported files to the context
+      supportedFiles.forEach((file: FileData, index: number) => {
+        console.log(`[Unified Chat] Adding file ${index + 1}/${supportedFiles.length}: ${file.filename}`);
         fileParts.push({
           fileData: {
             mimeType: file.mimeType,
@@ -76,9 +117,9 @@ export async function POST(request: Request) {
 
       // Add system instruction
       fileParts.push({
-        text: `You are a helpful AI assistant with access to ${files.length} file(s) uploaded by the user:
+        text: `You are a helpful AI assistant with access to ${supportedFiles.length} file(s) uploaded by the user:
 
-${files.map((f: FileData, i: number) => `${i + 1}. ${f.filename} (${f.mimeType})`).join('\n')}
+${supportedFiles.map((f: FileData, i: number) => `${i + 1}. ${f.filename} (${f.mimeType})`).join('\n')}
 
 Your capabilities:
 - Analyze and answer questions about ANY of these files
@@ -108,7 +149,7 @@ Now, please answer the user's questions about these files.`,
       // Model acknowledges the file context
       contents.push({
         role: 'model',
-        parts: [{ text: `I understand. I have access to ${files.length} file(s) and I'm ready to answer your questions about them. What would you like to know?` }],
+        parts: [{ text: `I understand. I have access to ${supportedFiles.length} file(s) and I'm ready to answer your questions about them. What would you like to know?` }],
       });
     }
 
