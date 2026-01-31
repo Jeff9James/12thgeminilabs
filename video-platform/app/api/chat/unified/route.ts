@@ -55,7 +55,7 @@ export async function POST(request: Request) {
 
     // First, add the system context with all files (if any)
     if (files && files.length > 0) {
-      console.log('[Unified Chat] Processing files:', files.map(f => ({ 
+      console.log('[Unified Chat] Processing files:', files.map((f: FileData) => ({ 
         filename: f.filename, 
         mimeType: f.mimeType, 
         uri: f.uri?.substring(0, 30) + '...' 
