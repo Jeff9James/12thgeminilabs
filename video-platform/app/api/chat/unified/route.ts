@@ -19,6 +19,12 @@ export async function POST(request: Request) {
   try {
     const { message, files, history } = await request.json();
 
+    console.log('[Unified Chat] Request received:', {
+      messageLength: message?.length,
+      filesCount: files?.length,
+      historyCount: history?.length,
+    });
+
     if (!message || typeof message !== 'string') {
       return NextResponse.json(
         { success: false, error: 'Message is required' },
@@ -26,13 +32,24 @@ export async function POST(request: Request) {
       );
     }
 
-    // Use Gemini 3 Flash as per official docs
+    if (!process.env.GEMINI_API_KEY) {
+      console.error('[Unified Chat] Missing GEMINI_API_KEY');
+      return NextResponse.json(
+        { success: false, error: 'API key not configured' },
+        { status: 500 }
+      );
+    }
+
+    // Use Gemini 1.5 Flash (stable) or Pro instead of preview
+    // gemini-3-flash-preview may not be available yet
     const model = genAI.getGenerativeModel({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-1.5-flash-latest', // Use stable model
       generationConfig: {
-        temperature: 1.0, // Keep at default as per Gemini 3 docs
-      } as any
+        temperature: 1.0,
+      },
     });
+
+    console.log('[Unified Chat] Model initialized');
 
     // Build conversation contents array with thought signatures
     const contents: any[] = [];
@@ -117,13 +134,19 @@ Now, please answer the user's questions about these files.`,
       parts: [{ text: message }],
     });
 
+    console.log('[Unified Chat] Generating content with', contents.length, 'content blocks');
+
     // Generate response
     const result = await model.generateContent({
       contents,
     });
 
+    console.log('[Unified Chat] Response received');
+
     const response = result.response;
     const text = response.text();
+
+    console.log('[Unified Chat] Response text extracted, length:', text.length);
 
     // Extract thought signature for Gemini 3 continuity (if present)
     let thoughtSignature: string | null = null;
@@ -144,27 +167,44 @@ Now, please answer the user's questions about these files.`,
     });
 
   } catch (error: any) {
-    console.error('Unified chat error:', error);
+    console.error('[Unified Chat] Error:', error);
+    console.error('[Unified Chat] Error details:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+    });
     
     // Handle specific Gemini API errors
-    if (error.message?.includes('API key')) {
+    if (error.message?.includes('API key') || error.message?.includes('API_KEY')) {
       return NextResponse.json(
-        { success: false, error: 'API key configuration error' },
+        { success: false, error: 'API key configuration error. Please check your .env.local file.' },
         { status: 500 }
       );
     }
 
-    if (error.message?.includes('quota')) {
+    if (error.message?.includes('quota') || error.message?.includes('429')) {
       return NextResponse.json(
         { success: false, error: 'API quota exceeded. Please try again later.' },
         { status: 429 }
       );
     }
 
+    if (error.message?.includes('not found') || error.message?.includes('404')) {
+      return NextResponse.json(
+        { success: false, error: 'Model not found. The AI model may not be available.' },
+        { status: 500 }
+      );
+    }
+
+    // Return detailed error in development
+    const errorMessage = process.env.NODE_ENV === 'development' 
+      ? `${error.message}\n\nStack: ${error.stack}`
+      : error.message || 'Failed to generate response';
+
     return NextResponse.json(
       { 
         success: false, 
-        error: error.message || 'Failed to generate response' 
+        error: errorMessage
       },
       { status: 500 }
     );
