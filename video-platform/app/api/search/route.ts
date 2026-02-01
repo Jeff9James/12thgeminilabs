@@ -21,6 +21,14 @@ interface SearchResult {
   category?: string;
 }
 
+interface CachedSearchData {
+  results: SearchResult[];
+  aiResponse?: {
+    answer: string;
+    citations: string[];
+  };
+}
+
 // Note: Using responseMimeType alone forces JSON output
 // responseSchema has type issues with current SDK version
 
@@ -36,15 +44,21 @@ export async function POST(request: NextRequest) {
 
     // Check cache first (include mode in cache key)
     const cacheKey = createCacheKey(`${mode}:${query}`, videos.map((v: any) => v.id));
-    const cachedResults = await getSearchResults(cacheKey);
+    const cachedData = await getSearchResults(cacheKey);
 
-    if (cachedResults) {
+    if (cachedData) {
       console.log('Returning cached search results');
+      
+      // Handle both old format (array) and new format (object with results)
+      const isNewFormat = cachedData && typeof cachedData === 'object' && 'results' in cachedData;
+      const results = isNewFormat ? (cachedData as CachedSearchData).results : cachedData as SearchResult[];
+      const aiResponse = isNewFormat ? (cachedData as CachedSearchData).aiResponse : undefined;
+      
       return NextResponse.json({
         success: true,
-        results: cachedResults.results || cachedResults,
-        aiResponse: cachedResults.aiResponse,
-        count: (cachedResults.results || cachedResults).length,
+        results,
+        aiResponse,
+        count: results.length,
         cached: true
       });
     }
@@ -145,8 +159,8 @@ Return empty array [] if no matches.`;
     }
 
     // Cache the results for future queries
-    const cacheData = mode === 'chat' 
-      ? { results, aiResponse }
+    const cacheData: CachedSearchData | SearchResult[] = mode === 'chat' 
+      ? { results, aiResponse: aiResponse || undefined }
       : results;
     await saveSearchResults(cacheKey, cacheData);
 
