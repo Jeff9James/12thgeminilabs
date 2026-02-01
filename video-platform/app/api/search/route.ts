@@ -26,7 +26,7 @@ interface SearchResult {
 
 export async function POST(request: NextRequest) {
   try {
-    const { query, videos } = await request.json();
+    const { query, videos, mode = 'search' } = await request.json();
 
     if (!query || !videos || videos.length === 0) {
       return NextResponse.json({
@@ -34,31 +34,36 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Check cache first
-    const cacheKey = createCacheKey(query, videos.map((v: any) => v.id));
+    // Check cache first (include mode in cache key)
+    const cacheKey = createCacheKey(`${mode}:${query}`, videos.map((v: any) => v.id));
     const cachedResults = await getSearchResults(cacheKey);
 
     if (cachedResults) {
       console.log('Returning cached search results');
       return NextResponse.json({
         success: true,
-        results: cachedResults,
-        count: cachedResults.length,
+        results: cachedResults.results || cachedResults,
+        aiResponse: cachedResults.aiResponse,
+        count: (cachedResults.results || cachedResults).length,
         cached: true
       });
     }
 
-    // Process all videos in PARALLEL for speed
+    // Process all videos in PARALLEL for speed (same for both modes)
     const searchPromises = videos.map(async (video: any) => {
       if (!video.geminiFileUri) return [];
 
       try {
-        // Use Gemini 3 Flash for fastest response
+        // Use Gemini 3 Flash with LOW THINKING for fastest response
         const model = genAI.getGenerativeModel({
           model: 'gemini-3-flash-preview',
           generationConfig: {
             temperature: 1.0,
             responseMimeType: 'application/json',
+            // LOW THINKING for maximum speed
+            thinkingConfig: {
+              thinkingLevel: 'low'
+            }
           },
         });
 
@@ -128,12 +133,27 @@ Return empty array [] if no matches.`;
       .flat()
       .sort((a, b) => b.relevance - a.relevance);
 
+    // Generate AI response in Chat mode
+    let aiResponse = null;
+    if (mode === 'chat' && results.length > 0) {
+      try {
+        aiResponse = await generateChatResponse(query, results, videos);
+      } catch (chatError) {
+        console.error('Failed to generate chat response:', chatError);
+        // Continue without AI response - still show results
+      }
+    }
+
     // Cache the results for future queries
-    await saveSearchResults(cacheKey, results);
+    const cacheData = mode === 'chat' 
+      ? { results, aiResponse }
+      : results;
+    await saveSearchResults(cacheKey, cacheData);
 
     return NextResponse.json({
       success: true,
       results,
+      aiResponse,
       count: results.length,
       cached: false
     });
@@ -144,6 +164,76 @@ Return empty array [] if no matches.`;
       error: error.message || 'Search failed'
     }, { status: 500 });
   }
+}
+
+// Generate AI response for chat mode
+async function generateChatResponse(
+  query: string, 
+  results: SearchResult[], 
+  videos: any[]
+): Promise<{ answer: string; citations: string[] }> {
+  // Use Gemini 3 Flash with LOW THINKING for fastest response
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-3-flash-preview',
+    generationConfig: {
+      temperature: 1.0,
+      // LOW THINKING for maximum speed
+      thinkingConfig: {
+        thinkingLevel: 'low'
+      }
+    },
+  });
+
+  // Group results by file
+  const fileResults = new Map<string, SearchResult[]>();
+  results.forEach(result => {
+    if (!fileResults.has(result.videoId)) {
+      fileResults.set(result.videoId, []);
+    }
+    fileResults.get(result.videoId)!.push(result);
+  });
+
+  // Build context from top results (limit to top 10 for speed)
+  const topResults = results.slice(0, 10);
+  const context = topResults.map((result, index) => {
+    const timestamp = result.timestamp > 0 ? ` [${formatTimestamp(result.timestamp)}]` : '';
+    return `[${index + 1}] ${result.videoTitle}${timestamp}: ${result.snippet}`;
+  }).join('\n\n');
+
+  // Get unique file names for citations
+  const citedFiles = Array.from(new Set(topResults.map(r => r.videoTitle)));
+
+  const prompt = `You are an AI assistant answering questions based on the user's uploaded files.
+
+Question: "${query}"
+
+Relevant content from files:
+${context}
+
+Instructions:
+- Answer the question directly and concisely
+- Use information from the provided content
+- Reference sources using numbers [1], [2], etc.
+- Be factual and cite your sources
+- Keep response under 250 words
+- Use LOW THINKING for speed
+
+Answer:`;
+
+  const result = await model.generateContent(prompt);
+  const answer = result.response.text();
+
+  return {
+    answer: answer.trim(),
+    citations: citedFiles
+  };
+}
+
+// Helper to format timestamp for display
+function formatTimestamp(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${String(secs).padStart(2, '0')}`;
 }
 
 // Helper function to convert timestamp string to seconds

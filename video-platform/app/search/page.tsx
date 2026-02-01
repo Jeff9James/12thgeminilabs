@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search as SearchIcon, Sparkles, Clock, Video as VideoIcon, Music, Image as ImageIcon, FileText, FileSpreadsheet, File, Filter, SortAsc, X, ChevronDown } from 'lucide-react';
+import { Search as SearchIcon, Sparkles, Clock, Video as VideoIcon, Music, Image as ImageIcon, FileText, FileSpreadsheet, File, Filter, SortAsc, X, ChevronDown, MessageSquare, Bot } from 'lucide-react';
 
 interface SearchResult {
   id: string;
@@ -16,6 +16,11 @@ interface SearchResult {
   category?: string;
   uploadedAt?: string;
   lastUsedAt?: string;
+}
+
+interface AIResponse {
+  answer: string;
+  citations: string[];
 }
 
 type SortOption = 'relevance' | 'uploadedAsc' | 'uploadedDesc' | 'usedAsc' | 'usedDesc' | 'nameAsc' | 'nameDesc';
@@ -34,6 +39,8 @@ export default function SearchPage() {
   const [isSearching, setIsSearching] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
   const [searchStatus, setSearchStatus] = useState<string>('');
+  const [mode, setMode] = useState<'search' | 'chat'>('search');
+  const [aiResponse, setAiResponse] = useState<AIResponse | null>(null);
   
   // Filter and sort state
   const [sortBy, setSortBy] = useState<SortOption>('relevance');
@@ -130,6 +137,7 @@ export default function SearchPage() {
 
     setIsSearching(true);
     setRawResults([]);
+    setAiResponse(null);
     setSearchStatus('Preparing search...');
 
     try {
@@ -165,7 +173,7 @@ export default function SearchPage() {
 
       setSearchStatus(`Searching ${searchableFiles.length} file${searchableFiles.length > 1 ? 's' : ''}...`);
 
-      // Call search API
+      // Call search API with mode parameter
       const response = await fetch('/api/search', {
         method: 'POST',
         headers: {
@@ -173,6 +181,7 @@ export default function SearchPage() {
         },
         body: JSON.stringify({
           query: query.trim(),
+          mode: mode,
           videos: searchableFiles.map((f: any) => ({
             id: f.id,
             filename: f.filename,
@@ -202,6 +211,12 @@ export default function SearchPage() {
         });
         
         setRawResults(enrichedResults);
+        
+        // Set AI response if in chat mode
+        if (mode === 'chat' && data.aiResponse) {
+          setAiResponse(data.aiResponse);
+        }
+        
         if (data.cached) {
           setSearchStatus('Results from cache');
         } else {
@@ -264,16 +279,50 @@ export default function SearchPage() {
             animate={{ opacity: 1, y: 0 }}
             className="text-center mb-8"
           >
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-full mb-6">
-              <Sparkles className="w-4 h-4 text-yellow-300" />
-              <span className="text-sm font-medium text-white">Natural Language File Search</span>
+            <div className="flex items-center gap-4 justify-center mb-6">
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-full">
+                <Sparkles className="w-4 h-4 text-yellow-300" />
+                <span className="text-sm font-medium text-white">Natural Language File Search</span>
+              </div>
+              
+              {/* Mode Toggle */}
+              <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full p-1">
+                <button
+                  onClick={() => setMode('search')}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                    mode === 'search'
+                      ? 'bg-white text-blue-600 shadow-lg'
+                      : 'text-white hover:bg-white/10'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <SearchIcon className="w-4 h-4" />
+                    <span>Search</span>
+                  </div>
+                </button>
+                <button
+                  onClick={() => setMode('chat')}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                    mode === 'chat'
+                      ? 'bg-white text-purple-600 shadow-lg'
+                      : 'text-white hover:bg-white/10'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="w-4 h-4" />
+                    <span>Chat</span>
+                  </div>
+                </button>
+              </div>
             </div>
 
             <h1 className="text-4xl lg:text-5xl font-bold text-white mb-4">
-              Find moments that matter
+              {mode === 'search' ? 'Find moments that matter' : 'Ask questions about your files'}
             </h1>
             <p className="text-xl text-blue-100 max-w-2xl mx-auto">
-              Search across all your files using natural language - videos, images, audio, PDFs & more
+              {mode === 'search' 
+                ? 'Search across all your files using natural language - videos, images, audio, PDFs & more'
+                : 'Get AI-powered answers with citations from your uploaded files'}
             </p>
           </motion.div>
 
@@ -291,15 +340,21 @@ export default function SearchPage() {
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search across videos, images, audio, PDFs, and documents..."
+                placeholder={mode === 'search' 
+                  ? "Search across videos, images, audio, PDFs, and documents..."
+                  : "Ask a question about your files..."}
                 className="w-full pl-16 pr-32 py-6 text-lg rounded-2xl border-0 shadow-2xl focus:ring-4 focus:ring-blue-300 transition-all"
               />
               <button
                 type="submit"
                 disabled={isSearching || !query.trim()}
-                className="absolute right-3 top-1/2 -translate-y-1/2 px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className={`absolute right-3 top-1/2 -translate-y-1/2 px-6 py-3 rounded-xl font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                  mode === 'search'
+                    ? 'bg-blue-600 text-white hover:bg-blue-700'
+                    : 'bg-purple-600 text-white hover:bg-purple-700'
+                }`}
               >
-                {isSearching ? 'Searching...' : 'Search'}
+                {isSearching ? (mode === 'search' ? 'Searching...' : 'Thinking...') : (mode === 'search' ? 'Search' : 'Ask')}
               </button>
             </div>
           </motion.form>
@@ -499,38 +554,63 @@ export default function SearchPage() {
             transition={{ delay: 0.3 }}
             className="mt-4 flex flex-wrap gap-3 justify-center"
           >
-            {[
-              'Show me action scenes',
-              'Find images with mountains',
-              'What does the PDF say about budget?',
-              'Audio clips about meetings',
-            ].map((example) => (
-              <button
-                key={example}
-                onClick={() => setQuery(example)}
-                className="px-4 py-2 bg-white/10 backdrop-blur-sm text-white rounded-lg text-sm hover:bg-white/20 transition-colors"
-              >
-                {example}
-              </button>
-            ))}
+            {mode === 'search' ? (
+              [
+                'Show me action scenes',
+                'Find images with mountains',
+                'What does the PDF say about budget?',
+                'Audio clips about meetings',
+              ].map((example) => (
+                <button
+                  key={example}
+                  onClick={() => setQuery(example)}
+                  className="px-4 py-2 bg-white/10 backdrop-blur-sm text-white rounded-lg text-sm hover:bg-white/20 transition-colors"
+                >
+                  {example}
+                </button>
+              ))
+            ) : (
+              [
+                'Summarize what was discussed in the meetings',
+                'What are the key points from the presentation?',
+                'Explain the budget allocation',
+                'What recommendations were made?',
+              ].map((example) => (
+                <button
+                  key={example}
+                  onClick={() => setQuery(example)}
+                  className="px-4 py-2 bg-white/10 backdrop-blur-sm text-white rounded-lg text-sm hover:bg-white/20 transition-colors"
+                >
+                  {example}
+                </button>
+              ))
+            )}
           </motion.div>
         </div>
       </div>
 
       {/* Results Info Bar - Only show after search */}
       {rawResults.length > 0 && (
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100">
+        <div className={`bg-gradient-to-r border-b ${
+          mode === 'search' 
+            ? 'from-blue-50 to-indigo-50 border-blue-100'
+            : 'from-purple-50 to-pink-50 border-purple-100'
+        }`}>
           <div className="max-w-7xl mx-auto px-6 py-3">
             <div className="flex items-center justify-between text-sm">
               <div className="flex items-center gap-4">
-                <Sparkles className="w-4 h-4 text-blue-600" />
+                {mode === 'search' ? (
+                  <Sparkles className="w-4 h-4 text-blue-600" />
+                ) : (
+                  <Bot className="w-4 h-4 text-purple-600" />
+                )}
                 <span className="font-semibold text-gray-900">
-                  Search Results
+                  {mode === 'search' ? 'Search Results' : 'AI Response & Sources'}
                 </span>
               </div>
               <div className="flex items-center gap-4">
                 {hasActiveFilters && (
-                  <span className="text-blue-600 font-medium">
+                  <span className={`font-medium ${mode === 'search' ? 'text-blue-600' : 'text-purple-600'}`}>
                     {filters.excludeFiles.length + filters.includeFiles.length + 
                      filters.excludeTypes.length + filters.includeTypes.length} filters active
                   </span>
@@ -554,8 +634,12 @@ export default function SearchPage() {
               exit={{ opacity: 0 }}
               className="flex flex-col items-center justify-center py-20"
             >
-              <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4" />
-              <p className="text-gray-600 text-lg">{searchStatus || 'Searching your files...'}</p>
+              <div className={`w-16 h-16 border-4 rounded-full animate-spin mb-4 ${
+                mode === 'search' 
+                  ? 'border-blue-200 border-t-blue-600'
+                  : 'border-purple-200 border-t-purple-600'
+              }`} />
+              <p className="text-gray-600 text-lg">{searchStatus || (mode === 'search' ? 'Searching your files...' : 'Generating AI response...')}</p>
               <p className="text-gray-500 text-sm mt-2">Using parallel AI search for faster results</p>
             </motion.div>
           )}
@@ -566,12 +650,56 @@ export default function SearchPage() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
             >
+              {/* AI Response Section (Chat Mode Only) */}
+              {mode === 'chat' && aiResponse && (
+                <div className="mb-8 bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-8 border-2 border-purple-200 shadow-lg">
+                  <div className="flex items-start gap-4">
+                    <div className="flex-shrink-0">
+                      <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
+                        <Bot className="w-6 h-6 text-white" />
+                      </div>
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
+                        <span>AI Response</span>
+                        <span className="px-2 py-1 bg-purple-200 text-purple-700 text-xs font-bold rounded-full">
+                          LOW THINKING
+                        </span>
+                      </h3>
+                      <div className="prose prose-purple max-w-none">
+                        <p className="text-gray-800 leading-relaxed whitespace-pre-wrap">{aiResponse.answer}</p>
+                      </div>
+                      
+                      {/* Citations */}
+                      {aiResponse.citations && aiResponse.citations.length > 0 && (
+                        <div className="mt-6">
+                          <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                            <FileText className="w-4 h-4" />
+                            Sources ({aiResponse.citations.length})
+                          </h4>
+                          <div className="flex flex-wrap gap-2">
+                            {aiResponse.citations.map((citation, index) => (
+                              <div
+                                key={index}
+                                className="px-3 py-1.5 bg-white rounded-lg text-sm border border-purple-200 text-purple-700 font-medium"
+                              >
+                                [{index + 1}] {citation}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="mb-6">
                 <h2 className="text-2xl font-bold text-gray-900">
-                  Found {results.length} results
+                  {mode === 'search' ? 'Found' : 'Source Files'} {results.length} {mode === 'search' ? 'results' : 'references'}
                 </h2>
                 <p className="text-gray-600">
-                  for "{query}"
+                  {mode === 'search' ? 'for' : 'used to answer'} "{query}"
                 </p>
               </div>
 
