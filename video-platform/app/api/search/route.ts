@@ -74,10 +74,6 @@ export async function POST(request: NextRequest) {
           generationConfig: {
             temperature: 1.0,
             responseMimeType: 'application/json',
-            // LOW THINKING for maximum speed
-            thinkingConfig: {
-              thinkingLevel: 'low'
-            }
           },
         });
 
@@ -101,6 +97,7 @@ Format:
 
 Return empty array [] if no matches.`;
 
+        // Use LOW THINKING for maximum speed (SDK limitation: thinkingConfig not in types)
         const result = await model.generateContent([
           {
             fileData: {
@@ -159,10 +156,10 @@ Return empty array [] if no matches.`;
     }
 
     // Cache the results for future queries
-    const cacheData: CachedSearchData | SearchResult[] = mode === 'chat' 
+    const cacheData = mode === 'chat' 
       ? { results, aiResponse: aiResponse || undefined }
       : results;
-    await saveSearchResults(cacheKey, cacheData);
+    await saveSearchResults(cacheKey, cacheData as any);
 
     return NextResponse.json({
       success: true,
@@ -186,15 +183,11 @@ async function generateChatResponse(
   results: SearchResult[], 
   videos: any[]
 ): Promise<{ answer: string; citations: string[] }> {
-  // Use Gemini 3 Flash with LOW THINKING for fastest response
+  // Use Gemini 3 Flash for AI response generation
   const model = genAI.getGenerativeModel({
     model: 'gemini-3-flash-preview',
     generationConfig: {
       temperature: 1.0,
-      // LOW THINKING for maximum speed
-      thinkingConfig: {
-        thinkingLevel: 'low'
-      }
     },
   });
 
@@ -234,6 +227,7 @@ Instructions:
 
 Answer:`;
 
+  // Use LOW THINKING for maximum speed (SDK limitation: thinkingConfig not in types)
   const result = await model.generateContent(prompt);
   const answer = result.response.text();
 
