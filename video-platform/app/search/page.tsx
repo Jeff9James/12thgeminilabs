@@ -400,15 +400,14 @@ export default function SearchPage() {
             </motion.div>
           )}  
    
-          {/* Filter and Sort Controls - Only in Search Mode */}
-          {mode === 'search' && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.2 }}
-              className="mt-6"
-            >
-              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 mb-4">
+          {/* Filter and Sort Controls - Available in both modes */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2 }}
+            className="mt-6"
+          >
+            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 mb-4">
                 <div className="flex flex-wrap items-center gap-4 justify-center">
                   {/* Sort Dropdown */}
                   <div className="flex items-center gap-2">
@@ -433,14 +432,16 @@ export default function SearchPage() {
                     onClick={() => setShowFilters(!showFilters)}
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
                       showFilters || hasActiveFilters
-                        ? 'bg-white text-blue-600'
+                        ? `bg-white ${mode === 'search' ? 'text-blue-600' : 'text-purple-600'}`
                         : 'bg-white/10 text-white hover:bg-white/20 border border-white/20'
                     }`}
                   >
                     <Filter className="w-5 h-5" />
                     Configure Filters
                     {hasActiveFilters && (
-                      <span className="px-2 py-0.5 bg-blue-600 text-white rounded-full text-xs font-bold">
+                      <span className={`px-2 py-0.5 text-white rounded-full text-xs font-bold ${
+                        mode === 'search' ? 'bg-blue-600' : 'bg-purple-600'
+                      }`}>
                         {filters.excludeFiles.length + filters.includeFiles.length + 
                          filters.excludeTypes.length + filters.includeTypes.length}
                       </span>
@@ -587,8 +588,7 @@ export default function SearchPage() {
                   )}
                 </AnimatePresence>
               </div>
-            </motion.div>
-          )}
+          </motion.div>
 
           {/* Clear Conversation Button (Chat Mode Only) */}
           {mode === 'chat' && chatHistory.length > 0 && (
@@ -914,9 +914,9 @@ export default function SearchPage() {
             </motion.div>
           )}
         </AnimatePresence>
-        {/* Chat Input Box - Fixed at Bottom (Chat Mode Only) */}
+          {/* Chat Input Box - Fixed at Bottom (Chat Mode Only) */}
         {mode === 'chat' && (
-          <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-2xl z-50">
+          <div className="fixed bottom-0 left-0 right-0 lg:left-72 bg-white border-t border-gray-200 shadow-2xl z-30">
             <div className="max-w-7xl mx-auto px-6 py-4">
               {/* Conversation counter + clear button */}
               {chatHistory.length > 0 && (
@@ -983,9 +983,9 @@ export default function SearchPage() {
                     </div>
                   )}
                 </form>
-              </div>
             </div>
-          )}
+          </div>
+        )}
       </div>
     </div>
   );
