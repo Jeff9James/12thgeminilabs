@@ -34,7 +34,7 @@ interface CachedSearchData {
 
 export async function POST(request: NextRequest) {
   try {
-    const { query, videos, mode = 'search' } = await request.json();
+    const { query, videos, mode = 'search', history = [] } = await request.json();
 
     if (!query || !videos || videos.length === 0) {
       return NextResponse.json({
@@ -148,7 +148,7 @@ Return empty array [] if no matches.`;
     let aiResponse = null;
     if (mode === 'chat' && results.length > 0) {
       try {
-        aiResponse = await generateChatResponse(query, results, videos);
+        aiResponse = await generateChatResponse(query, results, videos, history);
       } catch (chatError) {
         console.error('Failed to generate chat response:', chatError);
         // Continue without AI response - still show results
@@ -181,7 +181,8 @@ Return empty array [] if no matches.`;
 async function generateChatResponse(
   query: string, 
   results: SearchResult[], 
-  videos: any[]
+  videos: any[],
+  history: any[] = []
 ): Promise<{ answer: string; citations: string[] }> {
   // Use Gemini 3 Flash for AI response generation
   const model = genAI.getGenerativeModel({
@@ -210,20 +211,31 @@ async function generateChatResponse(
   // Get unique file names for citations
   const citedFiles = Array.from(new Set(topResults.map(r => r.videoTitle)));
 
-  const prompt = `You are an AI assistant answering questions based on the user's uploaded files.
+  // Build conversation history context (last 3 exchanges for efficiency)
+  let conversationContext = '';
+  if (history && history.length > 0) {
+    const recentHistory = history.slice(-3);
+    conversationContext = '\n\nPrevious conversation:\n' +
+      recentHistory.map((msg: any) => 
+        `Q: ${msg.question}\nA: ${msg.answer}`
+      ).join('\n\n') + '\n\n';
+  }
 
-Question: "${query}"
+  const prompt = `You are an AI assistant answering questions based on the user's uploaded files.
+${conversationContext}
+Current Question: "${query}"
 
 Relevant content from files:
 ${context}
 
 Instructions:
-- Answer the question directly and concisely
+- Answer the current question directly and concisely
 - Use information from the provided content
 - Reference sources using numbers [1], [2], etc.
 - Be factual and cite your sources
 - Keep response under 250 words
-- Use LOW THINKING for speed
+- If this is a follow-up question, reference the previous conversation context
+- Understand references like "tell me more", "what about that", "elaborate", etc.
 
 Answer:`;
 

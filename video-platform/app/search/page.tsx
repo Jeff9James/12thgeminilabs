@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search as SearchIcon, Sparkles, Clock, Video as VideoIcon, Music, Image as ImageIcon, FileText, FileSpreadsheet, File, Filter, SortAsc, X, ChevronDown, MessageSquare, Bot } from 'lucide-react';
+import { Search as SearchIcon, Sparkles, Clock, Video as VideoIcon, Music, Image as ImageIcon, FileText, FileSpreadsheet, File, Filter, SortAsc, X, ChevronDown, MessageSquare, Bot, RotateCcw } from 'lucide-react';
 
 interface SearchResult {
   id: string;
@@ -21,6 +21,13 @@ interface SearchResult {
 interface AIResponse {
   answer: string;
   citations: string[];
+}
+
+interface ChatMessage {
+  question: string;
+  answer: string;
+  citations: string[];
+  timestamp: Date;
 }
 
 type SortOption = 'relevance' | 'uploadedAsc' | 'uploadedDesc' | 'usedAsc' | 'usedDesc' | 'nameAsc' | 'nameDesc';
@@ -41,6 +48,7 @@ export default function SearchPage() {
   const [searchStatus, setSearchStatus] = useState<string>('');
   const [mode, setMode] = useState<'search' | 'chat'>('search');
   const [aiResponse, setAiResponse] = useState<AIResponse | null>(null);
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   
   // Filter and sort state
   const [sortBy, setSortBy] = useState<SortOption>('relevance');
@@ -137,7 +145,13 @@ export default function SearchPage() {
 
     setIsSearching(true);
     setRawResults([]);
-    setAiResponse(null);
+    
+    // Only clear AI response and chat history when switching modes or in search mode
+    if (mode === 'search') {
+      setAiResponse(null);
+      setChatHistory([]);
+    }
+    
     setSearchStatus('Preparing search...');
 
     try {
@@ -173,7 +187,7 @@ export default function SearchPage() {
 
       setSearchStatus(`Searching ${searchableFiles.length} file${searchableFiles.length > 1 ? 's' : ''}...`);
 
-      // Call search API with mode parameter
+      // Call search API with mode parameter and chat history
       const response = await fetch('/api/search', {
         method: 'POST',
         headers: {
@@ -182,6 +196,7 @@ export default function SearchPage() {
         body: JSON.stringify({
           query: query.trim(),
           mode: mode,
+          history: mode === 'chat' ? chatHistory : [],
           videos: searchableFiles.map((f: any) => ({
             id: f.id,
             filename: f.filename,
@@ -212,9 +227,18 @@ export default function SearchPage() {
         
         setRawResults(enrichedResults);
         
-        // Set AI response if in chat mode
+        // Set AI response and update chat history if in chat mode
         if (mode === 'chat' && data.aiResponse) {
           setAiResponse(data.aiResponse);
+          
+          // Add to chat history
+          const newMessage: ChatMessage = {
+            question: query.trim(),
+            answer: data.aiResponse.answer,
+            citations: data.aiResponse.citations || [],
+            timestamp: new Date(),
+          };
+          setChatHistory(prev => [...prev, newMessage]);
         }
         
         if (data.cached) {
@@ -547,12 +571,34 @@ export default function SearchPage() {
             </div>
           </motion.div>
 
+          {/* Clear Conversation Button (Chat Mode Only) */}
+          {mode === 'chat' && chatHistory.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="mt-4 flex justify-center"
+            >
+              <button
+                onClick={() => {
+                  setChatHistory([]);
+                  setAiResponse(null);
+                  setRawResults([]);
+                  setQuery('');
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors font-medium text-sm"
+              >
+                <RotateCcw className="w-4 h-4" />
+                Start New Conversation
+              </button>
+            </motion.div>
+          )}
+
           {/* Example Queries */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3 }}
-            className="mt-4 flex flex-wrap gap-3 justify-center"
+            className={`${mode === 'chat' && chatHistory.length > 0 ? 'mt-2' : 'mt-4'} flex flex-wrap gap-3 justify-center`}
           >
             {mode === 'search' ? (
               [
@@ -650,47 +696,74 @@ export default function SearchPage() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
             >
-              {/* AI Response Section (Chat Mode Only) */}
-              {mode === 'chat' && aiResponse && (
-                <div className="mb-8 bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-8 border-2 border-purple-200 shadow-lg">
-                  <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0">
-                      <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
-                        <Bot className="w-6 h-6 text-white" />
-                      </div>
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
-                        <span>AI Response</span>
-                        <span className="px-2 py-1 bg-purple-200 text-purple-700 text-xs font-bold rounded-full">
-                          LOW THINKING
-                        </span>
-                      </h3>
-                      <div className="prose prose-purple max-w-none">
-                        <p className="text-gray-800 leading-relaxed whitespace-pre-wrap">{aiResponse.answer}</p>
+              {/* Chat History Section (Chat Mode Only) */}
+              {mode === 'chat' && chatHistory.length > 0 && (
+                <div className="mb-8 space-y-6">
+                  {chatHistory.map((msg, index) => (
+                    <div key={index} className="space-y-4">
+                      {/* User Question */}
+                      <div className="flex justify-end">
+                        <div className="max-w-3xl bg-blue-600 text-white rounded-2xl px-6 py-4">
+                          <p className="font-medium">{msg.question}</p>
+                          <p className="text-xs text-blue-100 mt-2">
+                            {msg.timestamp.toLocaleTimeString()}
+                          </p>
+                        </div>
                       </div>
                       
-                      {/* Citations */}
-                      {aiResponse.citations && aiResponse.citations.length > 0 && (
-                        <div className="mt-6">
-                          <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                            <FileText className="w-4 h-4" />
-                            Sources ({aiResponse.citations.length})
-                          </h4>
-                          <div className="flex flex-wrap gap-2">
-                            {aiResponse.citations.map((citation, index) => (
-                              <div
-                                key={index}
-                                className="px-3 py-1.5 bg-white rounded-lg text-sm border border-purple-200 text-purple-700 font-medium"
-                              >
-                                [{index + 1}] {citation}
+                      {/* AI Response */}
+                      <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-8 border-2 border-purple-200 shadow-lg">
+                        <div className="flex items-start gap-4">
+                          <div className="flex-shrink-0">
+                            <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
+                              <Bot className="w-6 h-6 text-white" />
+                            </div>
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
+                              <span>AI Response</span>
+                              {index === chatHistory.length - 1 && (
+                                <span className="px-2 py-1 bg-purple-200 text-purple-700 text-xs font-bold rounded-full">
+                                  FOLLOW-UP AWARE
+                                </span>
+                              )}
+                            </h3>
+                            <div className="prose prose-purple max-w-none">
+                              <p className="text-gray-800 leading-relaxed whitespace-pre-wrap">{msg.answer}</p>
+                            </div>
+                            
+                            {/* Citations */}
+                            {msg.citations && msg.citations.length > 0 && (
+                              <div className="mt-6">
+                                <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                                  <FileText className="w-4 h-4" />
+                                  Sources ({msg.citations.length})
+                                </h4>
+                                <div className="flex flex-wrap gap-2">
+                                  {msg.citations.map((citation, citIndex) => (
+                                    <div
+                                      key={citIndex}
+                                      className="px-3 py-1.5 bg-white rounded-lg text-sm border border-purple-200 text-purple-700 font-medium"
+                                    >
+                                      [{citIndex + 1}] {citation}
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
-                            ))}
+                            )}
                           </div>
                         </div>
-                      )}
+                      </div>
                     </div>
-                  </div>
+                  ))}
+                  
+                  {/* Follow-up prompt */}
+                  {!isSearching && (
+                    <div className="flex items-center justify-center gap-2 text-sm text-purple-600 bg-purple-50 px-4 py-3 rounded-lg border border-purple-200">
+                      <MessageSquare className="w-4 h-4" />
+                      <span>Ask a follow-up question to continue the conversation</span>
+                    </div>
+                  )}
                 </div>
               )}
 
