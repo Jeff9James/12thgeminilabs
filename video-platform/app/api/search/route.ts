@@ -29,6 +29,48 @@ interface CachedSearchData {
   };
 }
 
+// Retry wrapper for Gemini API calls with exponential backoff
+async function callGeminiWithRetry<T>(
+  operation: () => Promise<T>,
+  operationName: string,
+  maxRetries: number = 3
+): Promise<T> {
+  let retries = 0;
+
+  while (retries < maxRetries) {
+    try {
+      return await operation();
+    } catch (error: any) {
+      // Check for 503/overloaded errors
+      const isOverloaded = error.message?.includes('503') ||
+        error.message?.includes('overloaded') ||
+        error.message?.includes('Service Unavailable');
+
+      // Check for RECITATION errors - return empty result for these
+      const isRecitation = error.message?.includes('RECITATION') ||
+        error.message?.includes('Candidate was blocked');
+
+      if (isRecitation) {
+        console.log(`${operationName} blocked due to recitation, returning empty result`);
+        throw new Error('RECITATION_BLOCKED');
+      }
+
+      if (isOverloaded && retries < maxRetries - 1) {
+        retries++;
+        // Wait with exponential backoff: 2s, 4s, 8s
+        const waitTime = Math.pow(2, retries) * 1000;
+        console.log(`${operationName}: Gemini API overloaded, retrying in ${waitTime / 1000}s... (attempt ${retries}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      } else {
+        // Last retry failed or non-overload error
+        throw error;
+      }
+    }
+  }
+
+  throw new Error(`${operationName}: Max retries exceeded`);
+}
+
 // Note: Using responseMimeType alone forces JSON output
 // responseSchema has type issues with current SDK version
 
@@ -48,12 +90,12 @@ export async function POST(request: NextRequest) {
 
     if (cachedData) {
       console.log('Returning cached search results');
-      
+
       // Handle both old format (array) and new format (object with results)
       const isNewFormat = cachedData && typeof cachedData === 'object' && 'results' in cachedData;
       const results = isNewFormat ? (cachedData as CachedSearchData).results : cachedData as SearchResult[];
       const aiResponse = isNewFormat ? (cachedData as CachedSearchData).aiResponse : undefined;
-      
+
       return NextResponse.json({
         success: true,
         results,
@@ -97,16 +139,20 @@ Format:
 
 Return empty array [] if no matches.`;
 
-        // Use LOW THINKING for maximum speed (SDK limitation: thinkingConfig not in types)
-        const result = await model.generateContent([
-          {
-            fileData: {
-              mimeType: video.mimeType || 'video/mp4',
-              fileUri: video.geminiFileUri
-            }
-          },
-          { text: prompt }
-        ]);
+        // Use retry logic for API call
+        const result = await callGeminiWithRetry(
+          () => model.generateContent([
+            {
+              fileData: {
+                mimeType: video.mimeType || 'video/mp4',
+                fileUri: video.geminiFileUri
+              }
+            },
+            { text: prompt }
+          ]),
+          `Search video ${video.id}`,
+          3
+        );
 
         const response = result.response.text();
 
@@ -130,7 +176,11 @@ Return empty array [] if no matches.`;
           category: video.category || 'video',
         }));
 
-      } catch (videoError) {
+      } catch (videoError: any) {
+        if (videoError.message === 'RECITATION_BLOCKED') {
+          // Return empty results for recitation blocks
+          return [];
+        }
         console.error(`Error searching video ${video.id}:`, videoError);
         return [];
       }
@@ -149,14 +199,29 @@ Return empty array [] if no matches.`;
     if (mode === 'chat' && results.length > 0) {
       try {
         aiResponse = await generateChatResponse(query, results, videos, history);
-      } catch (chatError) {
+      } catch (chatError: any) {
+        if (chatError.message?.includes('overloaded') || chatError.message?.includes('503')) {
+          console.error('Failed to generate chat response due to overload:', chatError);
+          // Return partial results with a message
+          return NextResponse.json({
+            success: true,
+            results,
+            aiResponse: {
+              answer: 'I found relevant content in your files, but the AI is currently experiencing high demand. Please try asking your question again in a moment.',
+              citations: Array.from(new Set(results.slice(0, 5).map(r => r.videoTitle)))
+            },
+            count: results.length,
+            cached: false,
+            partial: true
+          });
+        }
         console.error('Failed to generate chat response:', chatError);
         // Continue without AI response - still show results
       }
     }
 
     // Cache the results for future queries
-    const cacheData = mode === 'chat' 
+    const cacheData = mode === 'chat'
       ? { results, aiResponse: aiResponse || undefined }
       : results;
     await saveSearchResults(cacheKey, cacheData as any);
@@ -179,8 +244,8 @@ Return empty array [] if no matches.`;
 
 // Generate AI response for chat mode
 async function generateChatResponse(
-  query: string, 
-  results: SearchResult[], 
+  query: string,
+  results: SearchResult[],
   videos: any[],
   history: any[] = []
 ): Promise<{ answer: string; citations: string[] }> {
@@ -216,7 +281,7 @@ async function generateChatResponse(
   if (history && history.length > 0) {
     const recentHistory = history.slice(-3);
     conversationContext = '\n\nPrevious conversation:\n' +
-      recentHistory.map((msg: any) => 
+      recentHistory.map((msg: any) =>
         `Q: ${msg.question}\nA: ${msg.answer}`
       ).join('\n\n') + '\n\n';
   }
@@ -239,8 +304,13 @@ Instructions:
 
 Answer:`;
 
-  // Use LOW THINKING for maximum speed (SDK limitation: thinkingConfig not in types)
-  const result = await model.generateContent(prompt);
+  // Use retry logic for API call
+  const result = await callGeminiWithRetry(
+    () => model.generateContent(prompt),
+    'Generate chat response',
+    3
+  );
+
   const answer = result.response.text();
 
   return {
