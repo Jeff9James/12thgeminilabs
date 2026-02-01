@@ -13,28 +13,27 @@ const navItems: Array<{
   icon: React.ComponentType<{ className?: string }>;
   badge?: string;
 }> = [
-  {
-    name: 'My Files',
-    href: '/files',
-    icon: FileText,
-  },
-  {
-    name: 'Unified Chat',
-    href: '/chat',
-    icon: MessageCircle,
-    badge: 'New',
-  },
-  {
-    name: 'Search',
-    href: '/search',
-    icon: Search,
-  },
-  {
-    name: 'Analyze',
-    href: '/analyze',
-    icon: Sparkles,
-  },
-];
+    {
+      name: 'My Files',
+      href: '/files',
+      icon: FileText,
+    },
+    {
+      name: 'Chat',
+      href: '/chat',
+      icon: MessageCircle,
+    },
+    {
+      name: 'Search',
+      href: '/search',
+      icon: Search,
+    },
+    {
+      name: 'Analyze',
+      href: '/analyze',
+      icon: Sparkles,
+    },
+  ];
 
 export default function Sidebar() {
   const pathname = usePathname();

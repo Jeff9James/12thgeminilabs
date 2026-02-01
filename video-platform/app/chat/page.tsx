@@ -1,149 +1,222 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  MessageCircle, 
-  Send, 
-  Sparkles, 
-  Folder, 
-  FileText, 
-  Video, 
-  Music, 
-  Image as ImageIcon, 
+import {
+  Search as SearchIcon,
+  Sparkles,
+  Clock,
+  Video as VideoIcon,
+  Music,
+  Image as ImageIcon,
+  FileText,
   FileSpreadsheet,
-  File as FileIcon,
-  Loader2,
-  CheckCircle2,
-  AlertCircle,
-  Database,
-  Brain,
-  Info
+  File,
+  Filter,
+  SortAsc,
+  X,
+  ChevronDown,
+  MessageSquare,
+  Bot,
+  RotateCcw,
+  Database
 } from 'lucide-react';
 
-interface Message {
+interface SearchResult {
   id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: Date;
-  thoughtSignature?: string;
-}
-
-interface UploadedFile {
-  id: string;
-  filename: string;
+  videoId: string;
+  videoTitle: string;
+  timestamp: number;
+  snippet: string;
+  thumbnail?: string;
+  relevance: number;
   category?: string;
-  geminiFileUri?: string;
-  mimeType?: string;
-  uploadedAt: string;
+  uploadedAt?: string;
+  lastUsedAt?: string;
 }
 
-export default function UnifiedChatPage() {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [files, setFiles] = useState<UploadedFile[]>([]);
-  const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
-  const [showFileSelector, setShowFileSelector] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
+interface AIResponse {
+  answer: string;
+  citations: string[];
+}
 
-  // Load uploaded files
-  useEffect(() => {
-    loadFiles();
-  }, []);
+interface ChatMessage {
+  question: string;
+  answer: string;
+  citations: string[];
+  timestamp: Date;
+}
 
-  // Auto-scroll to bottom when messages change
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+type SortOption = 'relevance' | 'uploadedAsc' | 'uploadedDesc' | 'usedAsc' | 'usedDesc' | 'nameAsc' | 'nameDesc';
 
-  const loadFiles = () => {
+interface FileFilters {
+  excludeFiles: string[];
+  includeFiles: string[];
+  excludeTypes: string[];
+  includeTypes: string[];
+}
+
+export default function ChatPage() {
+  const router = useRouter();
+  const [query, setQuery] = useState('');
+  const [rawResults, setRawResults] = useState<SearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
+  const [searchStatus, setSearchStatus] = useState<string>('');
+  const [aiResponse, setAiResponse] = useState<AIResponse | null>(null);
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+
+  // Filter and sort state
+  const [sortBy, setSortBy] = useState<SortOption>('relevance');
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState<FileFilters>({
+    excludeFiles: [],
+    includeFiles: [],
+    excludeTypes: [],
+    includeTypes: [],
+  });
+  const [allFiles, setAllFiles] = useState<any[]>([]);
+
+  // Available file types
+  const fileTypes = ['video', 'audio', 'image', 'pdf', 'document', 'spreadsheet', 'text'];
+
+  // Load all files on mount so filters are available before search
+  React.useEffect(() => {
     const storedFiles = localStorage.getItem('uploadedFiles');
     const storedVideos = localStorage.getItem('uploadedVideos');
 
-    let allFiles: UploadedFile[] = [];
+    let loadedFiles: any[] = [];
 
     if (storedFiles) {
       const parsedFiles = JSON.parse(storedFiles);
-      allFiles = [...parsedFiles];
+      loadedFiles = [...parsedFiles];
     }
 
     if (storedVideos) {
       const parsedVideos = JSON.parse(storedVideos);
+      // Convert legacy video format to generic file format
       const convertedVideos = parsedVideos.map((v: any) => ({
         ...v,
         category: v.category || 'video',
         filename: v.filename || v.title || 'Unknown',
       }));
-      allFiles = [...allFiles, ...convertedVideos];
+      loadedFiles = [...loadedFiles, ...convertedVideos];
     }
 
-    // Filter files that have been uploaded to Gemini
-    const geminiFiles = allFiles.filter(f => f.geminiFileUri);
-    setFiles(geminiFiles);
+    setAllFiles(loadedFiles);
+  }, []);
 
-    // Auto-select all files by default
-    setSelectedFiles(geminiFiles.map(f => f.id));
-  };
+  // Apply filters and sort to results
+  const results = useMemo(() => {
+    let filtered = [...rawResults];
 
-  const handleSendMessage = async (e: React.FormEvent) => {
+    // Apply file type filters
+    if (filters.includeTypes.length > 0) {
+      filtered = filtered.filter(r => filters.includeTypes.includes(r.category || 'video'));
+    }
+    if (filters.excludeTypes.length > 0) {
+      filtered = filtered.filter(r => !filters.excludeTypes.includes(r.category || 'video'));
+    }
+
+    // Apply file name filters
+    if (filters.includeFiles.length > 0) {
+      filtered = filtered.filter(r => filters.includeFiles.includes(r.videoId));
+    }
+    if (filters.excludeFiles.length > 0) {
+      filtered = filtered.filter(r => !filters.excludeFiles.includes(r.videoId));
+    }
+
+    // Apply sorting
+    switch (sortBy) {
+      case 'relevance':
+        return filtered.sort((a, b) => b.relevance - a.relevance);
+      case 'uploadedAsc':
+        return filtered.sort((a, b) =>
+          new Date(a.uploadedAt || 0).getTime() - new Date(b.uploadedAt || 0).getTime()
+        );
+      case 'uploadedDesc':
+        return filtered.sort((a, b) =>
+          new Date(b.uploadedAt || 0).getTime() - new Date(a.uploadedAt || 0).getTime()
+        );
+      case 'usedAsc':
+        return filtered.sort((a, b) =>
+          new Date(a.lastUsedAt || 0).getTime() - new Date(b.lastUsedAt || 0).getTime()
+        );
+      case 'usedDesc':
+        return filtered.sort((a, b) =>
+          new Date(b.lastUsedAt || 0).getTime() - new Date(a.lastUsedAt || 0).getTime()
+        );
+      case 'nameAsc':
+        return filtered.sort((a, b) => a.videoTitle.localeCompare(b.videoTitle));
+      case 'nameDesc':
+        return filtered.sort((a, b) => b.videoTitle.localeCompare(a.videoTitle));
+      default:
+        return filtered;
+    }
+  }, [rawResults, filters, sortBy]);
+
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || isLoading) return;
+    if (!query.trim()) return;
 
-    // Get selected file URIs
-    const selectedFileData = files.filter(f => selectedFiles.includes(f.id));
+    setIsSearching(true);
+    setRawResults([]);
 
-    // Check for unsupported file types (Excel files)
-    const unsupportedFiles = selectedFileData.filter(f => 
-      f.mimeType?.includes('vnd.ms-excel') || 
-      f.mimeType?.includes('vnd.openxmlformats-officedocument.spreadsheetml') ||
-      f.filename?.endsWith('.xls') ||
-      f.filename?.endsWith('.xlsx')
-    );
-
-    if (unsupportedFiles.length > 0) {
-      const errorMessage: Message = {
-        id: Date.now().toString(),
-        role: 'assistant',
-        content: `⚠️ Sorry, I cannot process these files:\n\n${unsupportedFiles.map(f => `• ${f.filename}`).join('\n')}\n\nExcel files (.xls, .xlsx) are not supported by Gemini API. Please:\n1. Convert them to CSV format, or\n2. Deselect them from the sidebar\n\nSupported formats: Videos, Audio, Images, PDFs, Text files, and CSV.`,
-        timestamp: new Date(),
-      };
-      setMessages(prev => [...prev, errorMessage]);
-      return;
-    }
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: input.trim(),
-      timestamp: new Date(),
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setInput('');
-    setIsLoading(true);
+    setSearchStatus('Preparing chat...');
 
     try {
+      if (allFiles.length === 0) {
+        alert('No files found. Please upload some files first.');
+        setIsSearching(false);
+        return;
+      }
 
-      const response = await fetch('/api/chat/unified', {
+      // Filter files that have been uploaded to Gemini (all file types supported by Gemini)
+      // Also apply pre-search filters
+      let searchableFiles = allFiles.filter((f: any) => f.geminiFileUri);
+
+      // Apply filters to searchable files before searching
+      if (filters.includeTypes.length > 0) {
+        searchableFiles = searchableFiles.filter(f => filters.includeTypes.includes(f.category || 'video'));
+      }
+      if (filters.excludeTypes.length > 0) {
+        searchableFiles = searchableFiles.filter(f => !filters.excludeTypes.includes(f.category || 'video'));
+      }
+      if (filters.includeFiles.length > 0) {
+        searchableFiles = searchableFiles.filter(f => filters.includeFiles.includes(f.id));
+      }
+      if (filters.excludeFiles.length > 0) {
+        searchableFiles = searchableFiles.filter(f => !filters.excludeFiles.includes(f.id));
+      }
+
+      if (searchableFiles.length === 0) {
+        alert('No files available for chat with current filters. Please adjust your filters or upload more files.');
+        setIsSearching(false);
+        return;
+      }
+
+      setSearchStatus(`Analyzing ${searchableFiles.length} file${searchableFiles.length > 1 ? 's' : ''}...`);
+
+      // Call search API with mode=chat and chat history for follow-up support
+      const response = await fetch('/api/search', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          message: input.trim(),
-          files: selectedFileData.map(f => ({
-            uri: f.geminiFileUri,
-            mimeType: f.mimeType || 'application/octet-stream',
+          query: query.trim(),
+          mode: 'chat',
+          history: chatHistory,
+          videos: searchableFiles.map((f: any) => ({
+            id: f.id,
             filename: f.filename,
-          })),
-          history: messages.map(m => ({
-            role: m.role,
-            content: m.content,
-            thoughtSignature: m.thoughtSignature,
-          })),
-        }),
+            title: f.filename,
+            geminiFileUri: f.geminiFileUri,
+            mimeType: f.mimeType || 'video/mp4',
+            category: f.category || 'video',
+          }))
+        })
       });
 
       if (!response.ok) {
@@ -153,381 +226,685 @@ export default function UnifiedChatPage() {
       const data = await response.json();
 
       if (data.success) {
-        const assistantMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          role: 'assistant',
-          content: data.response,
-          timestamp: new Date(),
-          thoughtSignature: data.thoughtSignature,
-        };
+        // Enrich results with upload and usage timestamps
+        const enrichedResults = (data.results || []).map((result: SearchResult) => {
+          const file = allFiles.find(f => f.id === result.videoId);
+          return {
+            ...result,
+            uploadedAt: file?.uploadedAt || file?.createdAt,
+            lastUsedAt: file?.lastUsedAt || file?.lastAnalyzedAt,
+          };
+        });
 
-        setMessages(prev => [...prev, assistantMessage]);
+        setRawResults(enrichedResults);
+
+        // Set AI response and update chat history for follow-up support
+        if (data.aiResponse) {
+          setAiResponse(data.aiResponse);
+
+          // Add to chat history
+          const newMessage: ChatMessage = {
+            question: query.trim(),
+            answer: data.aiResponse.answer,
+            citations: data.aiResponse.citations || [],
+            timestamp: new Date(),
+          };
+          setChatHistory(prev => [...prev, newMessage]);
+        }
+
+        if (data.cached) {
+          setSearchStatus('Results from cache');
+        } else {
+          setSearchStatus('Chat complete');
+        }
+        // Clear status after 2 seconds
+        setTimeout(() => setSearchStatus(''), 2000);
       } else {
         throw new Error(data.error || 'Chat failed');
       }
+
     } catch (error: any) {
       console.error('Chat error:', error);
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: `Sorry, I encountered an error: ${error.message}. Please try again.`,
-        timestamp: new Date(),
-      };
-      setMessages(prev => [...prev, errorMessage]);
+      alert(`Chat failed: ${error.message}. Please try again.`);
+      setSearchStatus('');
     } finally {
-      setIsLoading(false);
-      inputRef.current?.focus();
+      setIsSearching(false);
     }
   };
 
-  const toggleFileSelection = (fileId: string) => {
-    setSelectedFiles(prev => {
-      if (prev.includes(fileId)) {
-        return prev.filter(id => id !== fileId);
+  const formatTimestamp = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${String(secs).padStart(2, '0')}`;
+  };
+
+  const toggleFilter = (type: 'excludeFiles' | 'includeFiles' | 'excludeTypes' | 'includeTypes', value: string) => {
+    setFilters(prev => {
+      const current = prev[type];
+      if (current.includes(value)) {
+        return { ...prev, [type]: current.filter(v => v !== value) };
       } else {
-        return [...prev, fileId];
+        return { ...prev, [type]: [...current, value] };
       }
     });
   };
 
-  const selectAllFiles = () => {
-    setSelectedFiles(files.map(f => f.id));
+  const clearFilters = () => {
+    setFilters({
+      excludeFiles: [],
+      includeFiles: [],
+      excludeTypes: [],
+      includeTypes: [],
+    });
   };
 
-  const deselectAllFiles = () => {
-    setSelectedFiles([]);
-  };
+  const hasActiveFilters =
+    filters.excludeFiles.length > 0 ||
+    filters.includeFiles.length > 0 ||
+    filters.excludeTypes.length > 0 ||
+    filters.includeTypes.length > 0;
 
   const getFileIcon = (category?: string) => {
     switch (category) {
-      case 'video': return <Video className="w-4 h-4" />;
+      case 'video': return <VideoIcon className="w-4 h-4" />;
       case 'audio': return <Music className="w-4 h-4" />;
       case 'image': return <ImageIcon className="w-4 h-4" />;
       case 'pdf':
       case 'document':
       case 'text': return <FileText className="w-4 h-4" />;
       case 'spreadsheet': return <FileSpreadsheet className="w-4 h-4" />;
-      default: return <FileIcon className="w-4 h-4" />;
-    }
-  };
-
-  const getCategoryColor = (category?: string) => {
-    switch (category) {
-      case 'video': return 'bg-blue-100 text-blue-700 border-blue-200';
-      case 'audio': return 'bg-purple-100 text-purple-700 border-purple-200';
-      case 'image': return 'bg-green-100 text-green-700 border-green-200';
-      case 'pdf': return 'bg-red-100 text-red-700 border-red-200';
-      case 'document': 
-      case 'text': return 'bg-orange-100 text-orange-700 border-orange-200';
-      case 'spreadsheet': return 'bg-pink-100 text-pink-700 border-pink-200';
-      default: return 'bg-gray-100 text-gray-700 border-gray-200';
+      default: return <File className="w-4 h-4" />;
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      {/* File Selector Sidebar */}
-      <AnimatePresence>
-        {showFileSelector && (
+    <div className="min-h-screen bg-gray-50">
+      {/* Hero/Chat Area */}
+      <div className="bg-gradient-to-br from-purple-600 via-purple-700 to-indigo-800 py-16 lg:py-24">
+        <div className="max-w-5xl mx-auto px-6">
           <motion.div
-            initial={{ x: -320, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: -320, opacity: 0 }}
-            transition={{ type: 'spring', damping: 25 }}
-            className="w-80 bg-white border-r border-gray-200 flex flex-col"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center mb-8"
           >
-            {/* Sidebar Header */}
-            <div className="p-4 border-b border-gray-200">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <Database className="w-5 h-5 text-blue-600" />
-                  <h3 className="font-semibold text-gray-900">File Context</h3>
-                </div>
-                <button
-                  onClick={() => setShowFileSelector(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  ✕
-                </button>
+            <div className="flex items-center gap-4 justify-center mb-6">
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-full">
+                <Sparkles className="w-4 h-4 text-yellow-300" />
+                <span className="text-sm font-medium text-white">AI-Powered Chat</span>
               </div>
-              <p className="text-xs text-gray-600 mb-3">
-                Select files for the AI to access during conversation
+            </div>
+
+            <h1 className="text-4xl lg:text-5xl font-bold text-white mb-4">
+              Ask questions about your files
+            </h1>
+            <p className="text-xl text-purple-100 max-w-2xl mx-auto">
+              Get AI-powered answers with citations from your uploaded files
+            </p>
+          </motion.div>
+
+          {/* Chat Mode Initial Prompt */}
+          {chatHistory.length === 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="text-center"
+            >
+              <p className="text-xl text-purple-100">
+                Ask a question and start a conversation with your files
               </p>
-              <div className="flex gap-2">
+            </motion.div>
+          )}
+
+          {/* Filter and Sort Controls - Available in chat mode */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2 }}
+            className="mt-6"
+          >
+            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 mb-4">
+              <div className="flex flex-wrap items-center gap-4 justify-center">
+                {/* Sort Dropdown */}
+                <div className="flex items-center gap-2">
+                  <SortAsc className="w-5 h-5 text-white" />
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as SortOption)}
+                    className="px-4 py-2 border border-white/20 rounded-lg focus:ring-2 focus:ring-white bg-white/10 text-white backdrop-blur-sm"
+                  >
+                    <option value="relevance" className="text-gray-900">Sort by Relevance</option>
+                    <option value="uploadedDesc" className="text-gray-900">Recently Uploaded (Newest First)</option>
+                    <option value="uploadedAsc" className="text-gray-900">Recently Uploaded (Oldest First)</option>
+                    <option value="usedDesc" className="text-gray-900">Recently Used (Newest First)</option>
+                    <option value="usedAsc" className="text-gray-900">Recently Used (Oldest First)</option>
+                    <option value="nameAsc" className="text-gray-900">Name (A-Z)</option>
+                    <option value="nameDesc" className="text-gray-900">Name (Z-A)</option>
+                  </select>
+                </div>
+
+                {/* Filter Toggle Button */}
                 <button
-                  onClick={selectAllFiles}
-                  className="flex-1 px-3 py-1.5 text-xs bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors font-medium"
+                  onClick={() => setShowFilters(!showFilters)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${showFilters || hasActiveFilters
+                      ? 'bg-white text-purple-600'
+                      : 'bg-white/10 text-white hover:bg-white/20 border border-white/20'
+                    }`}
                 >
-                  Select All
+                  <Filter className="w-5 h-5" />
+                  Configure Filters
+                  {hasActiveFilters && (
+                    <span className="px-2 py-0.5 text-white rounded-full text-xs font-bold bg-purple-600">
+                      {filters.excludeFiles.length + filters.includeFiles.length +
+                        filters.excludeTypes.length + filters.includeTypes.length}
+                    </span>
+                  )}
+                  <ChevronDown className={`w-4 h-4 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
                 </button>
-                <button
-                  onClick={deselectAllFiles}
-                  className="flex-1 px-3 py-1.5 text-xs bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors font-medium"
-                >
-                  Clear All
-                </button>
+
+                {/* Clear Filters */}
+                {hasActiveFilters && (
+                  <button
+                    onClick={clearFilters}
+                    className="flex items-center gap-2 px-4 py-2 bg-red-500/90 text-white hover:bg-red-600 rounded-lg font-medium transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                    Clear Filters
+                  </button>
+                )}
               </div>
-            </div>
 
-            {/* Files List */}
-            <div className="flex-1 overflow-y-auto p-4">
-              {files.length === 0 ? (
-                <div className="text-center py-8">
-                  <Folder className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                  <p className="text-sm text-gray-500">No files uploaded yet</p>
-                  <p className="text-xs text-gray-400 mt-1">Upload files to chat about them</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {files.map((file) => (
-                    <label
-                      key={file.id}
-                      className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                        selectedFiles.includes(file.id)
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 bg-white hover:border-gray-300'
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedFiles.includes(file.id)}
-                        onChange={() => toggleFileSelection(file.id)}
-                        className="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border ${getCategoryColor(file.category)}`}>
-                            {getFileIcon(file.category)}
-                            {file.category || 'file'}
-                          </span>
+              {/* Filter Panel */}
+              <AnimatePresence>
+                {showFilters && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* File Type Filters */}
+                      <div>
+                        <h3 className="text-sm font-semibold text-white mb-3">File Types</h3>
+                        <div className="space-y-3">
+                          {/* Include Types */}
+                          <div>
+                            <label className="text-xs text-purple-100 mb-2 block">Include Only:</label>
+                            <div className="flex flex-wrap gap-2">
+                              {fileTypes.map((type) => (
+                                <button
+                                  key={`include-${type}`}
+                                  onClick={() => toggleFilter('includeTypes', type)}
+                                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${filters.includeTypes.includes(type)
+                                      ? 'bg-green-500 text-white'
+                                      : 'bg-white/20 text-white hover:bg-white/30'
+                                    }`}
+                                >
+                                  {type.charAt(0).toUpperCase() + type.slice(1)}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Exclude Types */}
+                          <div>
+                            <label className="text-xs text-purple-100 mb-2 block">Exclude:</label>
+                            <div className="flex flex-wrap gap-2">
+                              {fileTypes.map((type) => (
+                                <button
+                                  key={`exclude-${type}`}
+                                  onClick={() => toggleFilter('excludeTypes', type)}
+                                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${filters.excludeTypes.includes(type)
+                                      ? 'bg-red-500 text-white'
+                                      : 'bg-white/20 text-white hover:bg-white/30'
+                                    }`}
+                                >
+                                  {type.charAt(0).toUpperCase() + type.slice(1)}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
                         </div>
-                        <p className="text-sm font-medium text-gray-900 truncate" title={file.filename}>
-                          {file.filename}
-                        </p>
-                        <p className="text-xs text-gray-500 mt-0.5">
-                          {new Date(file.uploadedAt).toLocaleDateString()}
-                        </p>
                       </div>
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
 
-            {/* Selected Count */}
-            <div className="p-4 border-t border-gray-200 bg-gray-50">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">Selected:</span>
+                      {/* Specific Files Filters */}
+                      <div>
+                        <h3 className="text-sm font-semibold text-white mb-3">Specific Files</h3>
+                        <div className="space-y-3">
+                          {/* Include Files */}
+                          <div>
+                            <label className="text-xs text-purple-100 mb-2 block">Include Only:</label>
+                            <div className="max-h-32 overflow-y-auto space-y-1 bg-white/10 backdrop-blur-sm rounded-lg p-2">
+                              {allFiles.length > 0 ? (
+                                allFiles.map((file) => (
+                                  <label
+                                    key={`include-file-${file.id}`}
+                                    className="flex items-center gap-2 px-2 py-1 hover:bg-white/20 rounded cursor-pointer"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={filters.includeFiles.includes(file.id)}
+                                      onChange={() => toggleFilter('includeFiles', file.id)}
+                                      className="rounded border-white/30 text-green-500 focus:ring-green-500"
+                                    />
+                                    <span className="text-sm text-white truncate flex-1">
+                                      {file.filename || file.title || 'Unknown'}
+                                    </span>
+                                    <span className="text-xs text-purple-200 uppercase">
+                                      {file.category || 'file'}
+                                    </span>
+                                  </label>
+                                ))
+                              ) : (
+                                <p className="text-sm text-purple-200 text-center py-2">No files available. Upload files to chat!</p>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Exclude Files */}
+                          <div>
+                            <label className="text-xs text-purple-100 mb-2 block">Exclude:</label>
+                            <div className="max-h-32 overflow-y-auto space-y-1 bg-white/10 backdrop-blur-sm rounded-lg p-2">
+                              {allFiles.length > 0 ? (
+                                allFiles.map((file) => (
+                                  <label
+                                    key={`exclude-file-${file.id}`}
+                                    className="flex items-center gap-2 px-2 py-1 hover:bg-white/20 rounded cursor-pointer"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={filters.excludeFiles.includes(file.id)}
+                                      onChange={() => toggleFilter('excludeFiles', file.id)}
+                                      className="rounded border-white/30 text-red-500 focus:ring-red-500"
+                                    />
+                                    <span className="text-sm text-white truncate flex-1">
+                                      {file.filename || file.title || 'Unknown'}
+                                    </span>
+                                    <span className="text-xs text-purple-200 uppercase">
+                                      {file.category || 'file'}
+                                    </span>
+                                  </label>
+                                ))
+                              ) : (
+                                <p className="text-sm text-purple-200 text-center py-2">No files available</p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </motion.div>
+
+          {/* Clear Conversation Button (Chat History exists) */}
+          {chatHistory.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="mt-4 flex justify-center"
+            >
+              <button
+                onClick={() => {
+                  setChatHistory([]);
+                  setAiResponse(null);
+                  setRawResults([]);
+                  setQuery('');
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors font-medium text-sm"
+              >
+                <RotateCcw className="w-4 h-4" />
+                Start New Conversation
+              </button>
+            </motion.div>
+          )}
+
+          {/* Example Queries */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3 }}
+            className={`${chatHistory.length > 0 ? 'mt-2' : 'mt-4'} flex flex-wrap gap-3 justify-center`}
+          >
+            {[
+              'Summarize what was discussed in the meetings',
+              'What are the key points from the presentation?',
+              'Explain the budget allocation',
+              'What recommendations were made?',
+            ].map((example) => (
+              <button
+                key={example}
+                onClick={() => setQuery(example)}
+                className="px-4 py-2 bg-white/10 backdrop-blur-sm text-white rounded-lg text-sm hover:bg-white/20 transition-colors"
+              >
+                {example}
+              </button>
+            ))}
+          </motion.div>
+        </div>
+      </div>
+
+      {/* Results Info Bar - Only show after search */}
+      {rawResults.length > 0 && (
+        <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple-100">
+          <div className="max-w-7xl mx-auto px-6 py-3">
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-4">
+                <Bot className="w-4 h-4 text-purple-600" />
                 <span className="font-semibold text-gray-900">
-                  {selectedFiles.length} / {files.length} files
+                  AI Response & Sources
+                </span>
+              </div>
+              <div className="flex items-center gap-4">
+                {hasActiveFilters && (
+                  <span className="font-medium text-purple-600">
+                    {filters.excludeFiles.length + filters.includeFiles.length +
+                      filters.excludeTypes.length + filters.includeTypes.length} filters active
+                  </span>
+                )}
+                <span className="text-gray-600">
+                  Showing <span className="font-bold text-gray-900">{results.length}</span> of <span className="font-bold text-gray-900">{rawResults.length}</span> results
                 </span>
               </div>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </div>
+        </div>
+      )}
 
-      {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col">
-        {/* Header */}
-        <div className="bg-white border-b border-gray-200 px-6 py-4">
-          <div className="max-w-5xl mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center">
-                <Brain className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">Unified Chat</h1>
-                <p className="text-sm text-gray-600">Chat with Gemini 3 Flash across all your files</p>
-              </div>
-            </div>
-
-            <button
-              onClick={() => setShowFileSelector(!showFileSelector)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors font-medium"
+      {/* Results Section */}
+      <div className="max-w-7xl mx-auto px-6 pb-32">
+        <AnimatePresence mode="wait">
+          {isSearching && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex flex-col items-center justify-center py-20"
             >
-              <Database className="w-4 h-4" />
-              {selectedFiles.length} {selectedFiles.length === 1 ? 'File' : 'Files'}
-            </button>
-          </div>
-        </div>
+              <div className="w-16 h-16 border-4 rounded-full animate-spin mb-4 border-purple-200 border-t-purple-600" />
+              <p className="text-gray-600 text-lg">{searchStatus || 'Generating AI response...'}</p>
+              <p className="text-gray-500 text-sm mt-2">Using parallel AI search for faster results</p>
+            </motion.div>
+          )}
 
-        {/* Info Banner */}
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100">
-          <div className="max-w-5xl mx-auto px-6 py-3">
-            <div className="flex items-start gap-3 text-sm">
-              <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <p className="text-gray-700">
-                  <span className="font-semibold text-blue-900">AI has access to {selectedFiles.length} selected {selectedFiles.length === 1 ? 'file' : 'files'}.</span>
-                  {selectedFiles.length === 0 && (
-                    <span className="text-orange-700"> Select files from the sidebar to enable AI analysis.</span>
+          {!isSearching && results.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              {/* Chat History Section */}
+              {chatHistory.length > 0 && (
+                <div className="mb-8 space-y-6">
+                  {chatHistory.map((msg, index) => (
+                    <div key={index} className="space-y-4">
+                      {/* User Question */}
+                      <div className="flex justify-end">
+                        <div className="max-w-3xl bg-blue-600 text-white rounded-2xl px-6 py-4">
+                          <p className="font-medium">{msg.question}</p>
+                          <p className="text-xs text-blue-100 mt-2">
+                            {msg.timestamp.toLocaleTimeString()}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* AI Response */}
+                      <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-8 border-2 border-purple-200 shadow-lg">
+                        <div className="flex items-start gap-4">
+                          <div className="flex-shrink-0">
+                            <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
+                              <Bot className="w-6 h-6 text-white" />
+                            </div>
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
+                              <span>AI Response</span>
+                              {index === chatHistory.length - 1 && (
+                                <span className="px-2 py-1 bg-purple-200 text-purple-700 text-xs font-bold rounded-full">
+                                  FOLLOW-UP AWARE
+                                </span>
+                              )}
+                            </h3>
+                            <div className="prose prose-purple max-w-none">
+                              <p className="text-gray-800 leading-relaxed whitespace-pre-wrap">{msg.answer}</p>
+                            </div>
+
+                            {/* Citations */}
+                            {msg.citations && msg.citations.length > 0 && (
+                              <div className="mt-6">
+                                <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                                  <FileText className="w-4 h-4" />
+                                  Sources ({msg.citations.length})
+                                </h4>
+                                <div className="flex flex-wrap gap-2">
+                                  {msg.citations.map((citation, citIndex) => (
+                                    <div
+                                      key={citIndex}
+                                      className="px-3 py-1.5 bg-white rounded-lg text-sm border border-purple-200 text-purple-700 font-medium"
+                                    >
+                                      [{citIndex + 1}] {citation}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Follow-up prompt */}
+                  {!isSearching && (
+                    <div className="flex items-center justify-center gap-2 text-sm text-purple-600 bg-purple-50 px-4 py-3 rounded-lg border border-purple-200">
+                      <MessageSquare className="w-4 h-4" />
+                      <span>Ask a follow-up question to continue the conversation</span>
+                    </div>
                   )}
-                  {selectedFiles.length > 0 && (
-                    <span> Ask questions about content, request summaries, or analyze across multiple files.</span>
-                  )}
+                </div>
+              )}
+
+              <div className="mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">
+                  Source Files {results.length} references
+                </h2>
+                <p className="text-gray-600">
+                  used to answer "{query}"
                 </p>
               </div>
-            </div>
-          </div>
-        </div>
 
-        {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto px-6 py-8 bg-gray-50">
-          <div className="max-w-5xl mx-auto space-y-6">
-            {messages.length === 0 ? (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="text-center py-12"
-              >
-                <div className="w-20 h-20 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                  <MessageCircle className="w-10 h-10 text-white" />
-                </div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-3">
-                  Start a conversation
-                </h2>
-                <p className="text-gray-600 mb-8 max-w-2xl mx-auto">
-                  Ask questions about your uploaded files, request summaries, compare content across multiple files, 
-                  or get detailed analysis. The AI has access to all selected files.
-                </p>
+              {/* Masonry Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {results.map((result, index) => {
+                  // Get icon and styling based on file category
+                  const isVideo = result.category === 'video' || !result.category;
+                  const isAudio = result.category === 'audio';
+                  const isImage = result.category === 'image';
+                  const isPDF = result.category === 'pdf';
+                  const isDocument = result.category === 'document' || result.category === 'text';
+                  const isSpreadsheet = result.category === 'spreadsheet';
 
-                {/* Example Questions */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl mx-auto">
-                  {[
-                    { q: "Summarize all my video files", icon: Video },
-                    { q: "What are the key points in my documents?", icon: FileText },
-                    { q: "Find common themes across all files", icon: Sparkles },
-                    { q: "What images contain landscapes?", icon: ImageIcon },
-                  ].map((example, i) => (
-                    <button
-                      key={i}
-                      onClick={() => setInput(example.q)}
-                      className="flex items-center gap-3 p-4 bg-white rounded-xl border-2 border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-all text-left group"
+                  // Get gradient based on category
+                  let gradient = 'from-gray-200 to-gray-300';
+                  let iconColor = 'text-gray-400';
+                  let icon = <VideoIcon className="w-12 h-12 text-gray-400" />;
+                  let actionText = 'View Details';
+
+                  if (isVideo) {
+                    gradient = 'from-blue-100 to-blue-200';
+                    iconColor = 'text-blue-500';
+                    icon = <VideoIcon className={`w-12 h-12 ${iconColor}`} />;
+                    actionText = 'Play from ' + formatTimestamp(result.timestamp);
+                  } else if (isAudio) {
+                    gradient = 'from-purple-100 to-purple-200';
+                    iconColor = 'text-purple-500';
+                    icon = <Music className={`w-12 h-12 ${iconColor}`} />;
+                    actionText = 'Play from ' + formatTimestamp(result.timestamp);
+                  } else if (isImage) {
+                    gradient = 'from-green-100 to-green-200';
+                    iconColor = 'text-green-500';
+                    icon = <ImageIcon className={`w-12 h-12 ${iconColor}`} />;
+                    actionText = 'View Image';
+                  } else if (isPDF) {
+                    gradient = 'from-red-100 to-red-200';
+                    iconColor = 'text-red-500';
+                    icon = <FileText className={`w-12 h-12 ${iconColor}`} />;
+                    actionText = 'View PDF';
+                  } else if (isDocument) {
+                    gradient = 'from-orange-100 to-orange-200';
+                    iconColor = 'text-orange-500';
+                    icon = <FileText className={`w-12 h-12 ${iconColor}`} />;
+                    actionText = 'View Document';
+                  } else if (isSpreadsheet) {
+                    gradient = 'from-pink-100 to-pink-200';
+                    iconColor = 'text-pink-500';
+                    icon = <FileSpreadsheet className={`w-12 h-12 ${iconColor}`} />;
+                    actionText = 'View Spreadsheet';
+                  }
+
+                  return (
+                    <motion.div
+                      key={result.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg transition-all cursor-pointer group"
+                      onClick={() => router.push(`/files/${result.videoId}`)}
                     >
-                      <div className="w-10 h-10 bg-gray-100 group-hover:bg-blue-100 rounded-lg flex items-center justify-center transition-colors">
-                        <example.icon className="w-5 h-5 text-gray-600 group-hover:text-blue-600" />
+                      {/* Thumbnail */}
+                      <div className={`relative aspect-video bg-gradient-to-br ${gradient} flex items-center justify-center`}>
+                        {icon}
+
+                        {/* Timestamp Badge - only for video/audio */}
+                        {(isVideo || isAudio) && result.timestamp > 0 && (
+                          <div className="absolute bottom-3 right-3 px-3 py-1 bg-black/80 text-white rounded-lg text-sm font-medium flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {formatTimestamp(result.timestamp)}
+                          </div>
+                        )}
+
+                        {/* Relevance Badge */}
+                        <div className="absolute top-3 right-3 px-2 py-1 bg-green-500 text-white rounded text-xs font-bold">
+                          {Math.round(result.relevance * 100)}%
+                        </div>
                       </div>
-                      <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900">
-                        {example.q}
-                      </span>
+
+                      {/* Content */}
+                      <div className="p-5">
+                        <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
+                          {isVideo && <VideoIcon className="w-4 h-4" />}
+                          {isAudio && <Music className="w-4 h-4" />}
+                          {isImage && <ImageIcon className="w-4 h-4" />}
+                          {(isPDF || isDocument) && <FileText className="w-4 h-4" />}
+                          {isSpreadsheet && <FileSpreadsheet className="w-4 h-4" />}
+                          <span className="font-medium">{result.videoTitle}</span>
+                        </div>
+
+                        <p className="text-gray-700 leading-relaxed line-clamp-3">
+                          {result.snippet}
+                        </p>
+
+                        <button className="mt-4 w-full px-4 py-2 bg-blue-50 text-blue-600 rounded-lg font-medium group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                          {actionText}
+                        </button>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </motion.div>
+          )}
+
+          {!isSearching && results.length === 0 && query && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="text-center py-20"
+            >
+              <SearchIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                No results found
+              </h3>
+              <p className="text-gray-600">
+                Try a different question or upload more files
+              </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        {/* Chat Input Box - Fixed at Bottom */}
+        <div className="fixed bottom-0 left-0 right-0 lg:left-72 bg-white border-t border-gray-200 shadow-2xl z-30">
+          <div className="max-w-7xl mx-auto px-6 py-4">
+            {/* Conversation counter + clear button */}
+            {chatHistory.length > 0 && (
+              <div className="mb-3 flex justify-between items-center">
+                <span className="text-sm text-gray-600">
+                  {chatHistory.length} {chatHistory.length === 1 ? 'exchange' : 'exchanges'} in conversation
+                </span>
+                <button
+                  onClick={() => {
+                    setChatHistory([]);
+                    setAiResponse(null);
+                    setRawResults([]);
+                    setQuery('');
+                  }}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors font-medium text-sm"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  New Conversation
+                </button>
+              </div>
+            )}
+
+            {/* Chat Input Form */}
+            <form onSubmit={handleSearch} className="relative">
+              <div className="relative">
+                <MessageSquare className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-purple-400" />
+                <input
+                  type="text"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={chatHistory.length === 0
+                    ? "Ask a question about your files..."
+                    : "Ask a follow-up question..."}
+                  disabled={isSearching}
+                  className="w-full pl-12 pr-32 py-4 text-base rounded-xl border-2 border-purple-200 focus:ring-4 focus:ring-purple-300 focus:border-purple-400 transition-all disabled:bg-gray-100"
+                />
+                <button
+                  type="submit"
+                  disabled={isSearching || !query.trim()}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 px-5 py-2.5 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition-colors disabled:opacity-50"
+                >
+                  {isSearching ? 'Thinking...' : (chatHistory.length === 0 ? 'Ask' : 'Send')}
+                </button>
+              </div>
+
+              {/* Example queries - only on first question */}
+              {chatHistory.length === 0 && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {[
+                    'Summarize all files',
+                    'What are the key points?',
+                    'Find budget information',
+                    'What topics are covered?',
+                  ].map((example) => (
+                    <button
+                      key={example}
+                      type="button"
+                      onClick={() => setQuery(example)}
+                      className="px-3 py-1 bg-purple-50 text-purple-700 rounded-lg text-xs hover:bg-purple-100 transition-colors"
+                    >
+                      {example}
                     </button>
                   ))}
                 </div>
-              </motion.div>
-            ) : (
-              <>
-                {messages.map((message, index) => (
-                  <motion.div
-                    key={message.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                    className={`flex gap-4 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                  >
-                    {message.role === 'assistant' && (
-                      <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <Sparkles className="w-5 h-5 text-white" />
-                      </div>
-                    )}
-
-                    <div
-                      className={`max-w-3xl rounded-2xl px-6 py-4 ${
-                        message.role === 'user'
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-white border border-gray-200 text-gray-900'
-                      }`}
-                    >
-                      <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
-                      <p className={`text-xs mt-2 ${message.role === 'user' ? 'text-blue-100' : 'text-gray-500'}`}>
-                        {message.timestamp.toLocaleTimeString()}
-                      </p>
-                    </div>
-
-                    {message.role === 'user' && (
-                      <div className="w-8 h-8 bg-gray-300 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <span className="text-sm font-semibold text-gray-700">You</span>
-                      </div>
-                    )}
-                  </motion.div>
-                ))}
-
-                {isLoading && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="flex gap-4"
-                  >
-                    <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <Sparkles className="w-5 h-5 text-white" />
-                    </div>
-                    <div className="bg-white border border-gray-200 rounded-2xl px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
-                        <span className="text-gray-600">Thinking...</span>
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-              </>
-            )}
-
-            <div ref={messagesEndRef} />
+              )}
+            </form>
           </div>
-        </div>
-
-        {/* Input Area */}
-        <div className="bg-white border-t border-gray-200 px-6 py-4">
-          <form onSubmit={handleSendMessage} className="max-w-5xl mx-auto">
-            {selectedFiles.length === 0 && (
-              <div className="mb-3 flex items-center gap-2 text-sm text-orange-600 bg-orange-50 px-4 py-2 rounded-lg">
-                <AlertCircle className="w-4 h-4" />
-                <span>Select at least one file to enable AI chat</span>
-              </div>
-            )}
-            <div className="flex gap-3">
-              <textarea
-                ref={inputRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSendMessage(e);
-                  }
-                }}
-                placeholder={
-                  selectedFiles.length === 0
-                    ? "Select files to start chatting..."
-                    : "Ask anything about your files... (Shift+Enter for new line)"
-                }
-                disabled={isLoading || selectedFiles.length === 0}
-                className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none disabled:bg-gray-50 disabled:text-gray-400"
-                rows={1}
-                style={{ minHeight: '48px', maxHeight: '200px' }}
-              />
-              <button
-                type="submit"
-                disabled={isLoading || !input.trim() || selectedFiles.length === 0}
-                className="px-6 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    Sending...
-                  </>
-                ) : (
-                  <>
-                    <Send className="w-5 h-5" />
-                    Send
-                  </>
-                )}
-              </button>
-            </div>
-            <p className="text-xs text-gray-500 mt-2 text-center">
-              Powered by Gemini 3 Flash • {selectedFiles.length} {selectedFiles.length === 1 ? 'file' : 'files'} selected
-            </p>
-          </form>
         </div>
       </div>
     </div>
