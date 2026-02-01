@@ -69,6 +69,15 @@ export async function POST(request: Request) {
     if (relevantFiles.length > 1) {
       console.log('[Unified Chat] Using FAST parallel search mode for', relevantFiles.length, 'files');
       
+      // Build conversation context for better follow-up support
+      let conversationContext = '';
+      if (history && Array.isArray(history) && history.length > 0) {
+        conversationContext = '\n\nPrevious conversation:\n' + 
+          history.slice(-4).map((msg: HistoryMessage) => 
+            `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`
+          ).join('\n');
+      }
+      
       // Step 1: Query each file in PARALLEL with minimal thinking
       const fileQueryPromises = relevantFiles.map(async (file: FileData) => {
         try {
@@ -80,8 +89,8 @@ export async function POST(request: Request) {
             },
           });
 
-          // Fast, focused query for this specific file
-          const quickPrompt = `Based on this file, answer: "${message}"
+          // Fast, focused query for this specific file (with context for follow-ups)
+          const quickPrompt = `Based on this file, answer: "${message}"${conversationContext}
 
 Return JSON:
 {
@@ -130,7 +139,7 @@ Return JSON:
         });
       }
 
-      // Step 2: Synthesize final answer from relevant results
+      // Step 2: Synthesize final answer from relevant results (with conversation history)
       const synthesisModel = genAI.getGenerativeModel({
         model: 'gemini-3-flash-preview',
         generationConfig: {
@@ -138,17 +147,30 @@ Return JSON:
         },
       });
 
-      const synthesisPrompt = `User asked: "${message}"
+      let synthesisPrompt = '';
+      
+      // Include conversation history for context
+      if (history && Array.isArray(history) && history.length > 0) {
+        synthesisPrompt += 'Previous conversation:\n';
+        synthesisPrompt += history.slice(-4).map((msg: HistoryMessage) => 
+          `${msg.role === 'user' ? 'User' : 'You'}: ${msg.content}`
+        ).join('\n\n');
+        synthesisPrompt += '\n\n---\n\n';
+      }
+      
+      synthesisPrompt += `Current question: "${message}"
 
 I found relevant information from ${relevantResults.length} file(s):
 
 ${relevantResults.map((r, i) => `${i + 1}. ${r.filename}: ${r.answer}`).join('\n\n')}
 
 Synthesize a comprehensive answer that:
+- Takes into account the conversation history above
 - Combines information from all sources
 - Mentions which files contain what information
 - Is clear and well-organized
 - Cites sources by filename
+- If this is a follow-up question, reference previous context
 
 Answer:`;
 
