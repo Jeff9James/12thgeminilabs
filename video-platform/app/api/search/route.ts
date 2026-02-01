@@ -88,7 +88,8 @@ export async function POST(request: NextRequest) {
     const cacheKey = createCacheKey(`${mode}:${query}`, videos.map((v: any) => v.id));
     const cachedData = await getSearchResults(cacheKey);
 
-    if (cachedData) {
+    // Skip cache for chat mode to ensure fresh results and filter support
+    if (cachedData && mode !== 'chat') {
       console.log('Returning cached search results');
 
       // Handle both old format (array) and new format (object with results)
@@ -220,11 +221,11 @@ Return empty array [] if no matches.`;
       }
     }
 
-    // Cache the results for future queries
-    const cacheData = mode === 'chat'
-      ? { results, aiResponse: aiResponse || undefined }
-      : results;
-    await saveSearchResults(cacheKey, cacheData as any);
+    // Cache the results for future queries (skip caching for chat mode)
+    if (mode !== 'chat') {
+      const cacheData = results;
+      await saveSearchResults(cacheKey, cacheData as any);
+    }
 
     return NextResponse.json({
       success: true,
