@@ -20,8 +20,20 @@ import {
   MessageSquare,
   Bot,
   RotateCcw,
-  Database
+  Database,
+  Plug,
+  Wrench,
+  Loader2,
+  CheckCircle2,
+  XCircle
 } from 'lucide-react';
+import {
+  connectToMCPServer,
+  disconnectFromMCPServer,
+  callMCPTool,
+  type MCPServerConnection,
+  type MCPTool
+} from '@/lib/mcp';
 
 interface SearchResult {
   id: string;
@@ -77,6 +89,103 @@ export default function ChatPage() {
     includeTypes: [],
   });
   const [allFiles, setAllFiles] = useState<any[]>([]);
+
+  // MCP Server state
+  const [mcpServerUrl, setMcpServerUrl] = useState('https://mcp.deepwiki.com/mcp');
+  const [mcpConnection, setMcpConnection] = useState<MCPServerConnection | null>(null);
+  const [mcpConnecting, setMcpConnecting] = useState(false);
+  const [mcpError, setMcpError] = useState<string | null>(null);
+  const [showMCPPanel, setShowMCPPanel] = useState(false);
+  const [selectedMCPTool, setSelectedMCPTool] = useState<MCPTool | null>(null);
+  const [mcpToolArgs, setMcpToolArgs] = useState<Record<string, string>>({});
+
+  // MCP connection handler
+  const handleMCPConnect = async () => {
+    if (!mcpServerUrl.trim()) return;
+    setMcpConnecting(true);
+    setMcpError(null);
+    try {
+      const connection = await connectToMCPServer(mcpServerUrl.trim());
+      setMcpConnection(connection);
+    } catch (err: any) {
+      setMcpError(err.message || 'Failed to connect');
+    } finally {
+      setMcpConnecting(false);
+    }
+  };
+
+  const handleMCPDisconnect = async () => {
+    if (mcpConnection) {
+      await disconnectFromMCPServer(mcpConnection);
+      setMcpConnection(null);
+      setSelectedMCPTool(null);
+      setMcpToolArgs({});
+    }
+  };
+
+  const handleCallMCPTool = async () => {
+    if (!mcpConnection || !selectedMCPTool) return;
+    setIsSearching(true);
+    setSearchStatus(`Calling ${selectedMCPTool.name}...`);
+    try {
+      const result = await callMCPTool(mcpConnection, selectedMCPTool.name, mcpToolArgs);
+
+      // Extract text content from MCP response
+      let responseText = '';
+      let isError = false;
+
+      if (result && typeof result === 'object') {
+        const mcpResult = result as { content?: Array<{ type: string; text?: string }>; isError?: boolean };
+
+        // Check for error
+        if (mcpResult.isError) {
+          isError = true;
+        }
+
+        // Extract text from content array (standard MCP format)
+        if (mcpResult.content && Array.isArray(mcpResult.content)) {
+          responseText = mcpResult.content
+            .filter((item) => item.type === 'text' && item.text)
+            .map((item) => item.text)
+            .join('\n\n');
+        }
+
+        // If no text content found, try other formats
+        if (!responseText) {
+          // Try output field (some tools use this)
+          if ('output' in result && typeof (result as any).output === 'string') {
+            responseText = (result as any).output;
+          } else {
+            // Fallback to pretty JSON
+            responseText = '```json\n' + JSON.stringify(result, null, 2) + '\n```';
+          }
+        }
+      } else if (typeof result === 'string') {
+        responseText = result;
+      } else {
+        responseText = String(result);
+      }
+
+      // Format the question to show tool call details
+      const argsDisplay = Object.entries(mcpToolArgs)
+        .map(([k, v]) => `${k}: "${v}"`)
+        .join(', ');
+
+      const newMessage = {
+        question: `🔧 **Tool:** \`${selectedMCPTool.name}\`\n**Arguments:** ${argsDisplay || '(none)'}`,
+        answer: isError ? `❌ **Error:**\n${responseText}` : responseText,
+        citations: [`${mcpConnection.serverInfo?.name || 'MCP Server'} → ${selectedMCPTool.name}`],
+        timestamp: new Date(),
+      };
+      setChatHistory(prev => [...prev, newMessage]);
+      setSearchStatus('');
+    } catch (err: any) {
+      setMcpError(err.message || 'Tool call failed');
+      setSearchStatus('');
+    } finally {
+      setIsSearching(false);
+    }
+  };
 
   // Available file types
   const fileTypes = ['video', 'audio', 'image', 'pdf', 'document', 'spreadsheet', 'text'];
@@ -356,6 +465,183 @@ export default function ChatPage() {
             </motion.div>
           )}
 
+          {/* MCP Server Panel */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.15 }}
+            className="mt-6"
+          >
+            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 mb-4">
+              {/* Toggle Button */}
+              <button
+                onClick={() => setShowMCPPanel(!showMCPPanel)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors w-full justify-center ${showMCPPanel || mcpConnection
+                  ? 'bg-white text-purple-600'
+                  : 'bg-white/10 text-white hover:bg-white/20 border border-white/20'
+                  }`}
+              >
+                <Plug className="w-5 h-5" />
+                MCP Server
+                {mcpConnection && (
+                  <span className="px-2 py-0.5 bg-green-500 text-white rounded-full text-xs font-bold">
+                    Connected
+                  </span>
+                )}
+                <ChevronDown className={`w-4 h-4 transition-transform ${showMCPPanel ? 'rotate-180' : ''}`} />
+              </button>
+
+              {/* MCP Panel Content */}
+              <AnimatePresence>
+                {showMCPPanel && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="pt-4 space-y-4">
+                      {/* Connection Status & URL Input */}
+                      <div className="flex flex-col md:flex-row gap-2">
+                        <input
+                          type="text"
+                          value={mcpServerUrl}
+                          onChange={(e) => setMcpServerUrl(e.target.value)}
+                          placeholder="MCP Server URL (e.g., https://mcp.deepwiki.com/mcp)"
+                          disabled={!!mcpConnection || mcpConnecting}
+                          className="flex-1 px-4 py-2 rounded-lg border border-white/20 bg-white/10 text-white placeholder-white/50 focus:ring-2 focus:ring-white disabled:opacity-50"
+                        />
+                        {!mcpConnection ? (
+                          <button
+                            onClick={handleMCPConnect}
+                            disabled={mcpConnecting || !mcpServerUrl.trim()}
+                            className="px-6 py-2 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors disabled:opacity-50 flex items-center gap-2"
+                          >
+                            {mcpConnecting ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Connecting...
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle2 className="w-4 h-4" />
+                                Connect
+                              </>
+                            )}
+                          </button>
+                        ) : (
+                          <button
+                            onClick={handleMCPDisconnect}
+                            className="px-6 py-2 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-colors flex items-center gap-2"
+                          >
+                            <XCircle className="w-4 h-4" />
+                            Disconnect
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Error Message */}
+                      {mcpError && (
+                        <div className="p-3 bg-red-500/20 border border-red-400 rounded-lg text-red-100 text-sm">
+                          {mcpError}
+                        </div>
+                      )}
+
+                      {/* Connected Server Info */}
+                      {mcpConnection && (
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-2 text-green-300 text-sm">
+                            <CheckCircle2 className="w-4 h-4" />
+                            Connected to {mcpConnection.serverInfo?.name || 'MCP Server'}
+                            {mcpConnection.serverInfo?.version && (
+                              <span className="text-white/60">v{mcpConnection.serverInfo.version}</span>
+                            )}
+                          </div>
+
+                          {/* Tools List */}
+                          {mcpConnection.tools.length > 0 && (
+                            <div>
+                              <h4 className="text-sm font-semibold text-white mb-2 flex items-center gap-2">
+                                <Wrench className="w-4 h-4" />
+                                Available Tools ({mcpConnection.tools.length})
+                              </h4>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                {mcpConnection.tools.map((tool) => (
+                                  <button
+                                    key={tool.name}
+                                    onClick={() => {
+                                      setSelectedMCPTool(tool);
+                                      setMcpToolArgs({});
+                                    }}
+                                    className={`p-3 rounded-lg text-left transition-colors ${selectedMCPTool?.name === tool.name
+                                      ? 'bg-white text-purple-700'
+                                      : 'bg-white/10 text-white hover:bg-white/20'
+                                      }`}
+                                  >
+                                    <div className="font-medium text-sm">{tool.name}</div>
+                                    {tool.description && (
+                                      <div className="text-xs opacity-70 mt-1 line-clamp-2">
+                                        {tool.description}
+                                      </div>
+                                    )}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Selected Tool Arguments */}
+                          {selectedMCPTool && (
+                            <div className="bg-white/10 rounded-lg p-4">
+                              <h4 className="text-sm font-semibold text-white mb-3">
+                                Call: {selectedMCPTool.name}
+                              </h4>
+                              {selectedMCPTool.inputSchema &&
+                                typeof selectedMCPTool.inputSchema === 'object' &&
+                                'properties' in selectedMCPTool.inputSchema && (
+                                  <div className="space-y-2 mb-4">
+                                    {Object.entries(
+                                      (selectedMCPTool.inputSchema as { properties: Record<string, { type?: string; description?: string }> }).properties
+                                    ).map(([key, schema]) => (
+                                      <div key={key}>
+                                        <label className="text-xs text-white/70 block mb-1">
+                                          {key}
+                                          {schema.description && (
+                                            <span className="text-white/50"> - {schema.description}</span>
+                                          )}
+                                        </label>
+                                        <input
+                                          type="text"
+                                          value={mcpToolArgs[key] || ''}
+                                          onChange={(e) =>
+                                            setMcpToolArgs((prev) => ({ ...prev, [key]: e.target.value }))
+                                          }
+                                          className="w-full px-3 py-2 rounded-lg border border-white/20 bg-white/10 text-white placeholder-white/40 text-sm"
+                                          placeholder={`Enter ${key}...`}
+                                        />
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              <button
+                                onClick={handleCallMCPTool}
+                                disabled={isSearching}
+                                className="w-full px-4 py-2 bg-purple-500 text-white rounded-lg font-medium hover:bg-purple-600 transition-colors disabled:opacity-50"
+                              >
+                                {isSearching ? 'Calling...' : 'Call Tool'}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </motion.div>
+
           {/* Filter and Sort Controls - Available in chat mode */}
           <motion.div
             initial={{ opacity: 0 }}
@@ -387,8 +673,8 @@ export default function ChatPage() {
                 <button
                   onClick={() => setShowFilters(!showFilters)}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${showFilters || hasActiveFilters
-                      ? 'bg-white text-purple-600'
-                      : 'bg-white/10 text-white hover:bg-white/20 border border-white/20'
+                    ? 'bg-white text-purple-600'
+                    : 'bg-white/10 text-white hover:bg-white/20 border border-white/20'
                     }`}
                 >
                   <Filter className="w-5 h-5" />
@@ -438,8 +724,8 @@ export default function ChatPage() {
                                   key={`include-${type}`}
                                   onClick={() => toggleFilter('includeTypes', type)}
                                   className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${filters.includeTypes.includes(type)
-                                      ? 'bg-green-500 text-white'
-                                      : 'bg-white/20 text-white hover:bg-white/30'
+                                    ? 'bg-green-500 text-white'
+                                    : 'bg-white/20 text-white hover:bg-white/30'
                                     }`}
                                 >
                                   {type.charAt(0).toUpperCase() + type.slice(1)}
@@ -457,8 +743,8 @@ export default function ChatPage() {
                                   key={`exclude-${type}`}
                                   onClick={() => toggleFilter('excludeTypes', type)}
                                   className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${filters.excludeTypes.includes(type)
-                                      ? 'bg-red-500 text-white'
-                                      : 'bg-white/20 text-white hover:bg-white/30'
+                                    ? 'bg-red-500 text-white'
+                                    : 'bg-white/20 text-white hover:bg-white/30'
                                     }`}
                                 >
                                   {type.charAt(0).toUpperCase() + type.slice(1)}
@@ -631,7 +917,7 @@ export default function ChatPage() {
             </motion.div>
           )}
 
-          {!isSearching && results.length > 0 && (
+          {!isSearching && (results.length > 0 || chatHistory.length > 0) && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -642,11 +928,14 @@ export default function ChatPage() {
                 <div className="mb-8 space-y-6">
                   {chatHistory.map((msg, index) => (
                     <div key={index} className="space-y-4">
-                      {/* User Question */}
+                      {/* User Question / MCP Tool Call */}
                       <div className="flex justify-end">
-                        <div className="max-w-3xl bg-blue-600 text-white rounded-2xl px-6 py-4">
-                          <p className="font-medium">{msg.question}</p>
-                          <p className="text-xs text-blue-100 mt-2">
+                        <div className={`max-w-3xl rounded-2xl px-6 py-4 ${msg.question.startsWith('🔧')
+                            ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white'
+                            : 'bg-blue-600 text-white'
+                          }`}>
+                          <p className="font-medium whitespace-pre-wrap">{msg.question}</p>
+                          <p className="text-xs opacity-70 mt-2">
                             {msg.timestamp.toLocaleTimeString()}
                           </p>
                         </div>
