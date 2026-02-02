@@ -1,161 +1,157 @@
+/**
+ * MCP Proxy API Route
+ * 
+ * This API route acts as a proxy to bypass CORS restrictions
+ * when connecting to MCP servers that don't have proper CORS headers.
+ * 
+ * Usage: The MCPProxyTransport sends requests here with the target URL and payload.
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
 
-/**
- * MCP Proxy API Route
- * 
- * This route proxies requests to external MCP servers to bypass CORS restrictions.
- * The browser cannot directly connect to MCP servers that don't have CORS headers,
- * so we forward requests through our Next.js backend.
- */
-
 export async function POST(request: NextRequest) {
-    try {
-        const { serverUrl, method, body } = await request.json();
+  try {
+    const body = await request.json();
+    const { targetUrl, method = 'POST', payload } = body;
 
-        if (!serverUrl) {
-            return NextResponse.json({ error: 'serverUrl is required' }, { status: 400 });
-        }
+    console.log('MCP Proxy POST request:', { targetUrl, method, hasPayload: !!payload });
 
-        // Forward the request to the MCP server
-        const response = await fetch(serverUrl, {
-            method: method || 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json, text/event-stream',
-            },
-            body: body ? JSON.stringify(body) : undefined,
-        });
-
-        // Check if it's an SSE response
-        const contentType = response.headers.get('content-type') || '';
-
-        if (contentType.includes('text/event-stream')) {
-            // For SSE, we need to stream the response
-            const reader = response.body?.getReader();
-            if (!reader) {
-                return NextResponse.json({ error: 'No response body' }, { status: 500 });
-            }
-
-            // Collect all SSE events and return as JSON
-            const decoder = new TextDecoder();
-            let fullText = '';
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                fullText += decoder.decode(value, { stream: true });
-            }
-
-            // Parse SSE events
-            const events = fullText.split('\n\n').filter(e => e.trim());
-            const parsedEvents = events.map(event => {
-                const lines = event.split('\n');
-                const dataLine = lines.find(l => l.startsWith('data:'));
-                if (dataLine) {
-                    try {
-                        return JSON.parse(dataLine.slice(5).trim());
-                    } catch {
-                        return dataLine.slice(5).trim();
-                    }
-                }
-                return null;
-            }).filter(Boolean);
-
-            return NextResponse.json({
-                events: parsedEvents,
-                raw: fullText
-            });
-        }
-
-        // For regular JSON responses
-        const data = await response.json();
-        return NextResponse.json(data);
-
-    } catch (error: any) {
-        console.error('MCP Proxy error:', error);
-        return NextResponse.json(
-            { error: error.message || 'Proxy request failed' },
-            { status: 500 }
-        );
+    if (!targetUrl) {
+      return NextResponse.json(
+        { error: 'targetUrl is required', received: body },
+        { status: 400 }
+      );
     }
-}import { NextRequest, NextResponse } from 'next/server';
 
-/**
- * MCP Proxy API Route
- * 
- * This route proxies requests to external MCP servers to bypass CORS restrictions.
- * The browser cannot directly connect to MCP servers that don't have CORS headers,
- * so we forward requests through our Next.js backend.
- */
-
-export async function POST(request: NextRequest) {
+    // Validate URL
+    let url: URL;
     try {
-        const { serverUrl, method, body } = await request.json();
-
-        if (!serverUrl) {
-            return NextResponse.json({ error: 'serverUrl is required' }, { status: 400 });
-        }
-
-        // Forward the request to the MCP server
-        const response = await fetch(serverUrl, {
-            method: method || 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json, text/event-stream',
-            },
-            body: body ? JSON.stringify(body) : undefined,
-        });
-
-        // Check if it's an SSE response
-        const contentType = response.headers.get('content-type') || '';
-
-        if (contentType.includes('text/event-stream')) {
-            // For SSE, we need to stream the response
-            const reader = response.body?.getReader();
-            if (!reader) {
-                return NextResponse.json({ error: 'No response body' }, { status: 500 });
-            }
-
-            // Collect all SSE events and return as JSON
-            const decoder = new TextDecoder();
-            let fullText = '';
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                fullText += decoder.decode(value, { stream: true });
-            }
-
-            // Parse SSE events
-            const events = fullText.split('\n\n').filter(e => e.trim());
-            const parsedEvents = events.map(event => {
-                const lines = event.split('\n');
-                const dataLine = lines.find(l => l.startsWith('data:'));
-                if (dataLine) {
-                    try {
-                        return JSON.parse(dataLine.slice(5).trim());
-                    } catch {
-                        return dataLine.slice(5).trim();
-                    }
-                }
-                return null;
-            }).filter(Boolean);
-
-            return NextResponse.json({
-                events: parsedEvents,
-                raw: fullText
-            });
-        }
-
-        // For regular JSON responses
-        const data = await response.json();
-        return NextResponse.json(data);
-
-    } catch (error: any) {
-        console.error('MCP Proxy error:', error);
-        return NextResponse.json(
-            { error: error.message || 'Proxy request failed' },
-            { status: 500 }
-        );
+      url = new URL(targetUrl);
+    } catch (error) {
+      return NextResponse.json(
+        { error: 'Invalid targetUrl', targetUrl },
+        { status: 400 }
+      );
     }
+
+    // Make request to the actual MCP server
+    const response = await fetch(url.toString(), {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: payload ? JSON.stringify(payload) : undefined,
+    });
+
+    console.log('MCP Server response:', {
+      status: response.status,
+      ok: response.ok,
+      headers: Object.fromEntries(response.headers.entries())
+    });
+
+    // Get response data
+    const data = await response.text();
+    let jsonData;
+    
+    try {
+      jsonData = JSON.parse(data);
+    } catch {
+      jsonData = data;
+    }
+
+    // Return with CORS headers
+    return NextResponse.json(
+      {
+        success: response.ok,
+        status: response.status,
+        data: jsonData,
+      },
+      {
+        status: 200, // Always return 200 for successful proxy requests
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        },
+      }
+    );
+  } catch (error: any) {
+    console.error('MCP Proxy error:', error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: error.message || 'Proxy request failed',
+        details: error.toString(),
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function GET(request: NextRequest) {
+  const targetUrl = request.nextUrl.searchParams.get('targetUrl');
+
+  if (!targetUrl) {
+    return NextResponse.json(
+      { error: 'targetUrl query parameter is required' },
+      { status: 400 }
+    );
+  }
+
+  try {
+    // Validate URL
+    const url = new URL(targetUrl);
+
+    // Make request to the actual MCP server
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json, text/event-stream',
+      },
+    });
+
+    // For SSE streams, we need to handle differently
+    if (response.headers.get('content-type')?.includes('text/event-stream')) {
+      // Stream the response
+      return new NextResponse(response.body, {
+        status: response.status,
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+          'Access-Control-Allow-Origin': '*',
+        },
+      });
+    }
+
+    // Regular JSON response
+    const data = await response.json();
+    return NextResponse.json(data, {
+      status: response.status,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+      },
+    });
+  } catch (error: any) {
+    console.error('MCP Proxy GET error:', error);
+    return NextResponse.json(
+      {
+        error: error.message || 'Proxy request failed',
+        details: error.toString(),
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    },
+  });
 }
