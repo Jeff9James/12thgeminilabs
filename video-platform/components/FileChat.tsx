@@ -2,12 +2,14 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { FileCategory } from '@/lib/fileTypes';
+import { connectToMCPServer, disconnectFromMCPServer, callMCPTool, type MCPServerConnection, type MCPTool } from '@/lib/mcp';
 
 interface Message {
     role: 'user' | 'assistant';
     content: string;
     timestamps?: string[];
     thoughtSignature?: string;
+    mcpToolsUsed?: string[];
 }
 
 interface FileChatProps {
@@ -196,6 +198,15 @@ export default function FileChat({ fileId, fileCategory, fileName }: FileChatPro
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
 
+    // MCP State
+    const [mcpServerUrl, setMcpServerUrl] = useState('https://mcp.deepwiki.com/mcp');
+    const [mcpConnection, setMcpConnection] = useState<MCPServerConnection | null>(null);
+    const [mcpConnecting, setMcpConnecting] = useState(false);
+    const [showMCPPanel, setShowMCPPanel] = useState(false);
+    const [mcpError, setMcpError] = useState<string | null>(null);
+    const [selectedMCPTool, setSelectedMCPTool] = useState<MCPTool | null>(null);
+    const [mcpToolArgs, setMcpToolArgs] = useState<Record<string, string>>({});
+
     // Load chat history from localStorage on mount
     useEffect(() => {
         const chatKey = `chat_${fileId}`;
@@ -228,6 +239,189 @@ export default function FileChat({ fileId, fileCategory, fileName }: FileChatPro
         inputRef.current?.focus();
     }, []);
 
+    // MCP Connection Handlers
+    const handleMCPConnect = async () => {
+        if (!mcpServerUrl.trim()) return;
+        setMcpConnecting(true);
+        setMcpError(null);
+        try {
+            const connection = await connectToMCPServer(mcpServerUrl.trim());
+            setMcpConnection(connection);
+        } catch (err: any) {
+            setMcpError(err.message || 'Failed to connect');
+            alert(`MCP connection failed: ${err.message}`);
+        } finally {
+            setMcpConnecting(false);
+        }
+    };
+
+    const handleMCPDisconnect = async () => {
+        if (mcpConnection) {
+            await disconnectFromMCPServer(mcpConnection);
+            setMcpConnection(null);
+            setSelectedMCPTool(null);
+            setMcpToolArgs({});
+            setMcpError(null);
+        }
+    };
+
+    // Manual MCP tool calling
+    const handleCallMCPTool = async () => {
+        if (!mcpConnection || !selectedMCPTool) return;
+        setIsLoading(true);
+        try {
+            const result = await callMCPTool(mcpConnection, selectedMCPTool.name, mcpToolArgs);
+
+            // Extract text content from MCP response
+            let responseText = '';
+            let isError = false;
+
+            if (result && typeof result === 'object') {
+                const mcpResult = result as { content?: Array<{ type: string; text?: string }>; isError?: boolean };
+
+                // Check for error
+                if (mcpResult.isError) {
+                    isError = true;
+                }
+
+                // Extract text from content array (standard MCP format)
+                if (mcpResult.content && Array.isArray(mcpResult.content)) {
+                    responseText = mcpResult.content
+                        .filter((item) => item.type === 'text' && item.text)
+                        .map((item) => item.text)
+                        .join('\n\n');
+                }
+
+                // If no text content found, try other formats
+                if (!responseText) {
+                    // Try output field (some tools use this)
+                    if ('output' in result && typeof (result as any).output === 'string') {
+                        responseText = (result as any).output;
+                    } else {
+                        // Fallback to pretty JSON
+                        responseText = '```json\n' + JSON.stringify(result, null, 2) + '\n```';
+                    }
+                }
+            } else if (typeof result === 'string') {
+                responseText = result;
+            } else {
+                responseText = String(result);
+            }
+
+            // Format the question to show tool call details
+            const argsDisplay = Object.entries(mcpToolArgs)
+                .map(([k, v]) => `${k}: "${v}"`)
+                .join(', ');
+
+            // Add tool call as a message
+            const toolCallMessage: Message = {
+                role: 'user',
+                content: `🔧 **Tool:** \`${selectedMCPTool.name}\`\n**Arguments:** ${argsDisplay || '(none)'}`
+            };
+
+            const toolResultMessage: Message = {
+                role: 'assistant',
+                content: isError ? `❌ **Error:**\n${responseText}` : responseText,
+                mcpToolsUsed: [`${selectedMCPTool.name}`]
+            };
+
+            setMessages(prev => [...prev, toolCallMessage, toolResultMessage]);
+            
+            // Update lastUsedAt timestamp
+            updateFileLastUsed(fileId);
+
+        } catch (err: any) {
+            setMcpError(err.message || 'Tool call failed');
+            const errorMessage: Message = {
+                role: 'assistant',
+                content: `❌ MCP tool call failed: ${err.message}`
+            };
+            setMessages(prev => [...prev, errorMessage]);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // Helper to call MCP tools if needed
+    const handleMCPToolsIfNeeded = async (userQuery: string): Promise<{
+        mcpResults: string[];
+        toolsUsed: string[];
+    }> => {
+        const mcpResults: string[] = [];
+        const toolsUsed: string[] = [];
+
+        if (!mcpConnection || !mcpConnection.connected) {
+            return { mcpResults, toolsUsed };
+        }
+
+        const needsDeepWiki = /github|repository|repo|documentation|wiki|moinfra|modelcontextprotocol|typescript-sdk|mcp-client-sdk/i.test(userQuery);
+        
+        if (!needsDeepWiki) {
+            return { mcpResults, toolsUsed };
+        }
+
+        const repoMatches = userQuery.match(/['"]?([a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+)['"]?/g);
+        const repos = repoMatches?.map(r => r.replace(/['"]/g, '')) || [];
+
+        if (repos.length === 0) {
+            if (/moinfra.*mcp-client-sdk|mcp-client-sdk/i.test(userQuery)) {
+                repos.push('moinfra/mcp-client-sdk');
+            }
+            if (/modelcontextprotocol.*typescript-sdk|typescript-sdk/i.test(userQuery)) {
+                repos.push('modelcontextprotocol/typescript-sdk');
+            }
+        }
+
+        for (const repo of repos.slice(0, 2)) {
+            try {
+                const structureResult = await callMCPTool(mcpConnection, 'read_wiki_structure', { repoName: repo });
+                let structureText = '';
+                if (structureResult && typeof structureResult === 'object') {
+                    const mcpResult = structureResult as { content?: Array<{ type: string; text?: string }> };
+                    if (mcpResult.content && Array.isArray(mcpResult.content)) {
+                        structureText = mcpResult.content
+                            .filter((item) => item.type === 'text' && item.text)
+                            .map((item) => item.text)
+                            .join('\n');
+                    }
+                }
+                
+                if (structureText) {
+                    mcpResults.push(`Wiki Structure for ${repo}:\n${structureText}`);
+                    toolsUsed.push(`read_wiki_structure(${repo})`);
+                }
+
+                if (/how|what|why|when|where|explain|describe|tell me|guide|tutorial/i.test(userQuery)) {
+                    const questionResult = await callMCPTool(mcpConnection, 'ask_question', {
+                        repoName: repo,
+                        question: userQuery
+                    });
+                    
+                    let answerText = '';
+                    if (questionResult && typeof questionResult === 'object') {
+                        const mcpResult = questionResult as { content?: Array<{ type: string; text?: string }> };
+                        if (mcpResult.content && Array.isArray(mcpResult.content)) {
+                            answerText = mcpResult.content
+                                .filter((item) => item.type === 'text' && item.text)
+                                .map((item) => item.text)
+                                .join('\n');
+                        }
+                    }
+                    
+                    if (answerText) {
+                        mcpResults.push(`Answer from DeepWiki about ${repo}:\n${answerText}`);
+                        toolsUsed.push(`ask_question(${repo})`);
+                    }
+                }
+
+            } catch (toolError: any) {
+                console.error(`Error calling MCP tool for ${repo}:`, toolError);
+            }
+        }
+
+        return { mcpResults, toolsUsed };
+    };
+
     const sendMessage = async () => {
         if (!input.trim() || isLoading) return;
 
@@ -242,6 +436,9 @@ export default function FileChat({ fileId, fileCategory, fileName }: FileChatPro
         setIsLoading(true);
 
         try {
+            // Check if we should use MCP tools
+            const { mcpResults, toolsUsed } = await handleMCPToolsIfNeeded(userMessage.content);
+
             // Prepare history for API (excluding current message, including thought signatures)
             const history = messages.map(msg => ({
                 role: msg.role === 'assistant' ? 'model' : 'user',
@@ -266,12 +463,19 @@ export default function FileChat({ fileId, fileCategory, fileName }: FileChatPro
                 throw new Error(data.error);
             }
 
+            // Enhance response with MCP results if available
+            let enhancedResponse = data.response;
+            if (mcpResults.length > 0) {
+                enhancedResponse += `\n\n---\n\n**Additional information from MCP server:**\n\n${mcpResults.join('\n\n---\n\n')}`;
+            }
+
             // Add assistant message
             const assistantMessage: Message = {
                 role: 'assistant',
-                content: data.response,
+                content: enhancedResponse,
                 timestamps: data.timestamps,
-                thoughtSignature: data.thoughtSignature
+                thoughtSignature: data.thoughtSignature,
+                mcpToolsUsed: toolsUsed.length > 0 ? toolsUsed : undefined
             };
 
             setMessages(prev => [...prev, assistantMessage]);
@@ -314,33 +518,187 @@ export default function FileChat({ fileId, fileCategory, fileName }: FileChatPro
             {/* Header */}
             <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 rounded-t-lg">
                 <div className="flex items-center justify-between">
-                    <div>
+                    <div className="flex-1">
                         <h2 className="text-xl font-bold flex items-center gap-2">
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                             </svg>
                             {getChatTitle(fileCategory)}
+                            {mcpConnection && (
+                                <span className="text-xs px-2 py-1 bg-green-500/90 rounded-full flex items-center gap-1 animate-pulse">
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                    </svg>
+                                    MCP
+                                </span>
+                            )}
                         </h2>
                         <p className="text-sm text-blue-100 mt-1">
                             Ask questions about {fileName}
                             {showTimestamps && '. Click timestamps to jump to moments!'}
                         </p>
                     </div>
-                    {messages.length > 0 && (
+                    <div className="flex items-center gap-2">
+                        {/* MCP Toggle Button */}
                         <button
-                            onClick={() => {
-                                if (confirm('Clear this chat session? This cannot be undone.')) {
-                                    setMessages([]);
-                                    localStorage.removeItem(`chat_${fileId}`);
-                                }
-                            }}
-                            className="px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-medium transition-colors"
-                            title="Clear chat history"
+                            onClick={() => setShowMCPPanel(!showMCPPanel)}
+                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                                mcpConnection 
+                                    ? 'bg-green-500 hover:bg-green-600' 
+                                    : 'bg-white/20 hover:bg-white/30'
+                            }`}
+                            title={mcpConnection ? 'MCP Connected' : 'Connect MCP'}
                         >
-                            Clear Chat
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
                         </button>
-                    )}
+                        
+                        {messages.length > 0 && (
+                            <button
+                                onClick={() => {
+                                    if (confirm('Clear this chat session? This cannot be undone.')) {
+                                        setMessages([]);
+                                        localStorage.removeItem(`chat_${fileId}`);
+                                    }
+                                }}
+                                className="px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-medium transition-colors"
+                                title="Clear chat history"
+                            >
+                                Clear Chat
+                            </button>
+                        )}
+                    </div>
                 </div>
+
+                {/* MCP Connection Panel */}
+                {showMCPPanel && (
+                    <div className="mt-4 bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
+                        {!mcpConnection ? (
+                            <div className="space-y-3">
+                                <input
+                                    type="text"
+                                    value={mcpServerUrl}
+                                    onChange={(e) => setMcpServerUrl(e.target.value)}
+                                    placeholder="https://mcp.deepwiki.com/mcp"
+                                    className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded text-white placeholder-white/50 text-sm"
+                                />
+                                <button
+                                    onClick={handleMCPConnect}
+                                    disabled={mcpConnecting || !mcpServerUrl.trim()}
+                                    className="w-full px-4 py-2 bg-white text-blue-600 rounded-lg font-semibold hover:bg-blue-50 transition-colors disabled:opacity-50 text-sm"
+                                >
+                                    {mcpConnecting ? 'Connecting...' : 'Connect MCP Server'}
+                                </button>
+                                
+                                {/* Error Message */}
+                                {mcpError && (
+                                    <div className="p-3 bg-red-500/20 border border-red-400 rounded-lg text-red-100 text-xs">
+                                        {mcpError}
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <div className="text-sm">
+                                        <div className="font-semibold">✓ Connected to {mcpConnection.serverInfo?.name || 'MCP Server'}</div>
+                                        <div className="text-xs text-blue-100">
+                                            {mcpConnection.tools.length} tools available
+                                            {mcpConnection.serverInfo?.version && (
+                                                <span className="ml-2">• v{mcpConnection.serverInfo.version}</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={handleMCPDisconnect}
+                                        className="px-3 py-1.5 bg-red-500/80 text-white rounded hover:bg-red-600 transition-colors text-sm"
+                                    >
+                                        Disconnect
+                                    </button>
+                                </div>
+
+                                {/* Tools List */}
+                                {mcpConnection.tools.length > 0 && (
+                                    <div>
+                                        <h4 className="text-xs font-semibold text-white mb-2 flex items-center gap-1">
+                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                                            </svg>
+                                            Available Tools
+                                        </h4>
+                                        <div className="grid grid-cols-1 gap-1 max-h-32 overflow-y-auto">
+                                            {mcpConnection.tools.map((tool) => (
+                                                <button
+                                                    key={tool.name}
+                                                    onClick={() => {
+                                                        setSelectedMCPTool(tool);
+                                                        setMcpToolArgs({});
+                                                    }}
+                                                    className={`p-2 rounded text-left transition-colors text-xs ${
+                                                        selectedMCPTool?.name === tool.name
+                                                            ? 'bg-white text-blue-700'
+                                                            : 'bg-white/10 text-white hover:bg-white/20'
+                                                    }`}
+                                                >
+                                                    <div className="font-medium">{tool.name}</div>
+                                                    {tool.description && (
+                                                        <div className="opacity-70 mt-0.5 line-clamp-1">
+                                                            {tool.description}
+                                                        </div>
+                                                    )}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Selected Tool Arguments */}
+                                {selectedMCPTool && (
+                                    <div className="bg-white/10 rounded-lg p-3 border border-white/20">
+                                        <h4 className="text-xs font-semibold text-white mb-2">
+                                            Call: {selectedMCPTool.name}
+                                        </h4>
+                                        {selectedMCPTool.inputSchema &&
+                                            typeof selectedMCPTool.inputSchema === 'object' &&
+                                            'properties' in selectedMCPTool.inputSchema && (
+                                                <div className="space-y-2 mb-3">
+                                                    {Object.entries(
+                                                        (selectedMCPTool.inputSchema as { properties: Record<string, { type?: string; description?: string }> }).properties
+                                                    ).map(([key, schema]) => (
+                                                        <div key={key}>
+                                                            <label className="text-xs text-white/70 block mb-1">
+                                                                {key}
+                                                                {schema.description && (
+                                                                    <span className="text-white/50"> - {schema.description}</span>
+                                                                )}
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                value={mcpToolArgs[key] || ''}
+                                                                onChange={(e) =>
+                                                                    setMcpToolArgs((prev) => ({ ...prev, [key]: e.target.value }))
+                                                                }
+                                                                className="w-full px-2 py-1.5 rounded border border-white/20 bg-white/10 text-white placeholder-white/40 text-xs"
+                                                                placeholder={`Enter ${key}...`}
+                                                            />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        <button
+                                            onClick={handleCallMCPTool}
+                                            disabled={isLoading}
+                                            className="w-full px-3 py-1.5 bg-white text-blue-600 rounded font-semibold hover:bg-blue-50 transition-colors disabled:opacity-50 text-xs"
+                                        >
+                                            {isLoading ? 'Calling...' : 'Call Tool'}
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* Messages Area */}
@@ -411,6 +769,23 @@ export default function FileChat({ fileId, fileCategory, fileName }: FileChatPro
                                             >
                                                 {ts}
                                             </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Show MCP tools used */}
+                            {msg.role === 'assistant' && msg.mcpToolsUsed && msg.mcpToolsUsed.length > 0 && (
+                                <div className="mt-2 pt-2 border-t border-gray-300">
+                                    <p className="text-xs text-gray-600 mb-1">MCP Tools Used:</p>
+                                    <div className="flex flex-wrap gap-1">
+                                        {msg.mcpToolsUsed.map((tool, i) => (
+                                            <span
+                                                key={i}
+                                                className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-medium"
+                                            >
+                                                ✓ {tool}
+                                            </span>
                                         ))}
                                     </div>
                                 </div>
