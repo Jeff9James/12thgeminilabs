@@ -191,6 +191,24 @@ export default function ChatPage() {
   // Available file types
   const fileTypes = ['video', 'audio', 'image', 'pdf', 'document', 'spreadsheet', 'text'];
 
+  // Save unified chat history to localStorage whenever it changes
+  React.useEffect(() => {
+    if (chatHistory.length > 0) {
+      const sessionData = {
+        history: chatHistory,
+        lastUpdated: new Date().toISOString(),
+        fileCount: allFiles.length,
+        mcpConnected: mcpConnection !== null,
+      };
+      localStorage.setItem('unified_chat_history', JSON.stringify(sessionData.history));
+      localStorage.setItem('unified_chat_metadata', JSON.stringify({
+        lastUpdated: sessionData.lastUpdated,
+        fileCount: sessionData.fileCount,
+        mcpConnected: sessionData.mcpConnected,
+      }));
+    }
+  }, [chatHistory, allFiles, mcpConnection]);
+
   // Load all files on mount so filters are available before search
   React.useEffect(() => {
     const storedFiles = localStorage.getItem('uploadedFiles');
@@ -1006,6 +1024,9 @@ export default function ChatPage() {
                   setAiResponse(null);
                   setRawResults([]);
                   setQuery('');
+                  // Clear localStorage for this session
+                  localStorage.removeItem('unified_chat_history');
+                  localStorage.removeItem('unified_chat_metadata');
                 }}
                 className="flex items-center gap-2 px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors font-medium text-sm"
               >
@@ -1306,6 +1327,9 @@ export default function ChatPage() {
                     setAiResponse(null);
                     setRawResults([]);
                     setQuery('');
+                    // Clear localStorage for this session
+                    localStorage.removeItem('unified_chat_history');
+                    localStorage.removeItem('unified_chat_metadata');
                   }}
                   className="flex items-center gap-2 px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors font-medium text-sm"
                 >

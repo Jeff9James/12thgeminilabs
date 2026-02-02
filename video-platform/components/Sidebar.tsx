@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { FileText, Search, Sparkles, Menu, X, MessageCircle } from 'lucide-react';
+import { FileText, Search, Sparkles, Menu, X, MessageCircle, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -22,6 +22,11 @@ const navItems: Array<{
       name: 'Chat',
       href: '/chat',
       icon: MessageCircle,
+    },
+    {
+      name: 'History',
+      href: '/history',
+      icon: Clock,
     },
     {
       name: 'Search',
