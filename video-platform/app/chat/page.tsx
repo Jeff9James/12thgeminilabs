@@ -496,23 +496,31 @@ export default function ChatPage() {
         setRawResults(enrichedResults);
 
         // Set AI response and update chat history for follow-up support
-        if (data.aiResponse) {
+        if (data.aiResponse || mcpResults.length > 0) {
           // If we have MCP results, enhance the AI response
-          let enhancedAnswer = data.aiResponse.answer;
+          let enhancedAnswer = '';
+          
+          if (data.aiResponse) {
+            enhancedAnswer = data.aiResponse.answer;
+          } else if (mcpResults.length > 0) {
+            // No file results, but we have MCP results
+            enhancedAnswer = `I couldn't find relevant information in your uploaded files for this query, but I retrieved information from the connected MCP server:`;
+          }
+
           if (mcpResults.length > 0) {
-            enhancedAnswer = `${data.aiResponse.answer}\n\n---\n\n**Additional information from MCP server:**\n\n${mcpResults.join('\n\n---\n\n')}`;
+            enhancedAnswer += `\n\n---\n\n**Information from MCP server:**\n\n${mcpResults.join('\n\n---\n\n')}`;
           }
 
           setAiResponse({
             answer: enhancedAnswer,
-            citations: [...(data.aiResponse.citations || []), ...toolsUsed]
+            citations: [...(data.aiResponse?.citations || []), ...toolsUsed]
           });
 
           // Add to chat history with MCP tools used
           const newMessage: ChatMessage = {
             question: query.trim(),
             answer: enhancedAnswer,
-            citations: [...(data.aiResponse.citations || []), ...toolsUsed],
+            citations: [...(data.aiResponse?.citations || []), ...toolsUsed],
             timestamp: new Date(),
             mcpToolsUsed: toolsUsed.length > 0 ? toolsUsed : undefined
           };
