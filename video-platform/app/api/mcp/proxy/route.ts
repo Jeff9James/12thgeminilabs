@@ -47,17 +47,43 @@ export async function POST(request: NextRequest) {
     console.log('MCP Server response:', {
       status: response.status,
       ok: response.ok,
+      contentType: response.headers.get('content-type'),
       headers: Object.fromEntries(response.headers.entries())
     });
 
-    // Get response data
+    // Check if response is SSE format
+    const contentType = response.headers.get('content-type') || '';
     const data = await response.text();
+    
     let jsonData;
     
-    try {
-      jsonData = JSON.parse(data);
-    } catch {
-      jsonData = data;
+    if (contentType.includes('text/event-stream') || data.startsWith('event:') || data.startsWith('data:')) {
+      // Parse SSE format: extract JSON from "data: {...}" lines
+      console.log('Parsing SSE response:', data.substring(0, 200));
+      
+      const lines = data.split('\n');
+      const dataLines = lines.filter(line => line.startsWith('data: '));
+      
+      if (dataLines.length > 0) {
+        // Get the first data line and parse it
+        const dataContent = dataLines[0].substring(6); // Remove "data: " prefix
+        try {
+          jsonData = JSON.parse(dataContent);
+          console.log('Parsed SSE data:', jsonData);
+        } catch (e) {
+          console.error('Failed to parse SSE data:', e);
+          jsonData = dataContent;
+        }
+      } else {
+        jsonData = data;
+      }
+    } else {
+      // Regular JSON response
+      try {
+        jsonData = JSON.parse(data);
+      } catch {
+        jsonData = data;
+      }
     }
 
     // Return with CORS headers

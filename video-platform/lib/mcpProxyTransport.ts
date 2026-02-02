@@ -58,18 +58,26 @@ export class MCPProxyTransport implements Transport {
 
       const result = await response.json();
       
-      if (result.success && result.data) {
-        // Handle the response
-        if (this.onmessage) {
-          this.onmessage(result.data);
-        }
-        
-        // Extract session ID if present
-        if (result.data._meta?.sessionId) {
-          this._sessionId = result.data._meta.sessionId;
+      if (result.success) {
+        if (result.data) {
+          // Handle the response
+          if (this.onmessage) {
+            this.onmessage(result.data);
+          }
+          
+          // Extract session ID if present
+          if (result.data._meta?.sessionId) {
+            this._sessionId = result.data._meta.sessionId;
+          }
+        } else if (result.status === 202) {
+          // 202 Accepted - request acknowledged but no response yet
+          // This is normal for some MCP servers, just wait
+          console.log('MCPProxyTransport: Request accepted (202), waiting for response...');
+        } else {
+          console.warn('MCPProxyTransport: No data in response:', result);
         }
       } else {
-        throw new Error(`Proxy returned unsuccessful result: ${JSON.stringify(result)}`);
+        throw new Error(`Proxy returned error: ${JSON.stringify(result)}`);
       }
     } catch (error: any) {
       console.error('MCPProxyTransport: Send error', error);
