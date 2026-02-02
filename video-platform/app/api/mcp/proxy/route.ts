@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
       method,
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
+        'Accept': 'application/json, text/event-stream',
       },
       body: payload ? JSON.stringify(payload) : undefined,
     });
