@@ -454,20 +454,15 @@ export default function ChatPage() {
 
       setSearchStatus(`Analyzing ${searchableFiles.length} file${searchableFiles.length > 1 ? 's' : ''}${mcpResults.length > 0 ? ' and MCP data' : ''}...`);
 
-      // Prepare query with MCP context if available
-      let enhancedQuery = query.trim();
-      if (mcpResults.length > 0) {
-        enhancedQuery = `${query.trim()}\n\nAdditional context from MCP server:\n${mcpResults.join('\n\n')}`;
-      }
-
       // Call search API with mode=chat and chat history for follow-up support
+      // Do NOT send MCP results in query to avoid JSON parsing issues
       const response = await fetch('/api/search', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          query: enhancedQuery,
+          query: query.trim(), // Original query only
           mode: 'chat',
           history: chatHistory,
           videos: searchableFiles.map((f: any) => ({
@@ -502,12 +497,21 @@ export default function ChatPage() {
 
         // Set AI response and update chat history for follow-up support
         if (data.aiResponse) {
-          setAiResponse(data.aiResponse);
+          // If we have MCP results, enhance the AI response
+          let enhancedAnswer = data.aiResponse.answer;
+          if (mcpResults.length > 0) {
+            enhancedAnswer = `${data.aiResponse.answer}\n\n---\n\n**Additional information from MCP server:**\n\n${mcpResults.join('\n\n---\n\n')}`;
+          }
+
+          setAiResponse({
+            answer: enhancedAnswer,
+            citations: [...(data.aiResponse.citations || []), ...toolsUsed]
+          });
 
           // Add to chat history with MCP tools used
           const newMessage: ChatMessage = {
             question: query.trim(),
-            answer: data.aiResponse.answer,
+            answer: enhancedAnswer,
             citations: [...(data.aiResponse.citations || []), ...toolsUsed],
             timestamp: new Date(),
             mcpToolsUsed: toolsUsed.length > 0 ? toolsUsed : undefined
