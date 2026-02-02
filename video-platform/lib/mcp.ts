@@ -1,5 +1,7 @@
 'use client';
 
+import { MCPClient } from './mcpClient';
+
 export interface MCPTool {
     name: string;
     description?: string;
@@ -22,120 +24,44 @@ export interface MCPServerConnection {
     tools: MCPTool[];
     resources: MCPResource[];
     connected: boolean;
+    client: MCPClient; // Internal client instance
 }
 
 /**
- * Send a JSON-RPC request through our proxy API
- */
-async function sendViaProxy(serverUrl: string, method: string, params?: object): Promise<any> {
-    const response = await fetch('/api/mcp/proxy', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            serverUrl,
-            method: 'POST',
-            body: {
-                jsonrpc: '2.0',
-                id: Date.now(),
-                method,
-                params: params || {},
-            },
-        }),
-    });
-
-    if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Request failed');
-    }
-
-    const data = await response.json();
-
-    // Handle SSE event responses
-    if (data.events && Array.isArray(data.events)) {
-        // Return the last event which should be the result
-        const resultEvent = data.events.find((e: any) => e.result !== undefined);
-        if (resultEvent) {
-            return resultEvent.result;
-        }
-        return data.events[data.events.length - 1];
-    }
-
-    // Handle direct JSON-RPC response
-    if (data.result !== undefined) {
-        return data.result;
-    }
-
-    if (data.error) {
-        throw new Error(data.error.message || 'JSON-RPC error');
-    }
-
-    return data;
-}
-
-/**
- * Create and connect an MCP client to a remote server URL via our proxy.
+ * Create and connect an MCP client to a remote server URL via proxy.
  */
 export async function connectToMCPServer(serverUrl: string): Promise<MCPServerConnection> {
-    // Initialize connection
-    const initResult = await sendViaProxy(serverUrl, 'initialize', {
-        protocolVersion: '2024-11-05',
-        capabilities: {},
-        clientInfo: {
-            name: 'video-platform-chat',
-            version: '1.0.0',
-        },
+    console.log('Connecting to MCP server:', serverUrl);
+    
+    // Create client with proxy enabled
+    const client = new MCPClient({
+        serverUrl,
+        useProxy: true, // Always use proxy for external servers
+        transport: 'streamable-http'
     });
 
-    // Send initialized notification (fire and forget)
-    try {
-        await sendViaProxy(serverUrl, 'notifications/initialized', {});
-    } catch (e) {
-        // Notifications may not return a response
-    }
+    // Connect
+    await client.connect();
 
-    // Fetch tools
-    const tools: MCPTool[] = [];
-    try {
-        const toolsResult = await sendViaProxy(serverUrl, 'tools/list', {});
-        if (toolsResult?.tools) {
-            tools.push(
-                ...toolsResult.tools.map((t: any) => ({
-                    name: t.name,
-                    description: t.description,
-                    inputSchema: t.inputSchema,
-                }))
-            );
-        }
-    } catch (e) {
-        console.warn('Failed to list tools:', e);
-    }
+    // Get capabilities
+    const tools = client.getTools();
+    const resources = client.getResources();
+    const serverInfo = client.getServerInfo();
 
-    // Fetch resources
-    const resources: MCPResource[] = [];
-    try {
-        const resourcesResult = await sendViaProxy(serverUrl, 'resources/list', {});
-        if (resourcesResult?.resources) {
-            resources.push(
-                ...resourcesResult.resources.map((r: any) => ({
-                    uri: r.uri,
-                    name: r.name,
-                    description: r.description,
-                    mimeType: r.mimeType,
-                }))
-            );
-        }
-    } catch (e) {
-        console.warn('Failed to list resources:', e);
-    }
+    console.log('MCP connection established:', {
+        serverUrl,
+        tools: tools.length,
+        resources: resources.length,
+        serverInfo
+    });
 
     return {
         serverUrl,
-        serverInfo: initResult?.serverInfo || { name: 'MCP Server' },
+        serverInfo: serverInfo || { name: 'MCP Server' },
         tools,
         resources,
         connected: true,
+        client // Store client for later use
     };
 }
 
@@ -146,16 +72,17 @@ export async function callMCPTool(
     connection: MCPServerConnection,
     toolName: string,
     args: Record<string, unknown>
-): Promise<unknown> {
-    if (!connection.connected) {
+): Promise<any> {
+    if (!connection.connected || !connection.client) {
         throw new Error('Not connected to MCP server');
     }
 
-    const result = await sendViaProxy(connection.serverUrl, 'tools/call', {
-        name: toolName,
-        arguments: args,
-    });
-
+    console.log('Calling MCP tool:', toolName, args);
+    
+    const result = await connection.client.callTool(toolName, args);
+    
+    console.log('MCP tool result:', result);
+    
     return result;
 }
 
@@ -165,12 +92,17 @@ export async function callMCPTool(
 export async function readMCPResource(
     connection: MCPServerConnection,
     uri: string
-): Promise<unknown> {
-    if (!connection.connected) {
+): Promise<any> {
+    if (!connection.connected || !connection.client) {
         throw new Error('Not connected to MCP server');
     }
 
-    const result = await sendViaProxy(connection.serverUrl, 'resources/read', { uri });
+    console.log('Reading MCP resource:', uri);
+    
+    const result = await connection.client.readResource(uri);
+    
+    console.log('MCP resource result:', result);
+    
     return result;
 }
 
@@ -180,6 +112,11 @@ export async function readMCPResource(
 export async function disconnectFromMCPServer(
     connection: MCPServerConnection
 ): Promise<void> {
-    // With proxy-based approach, we just mark as disconnected
+    console.log('Disconnecting from MCP server');
+    
+    if (connection.client) {
+        await connection.client.disconnect();
+    }
+    
     connection.connected = false;
 }
