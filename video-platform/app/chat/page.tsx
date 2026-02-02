@@ -58,6 +58,7 @@ interface ChatMessage {
   answer: string;
   citations: string[];
   timestamp: Date;
+  mcpToolsUsed?: string[];
 }
 
 type SortOption = 'relevance' | 'uploadedAsc' | 'uploadedDesc' | 'usedAsc' | 'usedDesc' | 'nameAsc' | 'nameDesc';
