@@ -265,6 +265,121 @@ export default function ChatPage() {
     }
   }, [rawResults, filters, sortBy]);
 
+  // Helper function to detect if query needs MCP tools and call them
+  const handleMCPToolsIfNeeded = async (userQuery: string): Promise<{
+    mcpResults: string[];
+    toolsUsed: string[];
+  }> => {
+    const mcpResults: string[] = [];
+    const toolsUsed: string[] = [];
+
+    // Only attempt MCP if connected
+    if (!mcpConnection || !mcpConnection.connected) {
+      return { mcpResults, toolsUsed };
+    }
+
+    // Check if query mentions repos or GitHub-related terms that DeepWiki can handle
+    const needsDeepWiki = /github|repository|repo|documentation|wiki|moinfra|modelcontextprotocol|typescript-sdk|mcp-client-sdk/i.test(userQuery);
+    
+    if (!needsDeepWiki) {
+      return { mcpResults, toolsUsed };
+    }
+
+    setSearchStatus('Using MCP tools for GitHub repositories...');
+
+    // Extract repository names from query
+    const repoMatches = userQuery.match(/['"]?([a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+)['"]?/g);
+    const repos = repoMatches?.map(r => r.replace(/['"]/g, '')) || [];
+
+    // If no specific repos found but mentions specific known repos, add them
+    if (repos.length === 0) {
+      if (/moinfra.*mcp-client-sdk|mcp-client-sdk/i.test(userQuery)) {
+        repos.push('moinfra/mcp-client-sdk');
+      }
+      if (/modelcontextprotocol.*typescript-sdk|typescript-sdk/i.test(userQuery)) {
+        repos.push('modelcontextprotocol/typescript-sdk');
+      }
+    }
+
+    // Use MCP tools for each repository
+    for (const repo of repos.slice(0, 3)) { // Limit to 3 repos to avoid timeouts
+      try {
+        // First get the wiki structure
+        const structureResult = await callMCPTool(mcpConnection, 'read_wiki_structure', {
+          repoName: repo
+        });
+        
+        let structureText = '';
+        if (structureResult && typeof structureResult === 'object') {
+          const mcpResult = structureResult as { content?: Array<{ type: string; text?: string }> };
+          if (mcpResult.content && Array.isArray(mcpResult.content)) {
+            structureText = mcpResult.content
+              .filter((item) => item.type === 'text' && item.text)
+              .map((item) => item.text)
+              .join('\n');
+          }
+        }
+        
+        if (structureText) {
+          mcpResults.push(`Wiki Structure for ${repo}:\n${structureText}`);
+          toolsUsed.push(`read_wiki_structure(${repo})`);
+        }
+
+        // Then read the full wiki contents
+        const contentsResult = await callMCPTool(mcpConnection, 'read_wiki_contents', {
+          repoName: repo
+        });
+        
+        let contentsText = '';
+        if (contentsResult && typeof contentsResult === 'object') {
+          const mcpResult = contentsResult as { content?: Array<{ type: string; text?: string }> };
+          if (mcpResult.content && Array.isArray(mcpResult.content)) {
+            contentsText = mcpResult.content
+              .filter((item) => item.type === 'text' && item.text)
+              .map((item) => item.text)
+              .join('\n');
+          }
+        }
+        
+        if (contentsText) {
+          mcpResults.push(`Wiki Contents for ${repo}:\n${contentsText}`);
+          toolsUsed.push(`read_wiki_contents(${repo})`);
+        }
+
+        // If query is asking a specific question, use ask_question tool
+        if (/how|what|why|when|where|explain|describe|tell me|guide|tutorial/i.test(userQuery)) {
+          const questionResult = await callMCPTool(mcpConnection, 'ask_question', {
+            repoName: repo,
+            question: userQuery
+          });
+          
+          let answerText = '';
+          if (questionResult && typeof questionResult === 'object') {
+            const mcpResult = questionResult as { content?: Array<{ type: string; text?: string }> };
+            if (mcpResult.content && Array.isArray(mcpResult.content)) {
+              answerText = mcpResult.content
+                .filter((item) => item.type === 'text' && item.text)
+                .map((item) => item.text)
+                .join('\n');
+            }
+          }
+          
+          if (answerText) {
+            mcpResults.push(`Answer from DeepWiki about ${repo}:\n${answerText}`);
+            toolsUsed.push(`ask_question(${repo})`);
+          }
+        }
+
+      } catch (toolError: any) {
+        console.error(`Error calling MCP tool for ${repo}:`, toolError);
+        // Don't fail the whole request, just log and continue
+        mcpResults.push(`Note: Could not fetch information for ${repo} via MCP`);
+      }
+    }
+
+    return { mcpResults, toolsUsed };
+  };
+
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!query.trim()) return;
@@ -275,8 +390,39 @@ export default function ChatPage() {
     setSearchStatus('Preparing chat...');
 
     try {
-      if (allFiles.length === 0) {
-        alert('No files found. Please upload some files first.');
+      // First, check if we should use MCP tools
+      const { mcpResults, toolsUsed } = await handleMCPToolsIfNeeded(query.trim());
+
+      if (allFiles.length === 0 && mcpResults.length === 0) {
+        alert('No files found and no MCP results. Please upload some files or connect to an MCP server.');
+        setIsSearching(false);
+        return;
+      }
+
+      // If we have MCP results and no files, create a direct response
+      if (mcpResults.length > 0 && allFiles.length === 0) {
+        // Create AI response from MCP results only
+        setSearchStatus('Generating response from MCP data...');
+        
+        const combinedMCPData = mcpResults.join('\n\n---\n\n');
+        const aiAnswer = `Based on the information retrieved from the connected MCP server:\n\n${combinedMCPData}`;
+        
+        setAiResponse({
+          answer: aiAnswer,
+          citations: toolsUsed
+        });
+
+        const newMessage: ChatMessage = {
+          question: query.trim(),
+          answer: aiAnswer,
+          citations: toolsUsed,
+          timestamp: new Date(),
+          mcpToolsUsed: toolsUsed
+        };
+        setChatHistory(prev => [...prev, newMessage]);
+        
+        setSearchStatus('Chat complete');
+        setTimeout(() => setSearchStatus(''), 2000);
         setIsSearching(false);
         return;
       }
@@ -299,13 +445,19 @@ export default function ChatPage() {
         searchableFiles = searchableFiles.filter(f => !filters.excludeFiles.includes(f.id));
       }
 
-      if (searchableFiles.length === 0) {
+      if (searchableFiles.length === 0 && mcpResults.length === 0) {
         alert('No files available for chat with current filters. Please adjust your filters or upload more files.');
         setIsSearching(false);
         return;
       }
 
-      setSearchStatus(`Analyzing ${searchableFiles.length} file${searchableFiles.length > 1 ? 's' : ''}...`);
+      setSearchStatus(`Analyzing ${searchableFiles.length} file${searchableFiles.length > 1 ? 's' : ''}${mcpResults.length > 0 ? ' and MCP data' : ''}...`);
+
+      // Prepare query with MCP context if available
+      let enhancedQuery = query.trim();
+      if (mcpResults.length > 0) {
+        enhancedQuery = `${query.trim()}\n\nAdditional context from MCP server:\n${mcpResults.join('\n\n')}`;
+      }
 
       // Call search API with mode=chat and chat history for follow-up support
       const response = await fetch('/api/search', {
@@ -314,7 +466,7 @@ export default function ChatPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          query: query.trim(),
+          query: enhancedQuery,
           mode: 'chat',
           history: chatHistory,
           videos: searchableFiles.map((f: any) => ({
@@ -351,12 +503,13 @@ export default function ChatPage() {
         if (data.aiResponse) {
           setAiResponse(data.aiResponse);
 
-          // Add to chat history
+          // Add to chat history with MCP tools used
           const newMessage: ChatMessage = {
             question: query.trim(),
             answer: data.aiResponse.answer,
-            citations: data.aiResponse.citations || [],
+            citations: [...(data.aiResponse.citations || []), ...toolsUsed],
             timestamp: new Date(),
+            mcpToolsUsed: toolsUsed.length > 0 ? toolsUsed : undefined
           };
           setChatHistory(prev => [...prev, newMessage]);
         }

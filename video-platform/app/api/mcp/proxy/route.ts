@@ -109,8 +109,16 @@ export async function POST(request: NextRequest) {
         success: false,
         error: error.message || 'Proxy request failed',
         details: error.toString(),
+        data: null
       },
-      { status: 500 }
+      { 
+        status: 500,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        },
+      }
     );
   }
 }
