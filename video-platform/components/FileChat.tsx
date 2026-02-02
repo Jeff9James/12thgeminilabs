@@ -542,16 +542,17 @@ export default function FileChat({ fileId, fileCategory, fileName }: FileChatPro
                         {/* MCP Toggle Button */}
                         <button
                             onClick={() => setShowMCPPanel(!showMCPPanel)}
-                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
                                 mcpConnection 
-                                    ? 'bg-green-500 hover:bg-green-600' 
-                                    : 'bg-white/20 hover:bg-white/30'
+                                    ? 'bg-green-500 hover:bg-green-600 text-white' 
+                                    : 'bg-white/20 hover:bg-white/30 text-white'
                             }`}
-                            title={mcpConnection ? 'MCP Connected' : 'Connect MCP'}
+                            title={mcpConnection ? 'MCP Connected' : 'Connect MCP Server'}
                         >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                             </svg>
+                            <span>MCP</span>
                         </button>
                         
                         {messages.length > 0 && (
