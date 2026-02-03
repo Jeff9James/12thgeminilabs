@@ -317,9 +317,13 @@ export default function AnalyzePage() {
       existingFiles.push(fileMetadata);
       localStorage.setItem('uploadedFiles', JSON.stringify(existingFiles));
       setUploadProgress(100);
+      setUploadStatus('Upload complete! Redirecting to analysis...');
 
-      // Redirect to file detail page
-      router.push(`/files/${fileId}`);
+      // Wait a moment to show completion message
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Redirect to file detail page with auto-analyze flag
+      router.push(`/files/${fileId}?autoAnalyze=true`);
     } catch (error) {
       console.error('Upload error:', error);
       alert(`Upload failed: ${(error as Error).message}\n\nPlease try again or use a smaller file.`);

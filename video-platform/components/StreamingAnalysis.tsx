@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, forwardRef, useImperativeHandle } from 'react';
 import { FileCategory } from '@/lib/fileTypes';
 
 interface ParsedAnalysis {
@@ -88,12 +88,22 @@ function updateFileLastUsed(fileId: string) {
   }
 }
 
-export default function StreamingAnalysis({ fileId, category, onAnalysisComplete }: StreamingAnalysisProps) {
+export interface StreamingAnalysisHandle {
+  startAnalysis: () => void;
+}
+
+const StreamingAnalysis = forwardRef<StreamingAnalysisHandle, StreamingAnalysisProps>(
+  ({ fileId, category, onAnalysisComplete }, ref) => {
   const [analyzing, setAnalyzing] = useState(false);
   const [rawAnalysis, setRawAnalysis] = useState('');
   const [parsedAnalysis, setParsedAnalysis] = useState<ParsedAnalysis | null>(null);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
+
+  // Expose startAnalysis function to parent via ref
+  useImperativeHandle(ref, () => ({
+    startAnalysis
+  }));
 
   const getAnalyzeButtonText = () => {
     if (analyzing) return 'Analyzing...';
@@ -429,4 +439,8 @@ export default function StreamingAnalysis({ fileId, category, onAnalysisComplete
       {renderAnalysisResults()}
     </div>
   );
-}
+});
+
+StreamingAnalysis.displayName = 'StreamingAnalysis';
+
+export default StreamingAnalysis;

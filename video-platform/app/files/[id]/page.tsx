@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import StreamingAnalysis from '@/components/StreamingAnalysis';
+import { useEffect, useState, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
+import StreamingAnalysis, { StreamingAnalysisHandle } from '@/components/StreamingAnalysis';
 import FileChat from '@/components/FileChat';
 import { FilePreview, FileTypeBadge, FileInfoCard } from '@/components/FilePreview';
 import Link from 'next/link';
@@ -35,11 +36,13 @@ interface FileData {
 }
 
 export default function FilePage({ params }: { params: Promise<{ id: string }> }) {
+    const searchParams = useSearchParams();
     const [file, setFile] = useState<FileData | null>(null);
     const [analysis, setAnalysis] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [id, setId] = useState<string>('');
     const [activeSection, setActiveSection] = useState<'analysis' | 'chat' | null>(null);
+    const streamingAnalysisRef = useRef<StreamingAnalysisHandle>(null);
 
     useEffect(() => {
         params.then(async p => {
@@ -69,9 +72,19 @@ export default function FilePage({ params }: { params: Promise<{ id: string }> }
                         });
                         setAnalysis(data.data.analysis);
 
-                        // Default to chat view (always available), or analysis if it exists
+                        // Default to analysis view and auto-start if autoAnalyze param is present
+                        const shouldAutoAnalyze = searchParams.get('autoAnalyze') === 'true';
+                        
                         if (data.data.analysis) {
                             setActiveSection('analysis');
+                        } else if (shouldAutoAnalyze) {
+                            setActiveSection('analysis');
+                            // Trigger analysis after a short delay to ensure component is mounted
+                            setTimeout(() => {
+                                if (streamingAnalysisRef.current) {
+                                    streamingAnalysisRef.current.startAnalysis();
+                                }
+                            }, 500);
                         } else {
                             setActiveSection('chat');
                         }
@@ -123,13 +136,27 @@ export default function FilePage({ params }: { params: Promise<{ id: string }> }
                             size: localFile.size,
                             createdAt: uploadDate || new Date().toISOString(),
                         });
-                        setActiveSection('chat');
+                        
+                        // Check for auto-analyze param
+                        const shouldAutoAnalyze = searchParams.get('autoAnalyze') === 'true';
+                        
+                        if (shouldAutoAnalyze) {
+                            setActiveSection('analysis');
+                            // Trigger analysis after a short delay to ensure component is mounted
+                            setTimeout(() => {
+                                if (streamingAnalysisRef.current) {
+                                    streamingAnalysisRef.current.startAnalysis();
+                                }
+                            }, 500);
+                        } else {
+                            setActiveSection('chat');
+                        }
                     }
 
                     setLoading(false);
                 });
         });
-    }, [params]);
+    }, [params, searchParams]);
 
     // Handle timestamp from URL hash (e.g., #t=123) - only for video files
     useEffect(() => {
@@ -292,7 +319,7 @@ export default function FilePage({ params }: { params: Promise<{ id: string }> }
                             }`}
                     >
                         <Sparkles className="w-5 h-5" />
-                        Analyze {getCategoryDisplayName(file.category)}
+                        {analysis ? `See Analysis` : `Analyze ${getCategoryDisplayName(file.category)}`}
                     </button>
 
                     <button
@@ -440,6 +467,7 @@ export default function FilePage({ params }: { params: Promise<{ id: string }> }
                                 </div>
                             ) : (
                                 <StreamingAnalysis
+                                    ref={streamingAnalysisRef}
                                     fileId={id}
                                     category={file.category}
                                     onAnalysisComplete={(completedAnalysis) => {
