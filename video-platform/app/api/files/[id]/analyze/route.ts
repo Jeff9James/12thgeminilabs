@@ -56,25 +56,63 @@ export async function POST(
                     );
                 }
 
-                // Save complete analysis
+                // Save complete analysis to both KV cache AND file metadata
+                let analysisData: any;
                 try {
                     const parsed = JSON.parse(fullResponse);
-                    await saveAnalysis(fileId, {
+                    analysisData = {
                         fileId,
                         category,
                         ...parsed,
                         createdAt: new Date().toISOString()
-                    });
+                    };
+                    
+                    // Save to analysis cache (temporary, 48h)
+                    await saveAnalysis(fileId, analysisData);
+                    
+                    // Save to file metadata (permanent) for token cost reduction
+                    const fileMetadata = await getFile(fileId);
+                    if (fileMetadata) {
+                        await saveFile(fileId, {
+                            ...fileMetadata,
+                            analysis: {
+                                summary: parsed.summary || '',
+                                keyPoints: parsed.keyPoints || [],
+                                scenes: parsed.scenes,
+                                transcription: parsed.transcription,
+                                objects: parsed.objects,
+                                colors: parsed.colors,
+                                textContent: parsed.textContent || parsed.ocrText,
+                                createdAt: new Date().toISOString(),
+                                ...parsed // Include all other fields
+                            }
+                        });
+                    }
                 } catch (e) {
                     console.error('Failed to parse analysis:', e);
                     // Save raw response if JSON parsing fails
-                    await saveAnalysis(fileId, {
+                    analysisData = {
                         fileId,
                         category,
                         summary: fullResponse,
                         keyPoints: [],
                         createdAt: new Date().toISOString()
-                    });
+                    };
+                    
+                    await saveAnalysis(fileId, analysisData);
+                    
+                    // Also save to file metadata
+                    const fileMetadata = await getFile(fileId);
+                    if (fileMetadata) {
+                        await saveFile(fileId, {
+                            ...fileMetadata,
+                            analysis: {
+                                summary: fullResponse,
+                                keyPoints: [],
+                                createdAt: new Date().toISOString()
+                            }
+                        });
+                    }
                 }
 
                 controller.enqueue(

@@ -76,7 +76,7 @@ async function callGeminiWithRetry<T>(
 
 export async function POST(request: NextRequest) {
   try {
-    const { query, videos, mode = 'search', history = [], color } = await request.json();
+    const { query, videos, mode = 'search', history = [], color, useMetadata = true } = await request.json();
 
     if (!query || !videos || videos.length === 0) {
       return NextResponse.json({
@@ -108,9 +108,15 @@ export async function POST(request: NextRequest) {
 
     // Process all videos in PARALLEL for speed (same for both modes)
     const searchPromises = videos.map(async (video: any) => {
-      if (!video.geminiFileUri) return [];
-
       try {
+        // If useMetadata is true and video has analysis, search metadata only (faster, cheaper)
+        if (useMetadata && video.analysis) {
+          return searchInMetadata(video, query, color);
+        }
+        
+        // Otherwise, use full file search (detailed mode)
+        if (!video.geminiFileUri) return [];
+
         // Use Gemini 3 Flash with LOW THINKING for fastest response
         const model = genAI.getGenerativeModel({
           model: 'gemini-3-flash-preview',
@@ -228,7 +234,8 @@ export async function POST(request: NextRequest) {
       results,
       aiResponse,
       count: results.length,
-      cached: false
+      cached: false,
+      usedMetadata: useMetadata
     });
 
   } catch (error: any) {
@@ -237,6 +244,115 @@ export async function POST(request: NextRequest) {
       error: error.message || 'Search failed'
     }, { status: 500 });
   }
+}
+
+// Search in metadata only (fast, cheap - no AI token cost for file processing)
+async function searchInMetadata(video: any, query: string, color?: string): Promise<SearchResult[]> {
+  const analysis = video.analysis;
+  if (!analysis) return [];
+
+  const category = video.category || 'video';
+  const isVideoOrAudio = category === 'video' || category === 'audio';
+
+  // Build searchable text from metadata
+  let searchableText = `${analysis.summary || ''}\n`;
+  if (analysis.keyPoints) {
+    searchableText += analysis.keyPoints.join('\n') + '\n';
+  }
+  if (analysis.transcription) {
+    searchableText += analysis.transcription + '\n';
+  }
+  if (analysis.textContent) {
+    searchableText += analysis.textContent + '\n';
+  }
+
+  // Simple keyword matching for metadata search
+  const queryLower = query.toLowerCase();
+  const keywords = queryLower.split(/\s+/).filter(k => k.length > 2);
+  
+  let relevanceScore = 0;
+  let matchedContent = '';
+  
+  // Check summary
+  if (analysis.summary && analysis.summary.toLowerCase().includes(queryLower)) {
+    relevanceScore += 40;
+    matchedContent = analysis.summary;
+  }
+  
+  // Check key points
+  if (analysis.keyPoints) {
+    for (const point of analysis.keyPoints) {
+      if (point.toLowerCase().includes(queryLower)) {
+        relevanceScore += 30;
+        if (!matchedContent) matchedContent = point;
+      }
+    }
+  }
+  
+  // Check transcription
+  if (analysis.transcription && analysis.transcription.toLowerCase().includes(queryLower)) {
+    relevanceScore += 20;
+    if (!matchedContent) matchedContent = analysis.transcription.substring(0, 200);
+  }
+  
+  // Check individual keywords
+  keywords.forEach(keyword => {
+    const matches = (searchableText.toLowerCase().match(new RegExp(keyword, 'g')) || []).length;
+    relevanceScore += matches * 5;
+  });
+
+  // Color matching for images
+  if (color && analysis.colors) {
+    const colorMatches = analysis.colors.some((c: string) => 
+      c.toLowerCase().includes(color.toLowerCase()) || 
+      color.toLowerCase().includes(c.toLowerCase())
+    );
+    if (colorMatches) {
+      relevanceScore += 30;
+      if (!matchedContent) matchedContent = `Contains color: ${color}`;
+    }
+  }
+
+  // Object matching for images
+  if (analysis.objects) {
+    keywords.forEach(keyword => {
+      const objectMatch = analysis.objects.some((obj: string) => 
+        obj.toLowerCase().includes(keyword)
+      );
+      if (objectMatch) {
+        relevanceScore += 20;
+      }
+    });
+  }
+
+  // Scene matching for videos
+  let bestScene: any = null;
+  if (analysis.scenes && isVideoOrAudio) {
+    for (const scene of analysis.scenes) {
+      const sceneText = `${scene.label} ${scene.description}`.toLowerCase();
+      if (sceneText.includes(queryLower)) {
+        relevanceScore += 25;
+        bestScene = scene;
+        break;
+      }
+    }
+  }
+
+  // Return result only if relevant
+  if (relevanceScore < 10) return [];
+
+  // Cap at 100
+  relevanceScore = Math.min(100, relevanceScore);
+
+  return [{
+    id: `${video.id}-metadata-${Date.now()}`,
+    videoId: video.id,
+    videoTitle: video.filename || video.title,
+    timestamp: bestScene ? parseTimestamp(bestScene.start) : 0,
+    snippet: matchedContent || analysis.summary || 'Match found in file metadata',
+    relevance: relevanceScore / 100,
+    category: video.category || 'video',
+  }];
 }
 
 // Generate AI response for chat mode

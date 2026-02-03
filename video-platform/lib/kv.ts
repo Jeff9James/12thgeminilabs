@@ -16,6 +16,18 @@ export interface FileMetadata {
   uploadedAt: string;
   status: 'uploading' | 'processing' | 'ready' | 'error';
   folderId?: string | null;
+  // Auto-saved analysis as metadata to reduce AI token costs
+  analysis?: {
+    summary: string;
+    keyPoints?: string[];
+    scenes?: Array<{ start: string; end: string; label: string; description: string }>;
+    transcription?: string;
+    objects?: string[];
+    colors?: string[];
+    textContent?: string;
+    createdAt: string;
+    [key: string]: any; // Allow category-specific fields
+  };
 }
 
 export interface FolderMetadata {

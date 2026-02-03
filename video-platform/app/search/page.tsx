@@ -36,6 +36,9 @@ export default function SearchPage() {
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
   const [searchStatus, setSearchStatus] = useState<string>('');
 
+  // Search mode: true = use metadata only (fast, cheap), false = use full file (detailed, slower)
+  const [useMetadata, setUseMetadata] = useState(true);
+
   // Filter and sort state
   const [sortBy, setSortBy] = useState<SortOption>('relevance');
   const [showFilters, setShowFilters] = useState(false);
@@ -85,28 +88,50 @@ export default function SearchPage() {
 
   // Load all files on mount so filters are available before search
   React.useEffect(() => {
-    const storedFiles = localStorage.getItem('uploadedFiles');
-    const storedVideos = localStorage.getItem('uploadedVideos');
+    const loadFiles = async () => {
+      const storedFiles = localStorage.getItem('uploadedFiles');
+      const storedVideos = localStorage.getItem('uploadedVideos');
 
-    let loadedFiles: any[] = [];
+      let loadedFiles: any[] = [];
 
-    if (storedFiles) {
-      const parsedFiles = JSON.parse(storedFiles);
-      loadedFiles = [...parsedFiles];
-    }
+      if (storedFiles) {
+        const parsedFiles = JSON.parse(storedFiles);
+        loadedFiles = [...parsedFiles];
+      }
 
-    if (storedVideos) {
-      const parsedVideos = JSON.parse(storedVideos);
-      // Convert legacy video format to generic file format
-      const convertedVideos = parsedVideos.map((v: any) => ({
-        ...v,
-        category: v.category || 'video',
-        filename: v.filename || v.title || 'Unknown',
-      }));
-      loadedFiles = [...loadedFiles, ...convertedVideos];
-    }
+      if (storedVideos) {
+        const parsedVideos = JSON.parse(storedVideos);
+        // Convert legacy video format to generic file format
+        const convertedVideos = parsedVideos.map((v: any) => ({
+          ...v,
+          category: v.category || 'video',
+          filename: v.filename || v.title || 'Unknown',
+        }));
+        loadedFiles = [...loadedFiles, ...convertedVideos];
+      }
 
-    setAllFiles(loadedFiles);
+      // Try to fetch analysis from API for each file
+      const enrichedFiles = await Promise.all(
+        loadedFiles.map(async (file) => {
+          try {
+            const response = await fetch(`/api/files/${file.id}`);
+            if (response.ok) {
+              const data = await response.json();
+              if (data.success && data.data.file.analysis) {
+                return { ...file, analysis: data.data.file.analysis };
+              }
+            }
+          } catch (err) {
+            console.error(`Failed to fetch analysis for ${file.id}:`, err);
+          }
+          return file;
+        })
+      );
+
+      setAllFiles(enrichedFiles);
+    };
+
+    loadFiles();
   }, []);
 
   // Apply filters and sort to results
@@ -208,6 +233,7 @@ export default function SearchPage() {
         body: JSON.stringify({
           query: query.trim(),
           color: filters.color,
+          useMetadata,
           videos: searchableFiles.map((f: any) => ({
             id: f.id,
             filename: f.filename,
@@ -215,6 +241,7 @@ export default function SearchPage() {
             geminiFileUri: f.geminiFileUri,
             mimeType: f.mimeType || 'video/mp4',
             category: f.category || 'video',
+            analysis: f.analysis, // Include analysis for metadata search
           }))
         })
       });
@@ -237,6 +264,13 @@ export default function SearchPage() {
         });
 
         setRawResults(enrichedResults);
+
+        // Log mode used for developer transparency
+        if (data.usedMetadata) {
+          console.log('✅ Quick Mode: Searched metadata only (major cost savings)');
+        } else {
+          console.log('🔍 Detailed Mode: AI processed all files');
+        }
 
         // Save search session to localStorage for history
         const searchSession = {
@@ -382,12 +416,46 @@ export default function SearchPage() {
             </div>
           </motion.form>
 
+          {/* Search Mode Toggle */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.15 }}
+            className="mt-4 flex justify-center"
+          >
+            <div className="inline-flex items-center gap-3 bg-white/10 backdrop-blur-sm rounded-xl px-4 py-3 border border-white/20">
+              <span className="text-sm font-semibold text-white">Search Mode:</span>
+              <button
+                onClick={() => setUseMetadata(true)}
+                className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all ${
+                  useMetadata
+                    ? 'bg-green-500 text-white shadow-lg scale-105'
+                    : 'bg-white/20 text-white/70 hover:bg-white/30'
+                }`}
+                title="Fast mode using saved analysis metadata (reduces AI costs by ~90%)"
+              >
+                ⚡ Quick Mode
+              </button>
+              <button
+                onClick={() => setUseMetadata(false)}
+                className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all ${
+                  !useMetadata
+                    ? 'bg-blue-500 text-white shadow-lg scale-105'
+                    : 'bg-white/20 text-white/70 hover:bg-white/30'
+                }`}
+                title="Detailed mode using full files (more accurate but slower and uses more AI tokens)"
+              >
+                🔍 Detailed Mode
+              </button>
+            </div>
+          </motion.div>
+
           {/* Filter and Sort Controls - Available in both modes */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.2 }}
-            className="mt-6"
+            className="mt-4"
           >
             <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 mb-4">
               <div className="flex flex-wrap items-center gap-4 justify-center">

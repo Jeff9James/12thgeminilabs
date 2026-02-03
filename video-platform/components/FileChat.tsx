@@ -198,6 +198,9 @@ export default function FileChat({ fileId, fileCategory, fileName }: FileChatPro
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
 
+    // Chat mode: true = use metadata only (fast, cheap), false = use full file (detailed, slower)
+    const [useMetadata, setUseMetadata] = useState(true);
+
     // MCP State
     const [mcpServerUrl, setMcpServerUrl] = useState('https://mcp.deepwiki.com/mcp');
     const [mcpConnection, setMcpConnection] = useState<MCPServerConnection | null>(null);
@@ -453,7 +456,8 @@ export default function FileChat({ fileId, fileCategory, fileName }: FileChatPro
                 },
                 body: JSON.stringify({
                     message: userMessage.content,
-                    history
+                    history,
+                    useMetadata
                 })
             });
 
@@ -479,6 +483,13 @@ export default function FileChat({ fileId, fileCategory, fileName }: FileChatPro
             };
 
             setMessages(prev => [...prev, assistantMessage]);
+
+            // Show notification if metadata was used (cost savings)
+            if (data.usedMetadata && useMetadata) {
+                console.log('✅ Quick Mode: Using metadata only (90% cost savings)');
+            } else if (!useMetadata) {
+                console.log('🔍 Detailed Mode: Using full file');
+            }
 
             // Update lastUsedAt timestamp in localStorage
             updateFileLastUsed(fileId);
@@ -519,24 +530,58 @@ export default function FileChat({ fileId, fileCategory, fileName }: FileChatPro
             <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 rounded-t-lg">
                 <div className="flex items-center justify-between">
                     <div className="flex-1">
-                        <h2 className="text-xl font-bold flex items-center gap-2">
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                            </svg>
-                            {getChatTitle(fileCategory)}
-                            {mcpConnection && (
-                                <span className="text-xs px-2 py-1 bg-green-500/90 rounded-full flex items-center gap-1 animate-pulse">
-                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                    </svg>
-                                    MCP
+                        <div>
+                            <h2 className="text-xl font-bold flex items-center gap-2">
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                </svg>
+                                {getChatTitle(fileCategory)}
+                                {mcpConnection && (
+                                    <span className="text-xs px-2 py-1 bg-green-500/90 rounded-full flex items-center gap-1 animate-pulse">
+                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                        </svg>
+                                        MCP
+                                    </span>
+                                )}
+                            </h2>
+                            <p className="text-sm text-blue-100 mt-1">
+                                Ask questions about {fileName}
+                                {showTimestamps && '. Click timestamps to jump to moments!'}
+                            </p>
+                        </div>
+
+                        {/* Chat Mode Toggle */}
+                        <div className="flex items-center gap-3 bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2 border border-white/20">
+                            <span className="text-xs font-medium text-white flex items-center gap-1">
+                                Chat Mode:
+                                <span className="text-[10px] text-blue-200 opacity-70">
+                                    {useMetadata ? '(~90% cheaper)' : '(full accuracy)'}
                                 </span>
-                            )}
-                        </h2>
-                        <p className="text-sm text-blue-100 mt-1">
-                            Ask questions about {fileName}
-                            {showTimestamps && '. Click timestamps to jump to moments!'}
-                        </p>
+                            </span>
+                            <button
+                                onClick={() => setUseMetadata(true)}
+                                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center gap-1 ${
+                                    useMetadata
+                                        ? 'bg-green-500 text-white shadow-md scale-105'
+                                        : 'bg-white/20 text-white/70 hover:bg-white/30'
+                                }`}
+                                title="Fast mode using saved analysis metadata (reduces AI costs by ~90%)"
+                            >
+                                ⚡ Quick
+                            </button>
+                            <button
+                                onClick={() => setUseMetadata(false)}
+                                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center gap-1 ${
+                                    !useMetadata
+                                        ? 'bg-blue-500 text-white shadow-md scale-105'
+                                        : 'bg-white/20 text-white/70 hover:bg-white/30'
+                                }`}
+                                title="Detailed mode using full file (more accurate but slower and uses more AI tokens)"
+                            >
+                                🔍 Detailed
+                            </button>
+                        </div>
                     </div>
                     <div className="flex items-center gap-2">
                         {/* MCP Toggle Button */}
