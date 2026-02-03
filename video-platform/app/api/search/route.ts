@@ -110,9 +110,10 @@ export async function POST(request: NextRequest) {
   try {
     const { query, videos, mode = 'search', history = [], color, useMetadata = true } = await request.json();
 
-    if (!query || !videos || videos.length === 0) {
+    // Allow search with either query OR color (or both)
+    if ((!query && !color) || !videos || videos.length === 0) {
       return NextResponse.json({
-        error: 'Query and videos are required'
+        error: 'Query or color filter is required, and videos must be provided'
       }, { status: 400 });
     }
 
@@ -309,39 +310,42 @@ async function searchInMetadata(video: any, query: string, color?: string): Prom
   }
 
   // Simple keyword matching for metadata search
-  const queryLower = query.toLowerCase();
-  const keywords = queryLower.split(/\s+/).filter(k => k.length > 2);
-  
   let relevanceScore = 0;
   let matchedContent = '';
   
-  // Check summary
-  if (analysis.summary && analysis.summary.toLowerCase().includes(queryLower)) {
-    relevanceScore += 40;
-    matchedContent = analysis.summary;
-  }
-  
-  // Check key points
-  if (analysis.keyPoints) {
-    for (const point of analysis.keyPoints) {
-      if (point.toLowerCase().includes(queryLower)) {
-        relevanceScore += 30;
-        if (!matchedContent) matchedContent = point;
+  // Only process text query if it exists
+  if (query && query.trim()) {
+    const queryLower = query.toLowerCase();
+    const keywords = queryLower.split(/\s+/).filter(k => k.length > 2);
+    
+    // Check summary
+    if (analysis.summary && analysis.summary.toLowerCase().includes(queryLower)) {
+      relevanceScore += 40;
+      matchedContent = analysis.summary;
+    }
+    
+    // Check key points
+    if (analysis.keyPoints) {
+      for (const point of analysis.keyPoints) {
+        if (point.toLowerCase().includes(queryLower)) {
+          relevanceScore += 30;
+          if (!matchedContent) matchedContent = point;
+        }
       }
     }
+    
+    // Check transcription
+    if (analysis.transcription && analysis.transcription.toLowerCase().includes(queryLower)) {
+      relevanceScore += 20;
+      if (!matchedContent) matchedContent = analysis.transcription.substring(0, 200);
+    }
+    
+    // Check individual keywords
+    keywords.forEach(keyword => {
+      const matches = (searchableText.toLowerCase().match(new RegExp(keyword, 'g')) || []).length;
+      relevanceScore += matches * 5;
+    });
   }
-  
-  // Check transcription
-  if (analysis.transcription && analysis.transcription.toLowerCase().includes(queryLower)) {
-    relevanceScore += 20;
-    if (!matchedContent) matchedContent = analysis.transcription.substring(0, 200);
-  }
-  
-  // Check individual keywords
-  keywords.forEach(keyword => {
-    const matches = (searchableText.toLowerCase().match(new RegExp(keyword, 'g')) || []).length;
-    relevanceScore += matches * 5;
-  });
 
   // Color matching for images (hex code matching)
   if (color && analysis.colors) {
@@ -384,8 +388,11 @@ async function searchInMetadata(video: any, query: string, color?: string): Prom
     }
   }
 
-  // Object matching for images
-  if (analysis.objects) {
+  // Object matching for images (only if query exists)
+  if (query && query.trim() && analysis.objects) {
+    const queryLower = query.toLowerCase();
+    const keywords = queryLower.split(/\s+/).filter(k => k.length > 2);
+    
     keywords.forEach(keyword => {
       const objectMatch = analysis.objects.some((obj: string) => 
         obj.toLowerCase().includes(keyword)
@@ -396,9 +403,11 @@ async function searchInMetadata(video: any, query: string, color?: string): Prom
     });
   }
 
-  // Scene matching for videos
+  // Scene matching for videos (only if query exists)
   let bestScene: any = null;
-  if (analysis.scenes && isVideoOrAudio) {
+  if (query && query.trim() && analysis.scenes && isVideoOrAudio) {
+    const queryLower = query.toLowerCase();
+    
     for (const scene of analysis.scenes) {
       const sceneText = `${scene.label} ${scene.description}`.toLowerCase();
       if (sceneText.includes(queryLower)) {
@@ -410,7 +419,9 @@ async function searchInMetadata(video: any, query: string, color?: string): Prom
   }
 
   // Return result only if relevant
-  if (relevanceScore < 10) return [];
+  // Lower threshold for color-only searches (30 points from color match is enough)
+  const threshold = (query && query.trim()) ? 10 : 5;
+  if (relevanceScore < threshold) return [];
 
   // Cap at 100
   relevanceScore = Math.min(100, relevanceScore);

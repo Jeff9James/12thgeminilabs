@@ -19,6 +19,7 @@ interface ParsedAnalysis {
   setting?: string;
   style?: string;
   colors?: string[];
+  colorDescriptions?: string[];
   // Audio-specific
   speakers?: Array<{
     name: string;
@@ -327,13 +328,44 @@ const StreamingAnalysis = forwardRef<StreamingAnalysisHandle, StreamingAnalysisP
 
         {category === 'image' && parsedAnalysis.colors && parsedAnalysis.colors.length > 0 && (
           <div className="p-4 bg-pink-50 border border-pink-200 rounded-lg">
-            <h3 className="text-xl font-semibold mb-3 text-pink-800">Colors</h3>
-            <div className="flex flex-wrap gap-2">
-              {parsedAnalysis.colors.map((color, i) => (
-                <span key={i} className="bg-pink-100 text-pink-800 px-3 py-1 rounded-full text-sm">
-                  {color}
-                </span>
-              ))}
+            <h3 className="text-xl font-semibold mb-3 text-pink-800 flex items-center gap-2">
+              <span>Detected Colors</span>
+              <span className="text-sm font-normal text-pink-600">({parsedAnalysis.colors.length} colors)</span>
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+              {parsedAnalysis.colors.map((color, i) => {
+                // Check if it's a hex code
+                const isHex = color.startsWith('#');
+                const description = parsedAnalysis.colorDescriptions?.[i] || color;
+                
+                return (
+                  <div key={i} className="flex items-center gap-2 bg-white p-2 rounded-lg border border-pink-100 hover:border-pink-300 transition-colors">
+                    {isHex ? (
+                      <>
+                        <div 
+                          className="w-10 h-10 rounded-lg border-2 border-gray-200 shadow-sm flex-shrink-0"
+                          style={{ backgroundColor: color }}
+                          title={color}
+                        />
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-xs font-mono font-bold text-gray-700 truncate">
+                            {color}
+                          </span>
+                          {description && description !== color && (
+                            <span className="text-xs text-gray-500 truncate" title={description}>
+                              {description}
+                            </span>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <span className="bg-pink-100 text-pink-800 px-3 py-1 rounded-full text-sm">
+                        {color}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
