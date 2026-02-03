@@ -41,23 +41,8 @@ export default function AnalyzePage() {
     const url = URL.createObjectURL(selectedFile);
     setPreviewUrl(url);
 
-    // Save to localStorage immediately (this is just temporary until actual upload)
-    const fileId = Date.now().toString();
-    const fileMetadata = {
-      id: fileId,
-      filename: selectedFile.name,
-      category: category,
-      mimeType: selectedFile.type,
-      size: selectedFile.size,
-      uploadedAt: new Date().toISOString(),
-      analyzed: false,
-      localUrl: url,
-      sourceType: fromUrl ? 'url-import' : 'file-upload',
-    };
-
-    const existingFiles = JSON.parse(localStorage.getItem('uploadedFiles') || '[]');
-    existingFiles.push(fileMetadata);
-    localStorage.setItem('uploadedFiles', JSON.stringify(existingFiles));
+    // Note: We don't save to localStorage here anymore.
+    // File will be saved only after successful upload in handleUploadAndAnalyze()
   };
 
   const handleUrlImport = async () => {
@@ -311,9 +296,8 @@ export default function AnalyzePage() {
         console.warn('Failed to save to database, using localStorage only:', err);
       }
 
-      // Update localStorage with new 'uploadedFiles' format
+      // Save to localStorage with new 'uploadedFiles' format
       const existingFiles = JSON.parse(localStorage.getItem('uploadedFiles') || '[]');
-      const fileIndex = existingFiles.findIndex((f: any) => f.id === fileId);
 
       const fileMetadata = {
         id: fileId,
@@ -330,12 +314,7 @@ export default function AnalyzePage() {
         sourceType: 'file-upload',
       };
 
-      if (fileIndex !== -1) {
-        existingFiles[fileIndex] = fileMetadata;
-      } else {
-        existingFiles.push(fileMetadata);
-      }
-
+      existingFiles.push(fileMetadata);
       localStorage.setItem('uploadedFiles', JSON.stringify(existingFiles));
       setUploadProgress(100);
 

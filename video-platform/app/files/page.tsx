@@ -119,10 +119,49 @@ export default function FilesPage() {
             allFiles = [...allFiles, ...convertedVideos];
         }
 
-        // Sort by upload date (newest first)
-        allFiles.sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
+        // Remove duplicates - keep files with geminiFileUri (fully uploaded) and remove incomplete ones
+        const seenFilenames = new Map<string, FileMetadata>();
+        const deduplicatedFiles: FileMetadata[] = [];
 
-        setFiles(allFiles);
+        for (const file of allFiles) {
+            const key = `${file.filename}_${file.uploadedAt}`;
+            const existing = seenFilenames.get(key);
+
+            // If we've seen this file before
+            if (existing) {
+                // Prefer the one with geminiFileUri (fully uploaded)
+                const hasGeminiUri = (file as any).geminiFileUri;
+                const existingHasGeminiUri = (existing as any).geminiFileUri;
+
+                if (hasGeminiUri && !existingHasGeminiUri) {
+                    // Replace with the better version
+                    const index = deduplicatedFiles.indexOf(existing);
+                    deduplicatedFiles[index] = file;
+                    seenFilenames.set(key, file);
+                }
+                // Otherwise keep existing (which is either complete or was first)
+            } else {
+                // First time seeing this file
+                seenFilenames.set(key, file);
+                deduplicatedFiles.push(file);
+            }
+        }
+
+        // Sort by upload date (newest first)
+        deduplicatedFiles.sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
+
+        setFiles(deduplicatedFiles);
+
+        // Save cleaned up data back to localStorage if we removed duplicates
+        if (deduplicatedFiles.length !== allFiles.length) {
+            console.log(`Cleaned up ${allFiles.length - deduplicatedFiles.length} duplicate files`);
+            const uploadedFilesOnly = deduplicatedFiles.filter(f => 
+                storedFiles && JSON.parse(storedFiles).some((sf: any) => sf.id === f.id)
+            );
+            if (uploadedFilesOnly.length > 0) {
+                localStorage.setItem('uploadedFiles', JSON.stringify(uploadedFilesOnly));
+            }
+        }
     }, []);
 
     const deleteFile = async (id: string) => {
