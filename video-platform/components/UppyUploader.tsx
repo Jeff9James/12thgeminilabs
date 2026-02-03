@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import Uppy from '@uppy/core';
-import { DashboardModal } from '@uppy/react';
+import DashboardModal from '@uppy/react/dashboard-modal';
 import Webcam from '@uppy/webcam';
 import ScreenCapture from '@uppy/screen-capture';
 import Audio from '@uppy/audio';
@@ -24,9 +24,6 @@ import '@uppy/webcam/dist/style.css';
 import '@uppy/screen-capture/dist/style.css';
 import '@uppy/audio/dist/style.css';
 import '@uppy/url/dist/style.css';
-import '@uppy/google-drive/dist/style.css';
-import '@uppy/dropbox/dist/style.css';
-import '@uppy/facebook/dist/style.css';
 
 interface UppyUploaderProps {
     open: boolean;
@@ -54,20 +51,20 @@ export default function UppyUploader({ open, onClose, onFileSelect }: UppyUpload
                 // We'll let the parent handle validation since it already has a robust system
             },
         })
-            .use(Webcam, { target: DashboardModal })
-            .use(ScreenCapture, { target: DashboardModal })
-            .use(Audio, { target: DashboardModal })
-            .use(Url, { target: DashboardModal, companionUrl })
-            .use(GoogleDrive, { target: DashboardModal, companionUrl })
-            .use(GooglePhotos, { target: DashboardModal, companionUrl })
-            .use(Instagram, { target: DashboardModal, companionUrl })
-            .use(OneDrive, { target: DashboardModal, companionUrl })
-            .use(Unsplash, { target: DashboardModal, companionUrl })
-            .use(Box, { target: DashboardModal, companionUrl })
-            .use(WebDAV, { target: DashboardModal, companionUrl })
-            .use(Zoom, { target: DashboardModal, companionUrl })
-            .use(Dropbox, { target: DashboardModal, companionUrl })
-            .use(Facebook, { target: DashboardModal, companionUrl });
+            .use(Webcam, { target: 'Dashboard' })
+            .use(ScreenCapture, { target: 'Dashboard' })
+            .use(Audio, { target: 'Dashboard' })
+            .use(Url, { target: 'Dashboard', companionUrl })
+            .use(GoogleDrive, { target: 'Dashboard', companionUrl })
+            .use(GooglePhotos, { target: 'Dashboard', companionUrl })
+            .use(Instagram, { target: 'Dashboard', companionUrl })
+            .use(OneDrive, { target: 'Dashboard', companionUrl })
+            .use(Unsplash, { target: 'Dashboard', companionUrl })
+            .use(Box, { target: 'Dashboard', companionUrl })
+            .use(WebDAV, { target: 'Dashboard', companionUrl })
+            .use(Zoom, { target: 'Dashboard', companionUrl })
+            .use(Dropbox, { target: 'Dashboard', companionUrl })
+            .use(Facebook, { target: 'Dashboard', companionUrl });
     }, []);
 
     useEffect(() => {
