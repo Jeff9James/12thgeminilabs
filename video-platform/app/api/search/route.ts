@@ -76,7 +76,7 @@ async function callGeminiWithRetry<T>(
 
 export async function POST(request: NextRequest) {
   try {
-    const { query, videos, mode = 'search', history = [] } = await request.json();
+    const { query, videos, mode = 'search', history = [], color } = await request.json();
 
     if (!query || !videos || videos.length === 0) {
       return NextResponse.json({
@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
         const isVideoOrAudio = category === 'video' || category === 'audio';
 
         // Shortened, optimized prompt with explicit JSON format
-        const prompt = `Search for: "${query}"
+        const prompt = `Search for: "${query}"${color ? ` and specifically find content matching the color "${color}"` : ''}
 
 Find matching content and return as JSON array.
 

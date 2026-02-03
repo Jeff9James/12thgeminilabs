@@ -134,8 +134,9 @@ async function analyzeImageFile(
 1. A brief description
 2. Key objects/subjects identified
 3. Main themes/topics
-4. Any text detected (OCR)
-5. Overall sentiment/mood
+4. Dominant colors (provide a list of 3-5 main colors)
+5. Any text detected (OCR)
+6. Overall sentiment/mood
 
 Respond in JSON format:
 {
@@ -143,6 +144,7 @@ Respond in JSON format:
   "keywords": ["..."],
   "topics": ["..."],
   "entities": ["..."],
+  "colors": ["red", "blue", ...],
   "sentiment": "positive|negative|neutral",
   "confidence": 0.95
 }`;
@@ -299,6 +301,7 @@ function parseAnalysisResponse(response: string): FileAnalysisResult {
         keywords: json.keywords || [],
         topics: json.topics || [],
         entities: json.entities || [],
+        colors: json.colors || [],
         sentiment: json.sentiment || 'neutral',
         language: json.language || 'en',
         confidence: json.confidence || 0.8,

@@ -22,6 +22,7 @@ export interface FileAnalysisResult {
   keywords?: string[];
   topics?: string[];
   entities?: string[];
+  colors?: string[];
   sentiment?: 'positive' | 'negative' | 'neutral';
   language?: string;
   confidence?: number;
@@ -39,6 +40,7 @@ export interface SearchOptions {
   query: string;
   fileTypes?: string[];
   directories?: string[];
+  color?: string;
   dateRange?: { from?: number; to?: number };
   includeAnalyzed?: boolean;
   includeUnanalyzed?: boolean;
@@ -154,7 +156,7 @@ export async function getAllIndexedFiles(): Promise<IndexedFile[]> {
       const tx = db.transaction(FILES_STORE, 'readonly');
       const store = tx.objectStore(FILES_STORE);
       const request = store.getAll();
-      
+
       request.onsuccess = () => resolve(request.result || []);
       request.onerror = () => reject(request.error);
     }).catch(reject);
@@ -169,7 +171,7 @@ export async function getIndexedFilesByDirectory(directoryName: string): Promise
       const store = tx.objectStore(FILES_STORE);
       const index = store.index('directoryName');
       const request = index.getAll(directoryName);
-      
+
       request.onsuccess = () => resolve(request.result || []);
       request.onerror = () => reject(request.error);
     }).catch(reject);
@@ -183,7 +185,7 @@ export async function getIndexedFile(id: string): Promise<IndexedFile | null> {
       const tx = db.transaction(FILES_STORE, 'readonly');
       const store = tx.objectStore(FILES_STORE);
       const request = store.get(id);
-      
+
       request.onsuccess = () => resolve(request.result || null);
       request.onerror = () => reject(request.error);
     }).catch(reject);
@@ -205,14 +207,14 @@ export async function updateFileAnalysis(
 
     getRequest.onsuccess = () => {
       const file = getRequest.result;
-      
+
       if (file) {
         file.analyzed = true;
         file.analyzedAt = Date.now();
         file.analysisResult = analysis;
         file.aiSummary = analysis.summary;
         file.tags = analysis.keywords || [];
-        
+
         const putRequest = fileStore.put(file);
         putRequest.onerror = () => reject(putRequest.error);
       }
@@ -232,7 +234,7 @@ export async function updateFileAnalysis(
       };
       cacheRequest.onerror = () => reject(cacheRequest.error);
     };
-    
+
     getRequest.onerror = () => reject(getRequest.error);
   });
 }
@@ -269,6 +271,15 @@ export async function searchIndexedFiles(options: SearchOptions): Promise<Search
     // Filter by analysis status
     if (options.includeAnalyzed === false && file.analyzed) continue;
     if (options.includeUnanalyzed === false && !file.analyzed) continue;
+
+    // Filter by color
+    if (options.color) {
+      if (!file.analyzed || !file.analysisResult || !file.analysisResult.colors) continue;
+      const targetColor = options.color.toLowerCase();
+      const hasColor = file.analysisResult.colors.some(c => c.toLowerCase().includes(targetColor));
+      if (!hasColor) continue;
+      score += 50; // Boost score if color matches
+    }
 
     // Skip if no query
     if (!query) {
@@ -412,7 +423,7 @@ export async function removeIndexedFile(id: string): Promise<void> {
       };
       cacheRequest.onerror = () => reject(cacheRequest.error);
     };
-    
+
     fileRequest.onerror = () => reject(fileRequest.error);
   });
 }
@@ -446,7 +457,7 @@ export async function clearIndex(): Promise<void> {
       };
       analysisRequest.onerror = () => reject(analysisRequest.error);
     };
-    
+
     filesRequest.onerror = () => reject(filesRequest.error);
   });
 }
@@ -487,7 +498,7 @@ export async function isFileIndexed(path: string): Promise<boolean> {
       const store = tx.objectStore(FILES_STORE);
       const index = store.index('path');
       const request = index.get(path);
-      
+
       request.onsuccess = () => resolve(!!request.result);
       request.onerror = () => reject(request.error);
     }).catch(reject);

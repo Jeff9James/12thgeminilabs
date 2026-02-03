@@ -27,6 +27,22 @@ import {
 import { analyzeLocalFile, type AnalysisProgress } from '@/lib/localFileAnalysis';
 import { formatFileSize } from '@/lib/localFileAccess';
 
+// Available colors for filter
+const COLOR_PRESETS = [
+  { name: 'Red', class: 'bg-red-500' },
+  { name: 'Blue', class: 'bg-blue-500' },
+  { name: 'Green', class: 'bg-green-500' },
+  { name: 'Yellow', class: 'bg-yellow-400' },
+  { name: 'Orange', class: 'bg-orange-500' },
+  { name: 'Purple', class: 'bg-purple-600' },
+  { name: 'Pink', class: 'bg-pink-400' },
+  { name: 'Black', class: 'bg-gray-900' },
+  { name: 'White', class: 'bg-white border border-gray-200' },
+  { name: 'Gray', class: 'bg-gray-500' },
+  { name: 'Brown', class: 'bg-amber-800' },
+  { name: 'Teal', class: 'bg-teal-500' },
+];
+
 export default function UnifiedSearch() {
   const [query, setQuery] = useState('');
   const [searchMode, setSearchMode] = useState<'all' | 'local' | 'cloud'>('all');
@@ -181,22 +197,20 @@ export default function UnifiedSearch() {
         <div className="flex gap-2">
           <button
             onClick={() => setSearchMode('all')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              searchMode === 'all'
-                ? 'bg-white text-blue-600'
-                : 'bg-white/20 text-white hover:bg-white/30'
-            }`}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${searchMode === 'all'
+              ? 'bg-white text-blue-600'
+              : 'bg-white/20 text-white hover:bg-white/30'
+              }`}
           >
             <Database className="w-4 h-4 inline mr-2" />
             All Files
           </button>
           <button
             onClick={() => setSearchMode('local')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              searchMode === 'local'
-                ? 'bg-white text-blue-600'
-                : 'bg-white/20 text-white hover:bg-white/30'
-            }`}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${searchMode === 'local'
+              ? 'bg-white text-blue-600'
+              : 'bg-white/20 text-white hover:bg-white/30'
+              }`}
           >
             <HardDrive className="w-4 h-4 inline mr-2" />
             Local Files
@@ -208,11 +222,10 @@ export default function UnifiedSearch() {
           </button>
           <button
             onClick={() => setSearchMode('cloud')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              searchMode === 'cloud'
-                ? 'bg-white text-blue-600'
-                : 'bg-white/20 text-white hover:bg-white/30'
-            }`}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${searchMode === 'cloud'
+              ? 'bg-white text-blue-600'
+              : 'bg-white/20 text-white hover:bg-white/30'
+              }`}
           >
             <Cloud className="w-4 h-4 inline mr-2" />
             Uploaded Files
@@ -296,6 +309,33 @@ export default function UnifiedSearch() {
                   <option value="date">Date</option>
                   <option value="size">Size</option>
                 </select>
+              </div>
+
+              <div className="md:col-span-3">
+                <label className="block text-sm font-medium text-white mb-2">Dominant Color</label>
+                <div className="flex flex-wrap gap-2">
+                  {COLOR_PRESETS.map((color) => (
+                    <button
+                      key={color.name}
+                      onClick={() => setFilters({ ...filters, color: filters.color === color.name ? undefined : color.name })}
+                      className={`w-8 h-8 rounded-full transition-all flex items-center justify-center ${color.class} ${filters.color === color.name ? 'ring-2 ring-white ring-offset-2 ring-offset-blue-600 scale-110 shadow-lg' : 'hover:scale-110'
+                        }`}
+                      title={color.name}
+                    >
+                      {filters.color === color.name && (
+                        <div className={`w-2 h-2 rounded-full ${color.name === 'White' ? 'bg-black' : 'bg-white'}`} />
+                      )}
+                    </button>
+                  ))}
+                  {filters.color && (
+                    <button
+                      onClick={() => setFilters({ ...filters, color: undefined })}
+                      className="px-3 py-1 bg-white/20 hover:bg-white/30 text-white rounded-lg text-xs font-medium transition-colors"
+                    >
+                      Clear: {filters.color}
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -397,6 +437,16 @@ export default function UnifiedSearch() {
                               <p key={idx} className="text-sm text-gray-700 bg-yellow-50 px-2 py-1 rounded">
                                 {highlight}
                               </p>
+                            ))}
+                          </div>
+                        )}
+
+                        {result.file.analysisResult?.colors && result.file.analysisResult.colors.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {result.file.analysisResult.colors.map((color, idx) => (
+                              <span key={idx} className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full text-[10px] font-medium uppercase border border-gray-200">
+                                {color}
+                              </span>
                             ))}
                           </div>
                         )}

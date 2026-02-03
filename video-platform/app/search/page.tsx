@@ -25,6 +25,7 @@ interface FileFilters {
   includeFiles: string[];
   excludeTypes: string[];
   includeTypes: string[];
+  color?: string;
 }
 
 export default function SearchPage() {
@@ -48,6 +49,22 @@ export default function SearchPage() {
 
   // Available file types
   const fileTypes = ['video', 'audio', 'image', 'pdf', 'document', 'spreadsheet', 'text'];
+
+  // Available colors for filter
+  const colors = [
+    { name: 'Red', class: 'bg-red-500' },
+    { name: 'Blue', class: 'bg-blue-500' },
+    { name: 'Green', class: 'bg-green-500' },
+    { name: 'Yellow', class: 'bg-yellow-400' },
+    { name: 'Orange', class: 'bg-orange-500' },
+    { name: 'Purple', class: 'bg-purple-600' },
+    { name: 'Pink', class: 'bg-pink-400' },
+    { name: 'Black', class: 'bg-gray-900' },
+    { name: 'White', class: 'bg-white border border-gray-200' },
+    { name: 'Gray', class: 'bg-gray-500' },
+    { name: 'Brown', class: 'bg-amber-800' },
+    { name: 'Teal', class: 'bg-teal-500' },
+  ];
 
   // Load all files on mount so filters are available before search
   React.useEffect(() => {
@@ -173,6 +190,7 @@ export default function SearchPage() {
         },
         body: JSON.stringify({
           query: query.trim(),
+          color: filters.color,
           videos: searchableFiles.map((f: any) => ({
             id: f.id,
             filename: f.filename,
@@ -279,6 +297,7 @@ export default function SearchPage() {
       includeFiles: [],
       excludeTypes: [],
       includeTypes: [],
+      color: undefined,
     });
   };
 
@@ -286,7 +305,8 @@ export default function SearchPage() {
     filters.excludeFiles.length > 0 ||
     filters.includeFiles.length > 0 ||
     filters.excludeTypes.length > 0 ||
-    filters.includeTypes.length > 0;
+    filters.includeTypes.length > 0 ||
+    !!filters.color;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -449,6 +469,31 @@ export default function SearchPage() {
                                 </button>
                               ))}
                             </div>
+                          </div>
+
+                          {/* Color Filter */}
+                          <div>
+                            <label className="text-xs text-blue-100 mb-2 block">Search by Color:</label>
+                            <div className="flex flex-wrap gap-2">
+                              {colors.map((color) => (
+                                <button
+                                  key={color.name}
+                                  onClick={() => setFilters(prev => ({ ...prev, color: prev.color === color.name ? undefined : color.name }))}
+                                  className={`w-8 h-8 rounded-full transition-all flex items-center justify-center ${color.class} ${filters.color === color.name ? 'ring-2 ring-white ring-offset-2 ring-offset-blue-600 scale-110 shadow-lg' : 'hover:scale-110'
+                                    }`}
+                                  title={color.name}
+                                >
+                                  {filters.color === color.name && (
+                                    <div className={`w-2 h-2 rounded-full ${color.name === 'White' ? 'bg-black' : 'bg-white'}`} />
+                                  )}
+                                </button>
+                              ))}
+                            </div>
+                            {filters.color && (
+                              <p className="text-xs text-blue-100 mt-2 font-medium">
+                                Filtered by: <span className="text-white font-bold">{filters.color}</span>
+                              </p>
+                            )}
                           </div>
                         </div>
                       </div>

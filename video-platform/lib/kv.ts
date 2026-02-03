@@ -40,6 +40,7 @@ export interface FileAnalysis {
   }>;
   // Image-specific fields (optional)
   objects?: string[];
+  colors?: string[];
   textContent?: string; // OCR results for images/PDFs
   // Audio-specific fields (optional)
   transcription?: string;
