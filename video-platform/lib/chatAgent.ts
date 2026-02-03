@@ -32,9 +32,12 @@ You MUST propose actions to the user using your tools.
 
 CURRENT FILE SYSTEM STATE:
 Folders: ${JSON.stringify(contextFolders.map(f => ({ id: f.id, name: f.name, parentId: f.parentId })))}
-Files: ${JSON.stringify(contextFiles.map(f => ({ id: f.id, filename: f.filename || f.title, folderId: f.folderId })))}
+Files: ${JSON.stringify(contextFiles.map(f => ({ id: f.id, filename: f.filename || f.title, folderId: f.folderId, category: f.category, uploadedAt: f.uploadedAt })))}
 
 When the user asks to perform an action, call the corresponding tool.
+You can call MULTIPLE tools in a single response to perform complex tasks.
+If you are creating a folder and want to move files into it immediately, use the virtual ID format 'virtual-folder:[NAME]' for the folderId in the move_item tool. This will be resolved during application.
+
 The user will review your proposed actions before they are applied. 
 Always explain what you are planning to do.`;
 

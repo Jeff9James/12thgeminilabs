@@ -71,7 +71,7 @@ export const agentTools: FunctionDeclaration[] = [
                 },
                 folderId: {
                     type: SchemaType.STRING,
-                    description: 'The ID of the destination folder. Set to null to move to root.',
+                    description: 'The ID of the destination folder. Set to null to move to root. If the folder is being created in this same turn, use "virtual-folder:[NAME]".',
                 }
             },
             required: ['fileId', 'folderId']

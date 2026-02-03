@@ -110,7 +110,7 @@ export default function ChatPage() {
   const [mcpToolArgs, setMcpToolArgs] = useState<Record<string, string>>({});
 
   // Agent State
-  const [isAgentMode, setIsAgentMode] = useState(false);
+  const [isAgentMode, setIsAgentMode] = useState(true);
   const [pendingActions, setPendingActions] = useState<AgentAction[]>([]);
   const [isApplying, setIsApplying] = useState(false);
 

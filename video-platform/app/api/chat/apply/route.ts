@@ -16,39 +16,54 @@ export async function POST(request: NextRequest) {
 
         const userId = 'demo-user';
         const results = [];
+        const virtualIdMap: Record<string, string> = {};
 
+        // Pass 1: Handle folder creations to map virtual IDs
+        for (const action of actions) {
+            if (action.toolName === 'create_folder') {
+                try {
+                    const folderId = uuidv4();
+                    const folder = {
+                        id: folderId,
+                        name: action.args.name,
+                        userId,
+                        parentId: action.args.parentId || null,
+                        createdAt: new Date().toISOString()
+                    };
+                    await saveFolder(folderId, folder);
+                    virtualIdMap[`virtual-folder:${action.args.name}`] = folderId;
+                    results.push({ action, success: true, id: folderId });
+                } catch (err: any) {
+                    results.push({ action, success: false, error: err.message });
+                }
+            }
+        }
+
+        // Pass 2: Handle other actions
         for (const action of actions) {
             const { toolName, args } = action;
+            if (toolName === 'create_folder') continue; // Already handled
 
             try {
                 switch (toolName) {
-                    case 'create_folder': {
-                        const folderId = uuidv4();
-                        const folder = {
-                            id: folderId,
-                            name: args.name,
-                            userId,
-                            parentId: args.parentId || null,
-                            createdAt: new Date().toISOString()
-                        };
-                        await saveFolder(folderId, folder);
-                        results.push({ action, success: true, id: folderId });
-                        break;
-                    }
-
                     case 'rename_item': {
+                        let targetId = args.id;
+                        if (targetId.startsWith('virtual-folder:')) {
+                            targetId = virtualIdMap[targetId] || targetId;
+                        }
+
                         if (args.type === 'folder') {
-                            const folder = await getFolder(args.id);
+                            const folder = await getFolder(targetId);
                             if (folder) {
                                 folder.name = args.newName;
-                                await saveFolder(args.id, folder);
+                                await saveFolder(targetId, folder);
                             }
                         } else {
-                            const file = await getFile(args.id);
+                            const file = await getFile(targetId);
                             if (file) {
                                 file.title = args.newName;
                                 file.fileName = args.newName;
-                                await saveFile(args.id, file);
+                                await saveFile(targetId, file);
                             }
                         }
                         results.push({ action, success: true });
@@ -56,9 +71,14 @@ export async function POST(request: NextRequest) {
                     }
 
                     case 'move_item': {
+                        let targetFolderId = args.folderId;
+                        if (targetFolderId && targetFolderId.startsWith('virtual-folder:')) {
+                            targetFolderId = virtualIdMap[targetFolderId] || targetFolderId;
+                        }
+
                         const file = await getFile(args.fileId);
                         if (file) {
-                            file.folderId = args.folderId || null;
+                            file.folderId = targetFolderId || null;
                             await saveFile(args.fileId, file);
                         }
                         results.push({ action, success: true });
