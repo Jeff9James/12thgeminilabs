@@ -1,36 +1,39 @@
 'use client';
 
 import React, { useEffect, useState, useMemo } from 'react';
-import Uppy from '@uppy/core';
+import {
+    Uppy,
+    Webcam,
+    Zoom,
+    Dropbox,
+    OneDrive,
+    Unsplash,
+    Url,
+    Box,
+    Audio,
+    ScreenCapture,
+    ImageEditor,
+    Tus,
+    GoogleDrivePicker,
+    GooglePhotosPicker,
+    Facebook,
+    Instagram,
+} from 'uppy';
 import DashboardModal from '@uppy/react/dashboard-modal';
-import Webcam from '@uppy/webcam';
-import ScreenCapture from '@uppy/screen-capture';
-import Audio from '@uppy/audio';
-import GoogleDrive from '@uppy/google-drive';
-import GooglePhotos from '@uppy/google-photos';
-import Instagram from '@uppy/instagram';
-import OneDrive from '@uppy/onedrive';
-import Unsplash from '@uppy/unsplash';
-import Url from '@uppy/url';
-import Box from '@uppy/box';
-import WebDAV from '@uppy/webdav';
-import Zoom from '@uppy/zoom';
-import Dropbox from '@uppy/dropbox';
-import Facebook from '@uppy/facebook';
 
-import '@uppy/core/css/style.css';
-import '@uppy/dashboard/css/style.css';
-import '@uppy/webcam/css/style.css';
-import '@uppy/screen-capture/css/style.css';
-import '@uppy/audio/css/style.css';
-import '@uppy/url/css/style.css';
+import 'uppy/dist/uppy.min.css';
 
 interface UppyUploaderProps {
     open: boolean;
     onClose: () => void;
     onFileSelect: (file: File) => void;
-    allowedMetaFields?: string[];
 }
+
+const companionUrl = 'https://companion.uppy.io';
+const endpoint = 'https://tusd.tusdemo.net/files/';
+const googlePickerClientId = '458443975467-fiplebcb8bdnplqo8hlfs9pagmseo5nk.apps.googleusercontent.com';
+const googlePickerApiKey = 'AIzaSyC6m6CZEFiTtSkBfNf_-PvtCxmDMiAgfag';
+const googlePickerAppId = '458443975467';
 
 export default function UppyUploader({ open, onClose, onFileSelect }: UppyUploaderProps) {
     const [isMounted, setIsMounted] = useState(false);
@@ -40,8 +43,6 @@ export default function UppyUploader({ open, onClose, onFileSelect }: UppyUpload
     }, []);
 
     const uppy = useMemo(() => {
-        const companionUrl = 'https://companion.uppy.io';
-
         return new Uppy({
             id: 'uppy-uploader',
             autoProceed: false,
@@ -53,24 +54,32 @@ export default function UppyUploader({ open, onClose, onFileSelect }: UppyUpload
             .use(Webcam)
             .use(ScreenCapture)
             .use(Audio)
+            .use(ImageEditor, {})
+            .use(Tus, { endpoint })
+            .use(Dropbox, { companionUrl })
             .use(Url, { companionUrl })
-            .use(GoogleDrive, { companionUrl })
-            .use(GooglePhotos, { companionUrl })
-            .use(Instagram, { companionUrl })
             .use(OneDrive, { companionUrl })
             .use(Unsplash, { companionUrl })
             .use(Box, { companionUrl })
-            .use(WebDAV, { companionUrl })
             .use(Zoom, { companionUrl })
-            .use(Dropbox, { companionUrl })
-            .use(Facebook, { companionUrl });
+            .use(Facebook, { companionUrl })
+            .use(Instagram, { companionUrl })
+            .use(GoogleDrivePicker, {
+                companionUrl,
+                clientId: googlePickerClientId,
+                apiKey: googlePickerApiKey,
+                appId: googlePickerAppId,
+            })
+            .use(GooglePhotosPicker, {
+                companionUrl,
+                clientId: googlePickerClientId,
+            });
     }, []);
 
     useEffect(() => {
         uppy.on('complete', (result) => {
             if (result.successful && result.successful.length > 0) {
                 const uppyFile = result.successful[0];
-                // Convert Uppy file to standard File object
                 if (uppyFile.data instanceof File) {
                     onFileSelect(uppyFile.data);
                 } else if (uppyFile.data instanceof Blob) {
@@ -78,15 +87,9 @@ export default function UppyUploader({ open, onClose, onFileSelect }: UppyUpload
                     onFileSelect(file);
                 }
                 onClose();
-                // Clear uppy state for next time
                 uppy.cancelAll();
             }
         });
-
-        return () => {
-            // uppy.close() is handled by uppy itself if we don't manage it carefully, 
-            // but in React with useMemo we should be careful.
-        };
     }, [uppy, onFileSelect, onClose]);
 
     if (!isMounted) return null;
@@ -98,9 +101,21 @@ export default function UppyUploader({ open, onClose, onFileSelect }: UppyUpload
             onRequestClose={onClose}
             closeModalOnClickOutside
             proudlyDisplayPoweredByUppy={false}
-            metaFields={[
-                { id: 'name', name: 'Name', placeholder: 'file name' },
-                { id: 'caption', name: 'Caption', placeholder: 'describe what the file is about' },
+            plugins={[
+                'Webcam',
+                'Dropbox',
+                'Url',
+                'OneDrive',
+                'Unsplash',
+                'Box',
+                'ImageEditor',
+                'GoogleDrivePicker',
+                'GooglePhotosPicker',
+                'Facebook',
+                'Instagram',
+                'Zoom',
+                'ScreenCapture',
+                'Audio'
             ]}
         />
     );
