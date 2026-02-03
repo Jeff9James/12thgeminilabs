@@ -9,6 +9,7 @@ import { validateFile, getFileCategory, formatFileSize, FILE_INPUT_ACCEPT, FileC
 import { convertSpreadsheetToCSV } from '@/lib/spreadsheetConverter';
 import { FilePreview } from '@/components/FilePreview';
 import LocalFilePicker from '@/components/LocalFilePicker';
+import UppyUploader from '@/components/UppyUploader';
 
 export default function AnalyzePage() {
   const [file, setFile] = useState<File | null>(null);
@@ -20,6 +21,7 @@ export default function AnalyzePage() {
   const [validationError, setValidationError] = useState<string | null>(null);
   const [showUrlModal, setShowUrlModal] = useState(false);
   const [fileUrl, setFileUrl] = useState('');
+  const [showUppyModal, setShowUppyModal] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
@@ -65,24 +67,24 @@ export default function AnalyzePage() {
 
       // Get the blob data
       const blob = await response.blob();
-      
+
       // Extract filename from URL or use a default name
       const urlPath = new URL(fileUrl).pathname;
       const fileName = urlPath.split('/').pop() || 'imported-file';
-      
+
       // Create a File object from the blob
       const file = new File([blob], fileName, { type: blob.type });
-      
+
       setUploadProgress(10);
       setUploadStatus('File fetched successfully');
-      
+
       // Close modal and continue with normal upload flow
       setShowUrlModal(false);
       setFileUrl('');
-      
+
       // Use the same file selection handler but mark as URL import
       await handleFileSelect(file, true);
-      
+
       setIsUploading(false);
       setUploadStatus('');
     } catch (error) {
@@ -123,14 +125,14 @@ export default function AnalyzePage() {
       if (needsConversionForGemini(fileType)) {
         console.log('Converting spreadsheet to CSV for Gemini compatibility...');
         setUploadStatus('Converting spreadsheet to CSV...');
-        
+
         try {
           const convertedFile = await convertSpreadsheetToCSV(fileData as File);
           fileData = convertedFile;
           fileName = convertedFile.name;
           fileType = 'text/csv';
           fileSize = convertedFile.size;
-          
+
           console.log('Converted to CSV:', fileName);
           setUploadStatus('Converted to CSV successfully');
         } catch (conversionError: any) {
@@ -411,7 +413,7 @@ export default function AnalyzePage() {
                 <Upload className="w-5 h-5" />
                 Select File
               </button>
-              
+
               <LocalFilePicker
                 allowMultiple={false}
                 onFileSelect={(file, localFile) => {
@@ -419,13 +421,21 @@ export default function AnalyzePage() {
                   handleFileSelect(file, false);
                 }}
               />
-              
+
               <button
                 onClick={() => setShowUrlModal(true)}
                 className="px-8 py-3 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition-colors inline-flex items-center justify-center gap-2"
               >
                 <LinkIcon className="w-5 h-5" />
                 Import from URL
+              </button>
+
+              <button
+                onClick={() => setShowUppyModal(true)}
+                className="px-8 py-3 bg-purple-600 text-white rounded-xl font-semibold hover:bg-purple-700 transition-colors inline-flex items-center justify-center gap-2"
+              >
+                <Sparkles className="w-5 h-5" />
+                Advanced Upload (Uppy)
               </button>
             </div>
 
@@ -516,8 +526,8 @@ export default function AnalyzePage() {
                   className="w-full px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl font-semibold hover:from-blue-600 hover:to-indigo-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Sparkles className="w-5 h-5" />
-                  {isUploading 
-                    ? `Uploading ${fileCategory ? getCategoryDisplayName(fileCategory) : 'File'}...` 
+                  {isUploading
+                    ? `Uploading ${fileCategory ? getCategoryDisplayName(fileCategory) : 'File'}...`
                     : `Upload & Analyze ${fileCategory ? getCategoryDisplayName(fileCategory) : 'File'}`}
                 </button>
                 <p className="text-sm text-gray-500 text-center mt-3">
@@ -642,6 +652,12 @@ export default function AnalyzePage() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        <UppyUploader
+          open={showUppyModal}
+          onClose={() => setShowUppyModal(false)}
+          onFileSelect={(file) => handleFileSelect(file, false)}
+        />
       </div>
     </div>
   );
