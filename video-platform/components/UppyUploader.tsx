@@ -48,23 +48,22 @@ export default function UppyUploader({ open, onClose, onFileSelect }: UppyUpload
             debug: process.env.NODE_ENV === 'development',
             restrictions: {
                 maxNumberOfFiles: 1,
-                // We'll let the parent handle validation since it already has a robust system
             },
         })
-            .use(Webcam, { target: 'Dashboard' })
-            .use(ScreenCapture, { target: 'Dashboard' })
-            .use(Audio, { target: 'Dashboard' })
-            .use(Url, { target: 'Dashboard', companionUrl })
-            .use(GoogleDrive, { target: 'Dashboard', companionUrl })
-            .use(GooglePhotos, { target: 'Dashboard', companionUrl })
-            .use(Instagram, { target: 'Dashboard', companionUrl })
-            .use(OneDrive, { target: 'Dashboard', companionUrl })
-            .use(Unsplash, { target: 'Dashboard', companionUrl })
-            .use(Box, { target: 'Dashboard', companionUrl })
-            .use(WebDAV, { target: 'Dashboard', companionUrl })
-            .use(Zoom, { target: 'Dashboard', companionUrl })
-            .use(Dropbox, { target: 'Dashboard', companionUrl })
-            .use(Facebook, { target: 'Dashboard', companionUrl });
+            .use(Webcam)
+            .use(ScreenCapture)
+            .use(Audio)
+            .use(Url, { companionUrl })
+            .use(GoogleDrive, { companionUrl })
+            .use(GooglePhotos, { companionUrl })
+            .use(Instagram, { companionUrl })
+            .use(OneDrive, { companionUrl })
+            .use(Unsplash, { companionUrl })
+            .use(Box, { companionUrl })
+            .use(WebDAV, { companionUrl })
+            .use(Zoom, { companionUrl })
+            .use(Dropbox, { companionUrl })
+            .use(Facebook, { companionUrl });
     }, []);
 
     useEffect(() => {
