@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { analyzeFileStreaming } from '@/lib/fileAnalysis';
-import { getFile, saveAnalysis } from '@/lib/kv';
+import { getFile, saveFile, saveAnalysis } from '@/lib/kv';
 import { getFileCategory } from '@/lib/fileTypes';
 
 export const runtime = 'edge'; // Enable streaming
