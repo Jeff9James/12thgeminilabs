@@ -1,5 +1,19 @@
 # ⚡ Quick Start: Dual-Mode Chat & Search
 
+## ✅ **NEW: Chat Page Now Has Quick/Detailed Mode!**
+
+The Quick/Detailed mode toggle is now available on **both** the Search and Chat pages!
+
+**What's New:**
+- ⚡ Quick Mode toggle on Chat page (sidebar + mobile)
+- 🔍 Detailed Mode toggle on Chat page (sidebar + mobile)
+- 90% cost savings with Quick Mode
+- Identical to Search page functionality
+
+See full details in [CHAT_QUICK_DETAILED_MODE.md](./CHAT_QUICK_DETAILED_MODE.md)
+
+---
+
 ## 🚀 Get Started in 3 Minutes
 
 ### Step 1: Start the Dev Server

@@ -88,6 +88,9 @@ export default function ChatPage() {
   const [aiResponse, setAiResponse] = useState<AIResponse | null>(null);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
 
+  // Search mode: true = use metadata only (fast, cheap), false = use full file (detailed, slower)
+  const [useMetadata, setUseMetadata] = useState(true);
+
   // Filter and sort state
   const [sortBy, setSortBy] = useState<SortOption>('relevance');
   const [showFilters, setShowFilters] = useState(false);
@@ -530,6 +533,7 @@ export default function ChatPage() {
           query: query.trim(), // Original query only
           mode: 'chat',
           history: chatHistory,
+          useMetadata,
           videos: searchableFiles.map((f: any) => ({
             id: f.id,
             filename: f.filename,
@@ -537,6 +541,7 @@ export default function ChatPage() {
             geminiFileUri: f.geminiFileUri,
             mimeType: f.mimeType || 'video/mp4',
             category: f.category || 'video',
+            analysis: f.analysis, // Include analysis for metadata search
           }))
         })
       });
@@ -559,6 +564,13 @@ export default function ChatPage() {
         });
 
         setRawResults(enrichedResults);
+
+        // Log mode used for developer transparency
+        if (data.usedMetadata) {
+          console.log('✅ Quick Mode: Searched metadata only (major cost savings)');
+        } else {
+          console.log('🔍 Detailed Mode: AI processed all files');
+        }
 
         // Set AI response and update chat history for follow-up support
         if (data.aiResponse || mcpResults.length > 0) {
@@ -813,6 +825,43 @@ export default function ChatPage() {
               </p>
             </div>
 
+            {/* Search Mode Toggle */}
+            <div className="mb-6 px-1">
+              <div className="flex items-center gap-2 mb-3">
+                <Sparkles className="w-4 h-4 text-green-600" />
+                <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Search Mode</h2>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setUseMetadata(true)}
+                  className={`flex-1 px-3 py-2.5 text-xs font-bold rounded-lg transition-all border-2 ${
+                    useMetadata
+                      ? 'bg-green-500 text-white border-green-500 shadow-lg shadow-green-100'
+                      : 'bg-white text-gray-600 border-gray-200 hover:border-green-200 hover:text-green-600'
+                  }`}
+                  title="Fast mode using saved analysis metadata (reduces AI costs by ~90%)"
+                >
+                  ⚡ Quick Mode
+                </button>
+                <button
+                  onClick={() => setUseMetadata(false)}
+                  className={`flex-1 px-3 py-2.5 text-xs font-bold rounded-lg transition-all border-2 ${
+                    !useMetadata
+                      ? 'bg-blue-500 text-white border-blue-500 shadow-lg shadow-blue-100'
+                      : 'bg-white text-gray-600 border-gray-200 hover:border-blue-200 hover:text-blue-600'
+                  }`}
+                  title="Detailed mode using full files (more accurate but slower and uses more AI tokens)"
+                >
+                  🔍 Detailed Mode
+                </button>
+              </div>
+              <p className="text-[9px] text-gray-500 mt-2 leading-relaxed font-medium px-1">
+                {useMetadata 
+                  ? '⚡ Using cached analysis (90% cost savings, faster responses)'
+                  : '🔍 Processing full files (more accurate, slower, higher cost)'}
+              </p>
+            </div>
+
             <div className="flex items-center justify-between mb-4 px-1">
               <div className="flex items-center gap-2">
                 <Filter className="w-4 h-4 text-purple-600" />
@@ -984,6 +1033,39 @@ export default function ChatPage() {
                           {mcpConnection ? 'Connected' : 'Connect'}
                         </button>
                       </div>
+                    </div>
+
+                    {/* Search Mode (Mobile) */}
+                    <div className="pt-6 border-t border-white/10">
+                      <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
+                        <Sparkles className="w-4 h-4" />
+                        Search Mode
+                      </h3>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setUseMetadata(true)}
+                          className={`flex-1 px-4 py-2.5 text-sm font-bold rounded-lg transition-all ${
+                            useMetadata
+                              ? 'bg-green-500 text-white shadow-lg'
+                              : 'bg-white/10 text-white/70 hover:bg-white/20 border border-white/20'
+                          }`}
+                        >
+                          ⚡ Quick
+                        </button>
+                        <button
+                          onClick={() => setUseMetadata(false)}
+                          className={`flex-1 px-4 py-2.5 text-sm font-bold rounded-lg transition-all ${
+                            !useMetadata
+                              ? 'bg-blue-500 text-white shadow-lg'
+                              : 'bg-white/10 text-white/70 hover:bg-white/20 border border-white/20'
+                          }`}
+                        >
+                          🔍 Detailed
+                        </button>
+                      </div>
+                      <p className="text-xs text-white/70 mt-2">
+                        {useMetadata ? '⚡ Fast & cheaper' : '🔍 Accurate & slower'}
+                      </p>
                     </div>
 
                     {/* Filters and Sort (Simplified for Mobile) */}
