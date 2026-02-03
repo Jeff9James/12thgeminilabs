@@ -94,6 +94,9 @@ export async function listFiles(userId: string): Promise<FileMetadata[]> {
 
 export async function deleteFile(fileId: string) {
   await kv.del(`file:${fileId}`);
+  // Also clean up related data
+  await kv.del(`analysis:${fileId}`);
+  await kv.del(`chat:${fileId}`);
 }
 
 // Folder operations
