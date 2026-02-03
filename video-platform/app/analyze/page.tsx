@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Upload, Sparkles, Video as VideoIcon, X, FileText, Image as ImageIcon, Music, FileSpreadsheet, Link as LinkIcon } from 'lucide-react';
@@ -9,7 +10,8 @@ import { validateFile, getFileCategory, formatFileSize, FILE_INPUT_ACCEPT, FileC
 import { convertSpreadsheetToCSV } from '@/lib/spreadsheetConverter';
 import { FilePreview } from '@/components/FilePreview';
 import LocalFilePicker from '@/components/LocalFilePicker';
-import UppyUploader from '@/components/UppyUploader';
+
+const UppyUploader = dynamic(() => import('@/components/UppyUploader'), { ssr: false });
 
 export default function AnalyzePage() {
   const [file, setFile] = useState<File | null>(null);
