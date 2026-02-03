@@ -129,20 +129,12 @@ export async function POST(request: NextRequest) {
           ? ` and specifically find content matching the ${color.startsWith('#') ? `hex color "${color}"` : `color "${color}"`}`
           : '';
 
-        const prompt = `Search for: "${query}"${colorContext}
+        let prompt = `Search for: "${query}"${colorContext}`;
+        if (!query.trim() && color) {
+          prompt = `Find any content or visual elements that match the ${color.startsWith('#') ? `hex color "${color}"` : `color "${color}"`}`;
+        }
 
-Find matching content and return as JSON array.
-
-Format:
-[
-  {
-    ${isVideoOrAudio ? '"timestamp": "MM:SS",' : ''}
-    "description": "1-2 sentences describing the match",
-    "relevance": 0-100
-  }
-]
-
-Return empty array [] if no matches.`;
+        prompt += `\n\nFormat:\n[\n  {\n    ${isVideoOrAudio ? '"timestamp": "MM:SS",' : ''}\n    "description": "1-2 sentences describing the match",\n    "relevance": 0-100\n  }\n]\n\nReturn empty array [] if no matches.`;
 
         // Use retry logic for API call
         const result = await callGeminiWithRetry(
@@ -155,7 +147,7 @@ Return empty array [] if no matches.`;
             },
             { text: prompt }
           ]),
-          `Search video ${video.id}`,
+          `Search video ${video.id} `,
           3
         );
 
@@ -172,7 +164,7 @@ Return empty array [] if no matches.`;
 
         // Add video info to each match
         return matches.map((match: any) => ({
-          id: `${video.id}-${match.timestamp || '0'}`,
+          id: `${video.id} -${match.timestamp || '0'} `,
           videoId: video.id,
           videoTitle: video.filename || video.title,
           timestamp: parseTimestamp(match.timestamp),
@@ -186,7 +178,7 @@ Return empty array [] if no matches.`;
           // Return empty results for recitation blocks
           return [];
         }
-        console.error(`Error searching video ${video.id}:`, videoError);
+        console.error(`Error searching video ${video.id}: `, videoError);
         return [];
       }
     });
@@ -275,7 +267,7 @@ async function generateChatResponse(
   const topResults = results.slice(0, 10);
   const context = topResults.map((result, index) => {
     const timestamp = result.timestamp > 0 ? ` [${formatTimestamp(result.timestamp)}]` : '';
-    return `[${index + 1}] ${result.videoTitle}${timestamp}: ${result.snippet}`;
+    return `[${index + 1}] ${result.videoTitle}${timestamp}: ${result.snippet} `;
   }).join('\n\n');
 
   // Get unique file names for citations
@@ -287,7 +279,7 @@ async function generateChatResponse(
     const recentHistory = history.slice(-3);
     conversationContext = '\n\nPrevious conversation:\n' +
       recentHistory.map((msg: any) =>
-        `Q: ${msg.question}\nA: ${msg.answer}`
+        `Q: ${msg.question} \nA: ${msg.answer} `
       ).join('\n\n') + '\n\n';
   }
 
@@ -298,16 +290,16 @@ Current Question: "${query}"
 Relevant content from files:
 ${context}
 
-Instructions:
-- Answer the current question directly and concisely
-- Use information from the provided content
-- Reference sources using numbers [1], [2], etc.
+    Instructions:
+    - Answer the current question directly and concisely
+      - Use information from the provided content
+        - Reference sources using numbers [1], [2], etc.
 - Be factual and cite your sources
-- Keep response under 250 words
-- If this is a follow-up question, reference the previous conversation context
-- Understand references like "tell me more", "what about that", "elaborate", etc.
+      - Keep response under 250 words
+        - If this is a follow - up question, reference the previous conversation context
+          - Understand references like "tell me more", "what about that", "elaborate", etc.
 
-Answer:`;
+            Answer: `;
 
   // Use retry logic for API call
   const result = await callGeminiWithRetry(
@@ -328,7 +320,7 @@ Answer:`;
 function formatTimestamp(seconds: number): string {
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
-  return `${mins}:${String(secs).padStart(2, '0')}`;
+  return `${mins}:${String(secs).padStart(2, '0')} `;
 }
 
 // Helper function to convert timestamp string to seconds

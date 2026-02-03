@@ -79,6 +79,12 @@ export default function UnifiedSearch() {
     });
   };
 
+  const hasActiveFilters =
+    (filters.fileTypes && filters.fileTypes.length > 0) ||
+    !!filters.color ||
+    filters.includeAnalyzed === false ||
+    filters.includeUnanalyzed === false;
+
   const loadIndexStats = async () => {
     try {
       const stats = await getIndexStats();
@@ -89,7 +95,7 @@ export default function UnifiedSearch() {
   };
 
   const handleSearch = async () => {
-    if (!query.trim()) {
+    if (!query.trim() && !hasActiveFilters) {
       setLocalResults([]);
       setCloudResults([]);
       return;
@@ -194,7 +200,7 @@ export default function UnifiedSearch() {
           </div>
           <button
             onClick={handleSearch}
-            disabled={loading}
+            disabled={loading || (!query.trim() && !hasActiveFilters)}
             className="px-8 py-4 bg-white text-blue-600 rounded-xl font-semibold hover:bg-blue-50 transition-colors disabled:opacity-50 flex items-center gap-2"
           >
             {loading ? (

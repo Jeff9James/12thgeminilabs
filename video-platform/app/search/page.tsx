@@ -160,7 +160,7 @@ export default function SearchPage() {
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!query.trim()) return;
+    if (!query.trim() && !hasActiveFilters) return;
 
     setIsSearching(true);
     setRawResults([]);
@@ -374,7 +374,7 @@ export default function SearchPage() {
               />
               <button
                 type="submit"
-                disabled={isSearching || !query.trim()}
+                disabled={isSearching || (!query.trim() && !hasActiveFilters)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 px-6 py-3 rounded-xl font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-blue-600 text-white hover:bg-blue-700"
               >
                 {isSearching ? 'Searching...' : 'Search'}
