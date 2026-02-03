@@ -15,6 +15,15 @@ export interface FileMetadata {
   playbackUrl?: string; // For video/audio files stored in blob storage
   uploadedAt: string;
   status: 'uploading' | 'processing' | 'ready' | 'error';
+  folderId?: string | null;
+}
+
+export interface FolderMetadata {
+  id: string;
+  name: string;
+  userId: string;
+  parentId: string | null;
+  createdAt: string;
 }
 
 // Analysis interface updated to support all file types
@@ -72,6 +81,29 @@ export async function listFiles(userId: string): Promise<FileMetadata[]> {
 
 export async function deleteFile(fileId: string) {
   await kv.del(`file:${fileId}`);
+}
+
+// Folder operations
+export async function saveFolder(folderId: string, metadata: FolderMetadata) {
+  await kv.set(`folder:${folderId}`, metadata);
+}
+
+export async function getFolder(folderId: string): Promise<FolderMetadata | null> {
+  return await kv.get(`folder:${folderId}`);
+}
+
+export async function listFolders(userId: string): Promise<FolderMetadata[]> {
+  const keys = await kv.keys(`folder:*`);
+  const folders = await Promise.all(
+    keys.map(key => kv.get(key))
+  );
+  return folders.filter(f => f && (f as FolderMetadata).userId === userId) as FolderMetadata[];
+}
+
+export async function deleteFolder(folderId: string) {
+  await kv.del(`folder:${folderId}`);
+
+  // Note: Recursive delete or moving files to root should be handled in the API layer
 }
 
 // Analysis operations (generic)

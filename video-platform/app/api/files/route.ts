@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { id, title, geminiFileUri, geminiFileName, mimeType, size, category, playbackUrl, sourceUrl, sourceType } = body;
+        const { id, title, geminiFileUri, geminiFileName, mimeType, size, category, playbackUrl, sourceUrl, sourceType, folderId } = body;
 
         if (!geminiFileUri) {
             return NextResponse.json({ error: 'Missing geminiFileUri' }, { status: 400 });
@@ -44,7 +44,8 @@ export async function POST(request: NextRequest) {
             playbackUrl,
             uploadedAt: new Date().toISOString(),
             userId: 'demo-user',
-            status: 'ready' as const
+            status: 'ready' as const,
+            folderId: folderId || null
         });
 
         return NextResponse.json({
