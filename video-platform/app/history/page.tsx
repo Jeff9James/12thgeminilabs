@@ -58,14 +58,30 @@ interface UnifiedChatSession {
   mcpServersUsed: string[];
 }
 
-type ChatSession = FileChatSession | UnifiedChatSession;
+interface SearchSession {
+  type: 'search';
+  sessionId: string;
+  query: string;
+  timestamp: string;
+  resultCount: number;
+  filters: {
+    excludeFiles: string[];
+    includeFiles: string[];
+    excludeTypes: string[];
+    includeTypes: string[];
+  };
+  sortBy: string;
+  fileSearched: number;
+}
+
+type ChatSession = FileChatSession | UnifiedChatSession | SearchSession;
 
 export default function HistoryPage() {
   const router = useRouter();
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [sortBy, setSortBy] = useState<'date' | 'messages'>('date');
-  const [filterType, setFilterType] = useState<'all' | 'file' | 'unified'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'file' | 'unified' | 'search'>('all');
   const [expandedSessions, setExpandedSessions] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -210,15 +226,52 @@ export default function HistoryPage() {
       }
     }
 
+    // Load search sessions from localStorage
+    const searchHistoryKey = 'search_history';
+    const searchHistory = localStorage.getItem(searchHistoryKey);
+    
+    if (searchHistory) {
+      try {
+        const searches = JSON.parse(searchHistory);
+        
+        if (Array.isArray(searches) && searches.length > 0) {
+          searches.forEach((search: any, index: number) => {
+            allSessions.push({
+              type: 'search',
+              sessionId: `search_${index}_${search.timestamp}`,
+              query: search.query,
+              timestamp: search.timestamp,
+              resultCount: search.resultCount || 0,
+              filters: search.filters || {
+                excludeFiles: [],
+                includeFiles: [],
+                excludeTypes: [],
+                includeTypes: [],
+              },
+              sortBy: search.sortBy || 'relevance',
+              fileSearched: search.fileSearched || 0,
+            });
+          });
+        }
+      } catch (error) {
+        console.error('Error loading search history:', error);
+      }
+    }
+
     setSessions(allSessions);
     setIsLoading(false);
   };
 
   const sortedSessions = [...sessions].sort((a, b) => {
     if (sortBy === 'date') {
-      return new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime();
+      const dateA = a.type === 'search' ? a.timestamp : a.lastUpdated;
+      const dateB = b.type === 'search' ? b.timestamp : b.lastUpdated;
+      return new Date(dateB).getTime() - new Date(dateA).getTime();
     } else {
-      return b.messageCount - a.messageCount;
+      // For search sessions, use resultCount instead of messageCount
+      const countA = a.type === 'search' ? a.resultCount : a.messageCount;
+      const countB = b.type === 'search' ? b.resultCount : b.messageCount;
+      return countB - countA;
     }
   });
 
@@ -228,14 +281,30 @@ export default function HistoryPage() {
   });
 
   const deleteSession = (session: ChatSession) => {
-    if (!confirm('Are you sure you want to delete this chat session? This cannot be undone.')) {
+    const sessionType = session.type === 'search' ? 'search session' : 'chat session';
+    if (!confirm(`Are you sure you want to delete this ${sessionType}? This cannot be undone.`)) {
       return;
     }
 
     if (session.type === 'file') {
       localStorage.removeItem(`chat_${session.fileId}`);
-    } else {
+    } else if (session.type === 'unified') {
       localStorage.removeItem('unified_chat_history');
+    } else if (session.type === 'search') {
+      // Remove specific search session from history
+      const searchHistory = localStorage.getItem('search_history');
+      if (searchHistory) {
+        try {
+          const searches = JSON.parse(searchHistory);
+          // Filter out the session to delete by matching timestamp and query
+          const updatedSearches = searches.filter((s: any) => 
+            !(s.timestamp === session.timestamp && s.query === session.query)
+          );
+          localStorage.setItem('search_history', JSON.stringify(updatedSearches));
+        } catch (e) {
+          console.error('Error deleting search session:', e);
+        }
+      }
     }
 
     loadChatHistory();
@@ -244,10 +313,13 @@ export default function HistoryPage() {
   const viewSession = (session: ChatSession) => {
     if (session.type === 'file') {
       router.push(`/files/${session.fileId}`);
-    } else {
+    } else if (session.type === 'unified') {
       // For unified chat, navigate to chat page
       // Ideally, you'd restore the session state
       router.push('/chat');
+    } else if (session.type === 'search') {
+      // For search sessions, navigate to search page
+      router.push('/search');
     }
   };
 
@@ -296,7 +368,12 @@ export default function HistoryPage() {
   };
 
   const getSessionId = (session: ChatSession) => {
-    return session.type === 'file' ? session.fileId : session.sessionId;
+    if (session.type === 'file') {
+      return session.fileId;
+    } else if (session.type === 'unified' || session.type === 'search') {
+      return session.sessionId;
+    }
+    return 'unknown';
   };
 
   return (
@@ -311,14 +388,14 @@ export default function HistoryPage() {
           >
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-full mb-4">
               <Clock className="w-4 h-4 text-yellow-300" />
-              <span className="text-sm font-medium text-white">Chat History</span>
+              <span className="text-sm font-medium text-white">Activity History</span>
             </div>
 
             <h1 className="text-4xl lg:text-5xl font-bold text-white mb-4">
-              Your Conversations
+              Your History
             </h1>
             <p className="text-xl text-purple-100 max-w-2xl mx-auto">
-              View and manage all your chat sessions with files and AI
+              View and manage all your chat sessions and search history
             </p>
           </motion.div>
         </div>
@@ -364,6 +441,17 @@ export default function HistoryPage() {
                   <Files className="w-4 h-4" />
                   Multi-File
                 </button>
+                <button
+                  onClick={() => setFilterType('search')}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 ${
+                    filterType === 'search'
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  <Search className="w-4 h-4" />
+                  Searches
+                </button>
               </div>
             </div>
 
@@ -405,12 +493,12 @@ export default function HistoryPage() {
             animate={{ opacity: 1 }}
             className="text-center py-20"
           >
-            <MessageSquare className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <Clock className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-gray-900 mb-2">
-              No chat sessions yet
+              No activity yet
             </h3>
             <p className="text-gray-600 mb-6">
-              Start chatting with your files or use the multi-file chat feature
+              Start chatting with your files or search across your content
             </p>
             <div className="flex gap-4 justify-center">
               <button
@@ -424,6 +512,12 @@ export default function HistoryPage() {
                 className="px-6 py-3 bg-white text-purple-600 border-2 border-purple-600 rounded-lg font-semibold hover:bg-purple-50 transition-colors"
               >
                 Go to Chat
+              </button>
+              <button
+                onClick={() => router.push('/search')}
+                className="px-6 py-3 bg-white text-green-600 border-2 border-green-600 rounded-lg font-semibold hover:bg-green-50 transition-colors"
+              >
+                Go to Search
               </button>
             </div>
           </motion.div>
@@ -448,12 +542,16 @@ export default function HistoryPage() {
                       <div className={`flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center ${
                         session.type === 'file'
                           ? 'bg-blue-100 text-blue-600'
-                          : 'bg-purple-100 text-purple-600'
+                          : session.type === 'unified'
+                          ? 'bg-purple-100 text-purple-600'
+                          : 'bg-green-100 text-green-600'
                       }`}>
                         {session.type === 'file' ? (
                           getFileIcon(session.fileCategory)
-                        ) : (
+                        ) : session.type === 'unified' ? (
                           <Files className="w-6 h-6" />
+                        ) : (
+                          <Search className="w-6 h-6" />
                         )}
                       </div>
 
@@ -464,13 +562,15 @@ export default function HistoryPage() {
                             <h3 className="text-lg font-semibold text-gray-900 truncate">
                               {session.type === 'file' ? (
                                 session.fileName
-                              ) : (
+                              ) : session.type === 'unified' ? (
                                 `Chat with ${session.fileNames.length > 0 ? session.fileNames.length : 'Multiple'} Files`
+                              ) : (
+                                session.query
                               )}
                             </h3>
                             <div className="flex items-center gap-2 mt-1 text-sm text-gray-600">
                               <Calendar className="w-4 h-4" />
-                              <span>{formatDate(session.lastUpdated)}</span>
+                              <span>{formatDate(session.type === 'search' ? session.timestamp : session.lastUpdated)}</span>
                             </div>
                           </div>
 
@@ -478,38 +578,55 @@ export default function HistoryPage() {
                           <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
                             session.type === 'file'
                               ? 'bg-blue-100 text-blue-700'
-                              : 'bg-purple-100 text-purple-700'
+                              : session.type === 'unified'
+                              ? 'bg-purple-100 text-purple-700'
+                              : 'bg-green-100 text-green-700'
                           }`}>
-                            {session.type === 'file' ? 'Single File' : 'Multi-File'}
+                            {session.type === 'file' ? 'Single File' : session.type === 'unified' ? 'Multi-File' : 'Search'}
                           </span>
                         </div>
 
                         {/* Stats */}
                         <div className="flex flex-wrap items-center gap-4 mt-3">
-                          <div className="flex items-center gap-1.5 text-sm text-gray-600">
-                            <MessageSquare className="w-4 h-4" />
-                            <span>{session.messageCount} messages</span>
-                          </div>
+                          {session.type === 'search' ? (
+                            <>
+                              <div className="flex items-center gap-1.5 text-sm text-gray-600">
+                                <Search className="w-4 h-4" />
+                                <span>{session.resultCount} results</span>
+                              </div>
+                              <div className="flex items-center gap-1.5 text-sm text-gray-600">
+                                <Files className="w-4 h-4" />
+                                <span>{session.fileSearched} files searched</span>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="flex items-center gap-1.5 text-sm text-gray-600">
+                                <MessageSquare className="w-4 h-4" />
+                                <span>{session.messageCount} messages</span>
+                              </div>
 
-                          {session.type === 'unified' && session.fileNames.length > 0 && (
-                            <div className="flex items-center gap-1.5 text-sm text-gray-600">
-                              <Files className="w-4 h-4" />
-                              <span>{session.fileNames.length} files</span>
-                            </div>
-                          )}
+                              {session.type === 'unified' && session.fileNames.length > 0 && (
+                                <div className="flex items-center gap-1.5 text-sm text-gray-600">
+                                  <Files className="w-4 h-4" />
+                                  <span>{session.fileNames.length} files</span>
+                                </div>
+                              )}
 
-                          {session.mcpServersUsed.length > 0 && (
-                            <div className="flex items-center gap-1.5 text-sm text-green-600">
-                              <Plug className="w-4 h-4" />
-                              <span>{session.mcpServersUsed.length} MCP server{session.mcpServersUsed.length > 1 ? 's' : ''}</span>
-                            </div>
+                              {session.mcpServersUsed.length > 0 && (
+                                <div className="flex items-center gap-1.5 text-sm text-green-600">
+                                  <Plug className="w-4 h-4" />
+                                  <span>{session.mcpServersUsed.length} MCP server{session.mcpServersUsed.length > 1 ? 's' : ''}</span>
+                                </div>
+                              )}
+                            </>
                           )}
                         </div>
 
-                        {/* MCP Servers Used */}
-                        {session.mcpServersUsed.length > 0 && (
+                        {/* MCP Servers Used - only for chat sessions */}
+                        {session.type !== 'search' && session.mcpServersUsed.length > 0 && (
                           <div className="flex flex-wrap gap-2 mt-3">
-                            {session.mcpServersUsed.map((server, idx) => (
+                            {session.mcpServersUsed.map((server: string, idx: number) => (
                               <span
                                 key={idx}
                                 className="px-2 py-1 bg-green-50 text-green-700 text-xs font-medium rounded"
@@ -517,6 +634,38 @@ export default function HistoryPage() {
                                 {server}
                               </span>
                             ))}
+                          </div>
+                        )}
+
+                        {/* Filters Used - only for search sessions */}
+                        {session.type === 'search' && (
+                          <div className="mt-3">
+                            {(session.filters.includeTypes.length > 0 || session.filters.excludeTypes.length > 0 ||
+                              session.filters.includeFiles.length > 0 || session.filters.excludeFiles.length > 0) && (
+                              <div className="flex flex-wrap gap-2">
+                                <span className="text-xs text-gray-600 font-medium">Filters:</span>
+                                {session.filters.includeTypes.map((type, idx) => (
+                                  <span key={idx} className="px-2 py-1 bg-green-50 text-green-700 text-xs font-medium rounded">
+                                    +{type}
+                                  </span>
+                                ))}
+                                {session.filters.excludeTypes.map((type, idx) => (
+                                  <span key={idx} className="px-2 py-1 bg-red-50 text-red-700 text-xs font-medium rounded">
+                                    -{type}
+                                  </span>
+                                ))}
+                                {session.filters.includeFiles.length > 0 && (
+                                  <span className="px-2 py-1 bg-blue-50 text-blue-700 text-xs font-medium rounded">
+                                    +{session.filters.includeFiles.length} files
+                                  </span>
+                                )}
+                                {session.filters.excludeFiles.length > 0 && (
+                                  <span className="px-2 py-1 bg-orange-50 text-orange-700 text-xs font-medium rounded">
+                                    -{session.filters.excludeFiles.length} files
+                                  </span>
+                                )}
+                              </div>
+                            )}
                           </div>
                         )}
 
@@ -562,41 +711,73 @@ export default function HistoryPage() {
                   {/* Expanded Preview */}
                   {isExpanded && (
                     <div className="border-t border-gray-200 bg-gray-50 p-6">
-                      <h4 className="text-sm font-semibold text-gray-700 mb-3">
-                        Message Preview (Last 3)
-                      </h4>
-                      <div className="space-y-3">
-                        {session.type === 'file' ? (
-                          session.messages.slice(-3).map((msg, idx) => (
-                            <div
-                              key={idx}
-                              className={`p-3 rounded-lg text-sm ${
-                                msg.role === 'user'
-                                  ? 'bg-blue-100 text-blue-900'
-                                  : 'bg-white text-gray-900 border border-gray-200'
-                              }`}
-                            >
-                              <div className="font-medium mb-1">
-                                {msg.role === 'user' ? 'You' : 'AI'}:
-                              </div>
-                              <div className="line-clamp-2">{msg.content}</div>
-                            </div>
-                          ))
-                        ) : (
-                          session.messages.slice(-3).map((msg, idx) => (
-                            <div key={idx} className="space-y-2">
-                              <div className="p-3 rounded-lg text-sm bg-blue-100 text-blue-900">
-                                <div className="font-medium mb-1">You:</div>
-                                <div className="line-clamp-2">{msg.question}</div>
-                              </div>
-                              <div className="p-3 rounded-lg text-sm bg-white text-gray-900 border border-gray-200">
-                                <div className="font-medium mb-1">AI:</div>
-                                <div className="line-clamp-2">{msg.answer}</div>
+                      {session.type === 'search' ? (
+                        <>
+                          <h4 className="text-sm font-semibold text-gray-700 mb-3">
+                            Search Details
+                          </h4>
+                          <div className="space-y-3">
+                            <div className="p-4 rounded-lg bg-white border border-gray-200">
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <span className="text-xs text-gray-500 font-medium">Query</span>
+                                  <p className="text-sm text-gray-900 font-medium mt-1">{session.query}</p>
+                                </div>
+                                <div>
+                                  <span className="text-xs text-gray-500 font-medium">Sort By</span>
+                                  <p className="text-sm text-gray-900 mt-1 capitalize">{session.sortBy}</p>
+                                </div>
+                                <div>
+                                  <span className="text-xs text-gray-500 font-medium">Results Found</span>
+                                  <p className="text-sm text-gray-900 mt-1">{session.resultCount}</p>
+                                </div>
+                                <div>
+                                  <span className="text-xs text-gray-500 font-medium">Files Searched</span>
+                                  <p className="text-sm text-gray-900 mt-1">{session.fileSearched}</p>
+                                </div>
                               </div>
                             </div>
-                          ))
-                        )}
-                      </div>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <h4 className="text-sm font-semibold text-gray-700 mb-3">
+                            Message Preview (Last 3)
+                          </h4>
+                          <div className="space-y-3">
+                            {session.type === 'file' ? (
+                              session.messages.slice(-3).map((msg: any, idx: number) => (
+                                <div
+                                  key={idx}
+                                  className={`p-3 rounded-lg text-sm ${
+                                    msg.role === 'user'
+                                      ? 'bg-blue-100 text-blue-900'
+                                      : 'bg-white text-gray-900 border border-gray-200'
+                                  }`}
+                                >
+                                  <div className="font-medium mb-1">
+                                    {msg.role === 'user' ? 'You' : 'AI'}:
+                                  </div>
+                                  <div className="line-clamp-2">{msg.content}</div>
+                                </div>
+                              ))
+                            ) : session.type === 'unified' ? (
+                              session.messages.slice(-3).map((msg: any, idx: number) => (
+                                <div key={idx} className="space-y-2">
+                                  <div className="p-3 rounded-lg text-sm bg-blue-100 text-blue-900">
+                                    <div className="font-medium mb-1">You:</div>
+                                    <div className="line-clamp-2">{msg.question}</div>
+                                  </div>
+                                  <div className="p-3 rounded-lg text-sm bg-white text-gray-900 border border-gray-200">
+                                    <div className="font-medium mb-1">AI:</div>
+                                    <div className="line-clamp-2">{msg.answer}</div>
+                                  </div>
+                                </div>
+                              ))
+                            ) : null}
+                          </div>
+                        </>
+                      )}
                     </div>
                   )}
                 </motion.div>

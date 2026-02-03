@@ -203,6 +203,39 @@ export default function SearchPage() {
 
         setRawResults(enrichedResults);
 
+        // Save search session to localStorage for history
+        const searchSession = {
+          query: query.trim(),
+          timestamp: new Date().toISOString(),
+          resultCount: enrichedResults.length,
+          filters: filters,
+          sortBy: sortBy,
+          fileSearched: searchableFiles.length,
+        };
+
+        // Get existing search history
+        const existingHistory = localStorage.getItem('search_history');
+        let searchHistory = [];
+        if (existingHistory) {
+          try {
+            searchHistory = JSON.parse(existingHistory);
+          } catch (e) {
+            console.error('Error parsing search history:', e);
+            searchHistory = [];
+          }
+        }
+
+        // Add new session to beginning of history
+        searchHistory.unshift(searchSession);
+
+        // Limit to last 50 searches
+        if (searchHistory.length > 50) {
+          searchHistory = searchHistory.slice(0, 50);
+        }
+
+        // Save updated history
+        localStorage.setItem('search_history', JSON.stringify(searchHistory));
+
         if (data.cached) {
           setSearchStatus('Results from cache');
         } else {
