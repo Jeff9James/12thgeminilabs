@@ -59,6 +59,14 @@ interface ChatMessage {
   citations: string[];
   timestamp: Date;
   mcpToolsUsed?: string[];
+  role?: 'user' | 'assistant';
+  pendingActions?: AgentAction[];
+}
+
+interface AgentAction {
+  toolName: string;
+  args: any;
+  id: string;
 }
 
 type SortOption = 'relevance' | 'uploadedAsc' | 'uploadedDesc' | 'usedAsc' | 'usedDesc' | 'nameAsc' | 'nameDesc';
@@ -100,6 +108,11 @@ export default function ChatPage() {
   const [showMobileSettings, setShowMobileSettings] = useState(false);
   const [selectedMCPTool, setSelectedMCPTool] = useState<MCPTool | null>(null);
   const [mcpToolArgs, setMcpToolArgs] = useState<Record<string, string>>({});
+
+  // Agent State
+  const [isAgentMode, setIsAgentMode] = useState(false);
+  const [pendingActions, setPendingActions] = useState<AgentAction[]>([]);
+  const [isApplying, setIsApplying] = useState(false);
 
   // MCP connection handler
   const handleMCPConnect = async () => {
@@ -407,11 +420,44 @@ export default function ChatPage() {
     setIsSearching(true);
     setRawResults([]);
 
-    setSearchStatus('Preparing chat...');
+    setSearchStatus(isAgentMode ? 'Consulting File Agent...' : 'Preparing chat...');
 
     try {
+      if (isAgentMode) {
+        const response = await fetch('/api/chat/agent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query: query.trim(),
+            history: chatHistory.slice(-5) // Send some context
+          })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+          const newMessage: ChatMessage = {
+            question: query.trim(),
+            answer: data.answer,
+            citations: [],
+            timestamp: new Date(),
+            role: 'assistant',
+            pendingActions: data.pendingActions
+          };
+          setChatHistory(prev => [...prev, newMessage]);
+          if (data.pendingActions?.length > 0) {
+            setPendingActions(prev => [...prev, ...data.pendingActions]);
+          }
+        } else {
+          throw new Error(data.error || 'Agent request failed');
+        }
+        setIsSearching(false);
+        setQuery('');
+        return;
+      }
+
       // First, check if we should use MCP tools
       const { mcpResults, toolsUsed } = await handleMCPToolsIfNeeded(query.trim());
+      // ... (rest of search logic remains until line 567)
 
       if (allFiles.length === 0 && mcpResults.length === 0) {
         alert('No files found and no MCP results. Please upload some files or connect to an MCP server.');
@@ -611,6 +657,37 @@ export default function ChatPage() {
     }
   };
 
+  const applyActions = async () => {
+    if (pendingActions.length === 0) return;
+    setIsApplying(true);
+    try {
+      const res = await fetch('/api/chat/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ actions: pendingActions })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPendingActions([]);
+        setChatHistory(prev => [...prev, {
+          question: "✅ Action Execution",
+          answer: "Successfully applied all proposed changes to your files and folders.",
+          citations: [],
+          timestamp: new Date(),
+          role: 'assistant'
+        }]);
+        // Refresh files
+        const storedFiles = localStorage.getItem('uploadedFiles');
+        // In a real app we'd trigger a re-fetch from API
+        window.location.reload();
+      }
+    } catch (err) {
+      console.error('Apply actions failed:', err);
+    } finally {
+      setIsApplying(false);
+    }
+  };
+
   return (
     <div className="flex min-h-screen bg-gray-50">
       {/* Left Sidebar for Desktop Settings */}
@@ -714,6 +791,28 @@ export default function ChatPage() {
           </div>
 
           <div className="border-t border-gray-100 pt-10">
+            <div className="p-4 bg-purple-50 rounded-xl border border-purple-100 mb-6 flex-shrink-0">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Bot className="w-5 h-5 text-purple-600" />
+                  <span className="font-bold text-gray-900 text-xs uppercase tracking-tight">File Agent Mode</span>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={isAgentMode}
+                    onChange={(e) => setIsAgentMode(e.target.checked)}
+                  />
+                  <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+                </label>
+              </div>
+              <p className="text-[10px] text-purple-700 leading-relaxed font-medium">
+                Proactive AI actions for files/folders.
+                <span className="block mt-1 font-bold">Review required before apply.</span>
+              </p>
+            </div>
+
             <div className="flex items-center justify-between mb-4 px-1">
               <div className="flex items-center gap-2">
                 <Filter className="w-4 h-4 text-purple-600" />
@@ -1087,6 +1186,63 @@ export default function ChatPage() {
                                       </div>
                                     ))}
                                   </div>
+                                </div>
+                              )}
+
+                              {/* Pending Actions UI */}
+                              {msg.pendingActions && msg.pendingActions.length > 0 && (
+                                <div className="mt-6 p-4 bg-white rounded-xl border-2 border-purple-200 border-dashed">
+                                  <h4 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
+                                    <Wrench className="w-4 h-4 text-purple-600" />
+                                    Proposed Actions ({msg.pendingActions.length})
+                                  </h4>
+                                  <div className="space-y-2">
+                                    {msg.pendingActions.map((action, actionIndex) => (
+                                      <div key={actionIndex} className="flex items-center justify-between p-2 bg-purple-50 rounded-lg text-sm border border-purple-100">
+                                        <div className="flex items-center gap-2">
+                                          <span className="font-mono text-purple-700 font-bold">{action.toolName}</span>
+                                          <span className="text-gray-500 truncate max-w-[200px]">
+                                            {Object.entries(action.args).map(([k, v]) => `${k}: ${v}`).join(', ')}
+                                          </span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-[10px] bg-purple-200 text-purple-700 px-1.5 py-0.5 rounded font-bold uppercase">Pending</span>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+
+                                  {index === chatHistory.length - 1 && pendingActions.length > 0 && (
+                                    <div className="mt-4 flex gap-2">
+                                      <button
+                                        onClick={applyActions}
+                                        disabled={isApplying}
+                                        className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg font-bold hover:bg-purple-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                                      >
+                                        {isApplying ? (
+                                          <Loader2 className="w-4 h-4 animate-spin" />
+                                        ) : (
+                                          <CheckCircle2 className="w-4 h-4" />
+                                        )}
+                                        Apply All Changes
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          setPendingActions([]);
+                                          // Remove pending actions from the last message as well
+                                          setChatHistory(prev => {
+                                            const newHistory = [...prev];
+                                            const last = newHistory[newHistory.length - 1];
+                                            if (last) last.pendingActions = [];
+                                            return newHistory;
+                                          });
+                                        }}
+                                        className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg font-bold hover:bg-gray-200 transition-all"
+                                      >
+                                        Discard
+                                      </button>
+                                    </div>
+                                  )}
                                 </div>
                               )}
                             </div>
