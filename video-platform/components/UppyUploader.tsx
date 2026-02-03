@@ -18,12 +18,12 @@ import Zoom from '@uppy/zoom';
 import Dropbox from '@uppy/dropbox';
 import Facebook from '@uppy/facebook';
 
-import '@uppy/core/dist/style.css';
-import '@uppy/dashboard/dist/style.css';
-import '@uppy/webcam/dist/style.css';
-import '@uppy/screen-capture/dist/style.css';
-import '@uppy/audio/dist/style.css';
-import '@uppy/url/dist/style.css';
+import '@uppy/core/css/style.css';
+import '@uppy/dashboard/css/style.css';
+import '@uppy/webcam/css/style.css';
+import '@uppy/screen-capture/css/style.css';
+import '@uppy/audio/css/style.css';
+import '@uppy/url/css/style.css';
 
 interface UppyUploaderProps {
     open: boolean;
