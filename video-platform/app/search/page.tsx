@@ -50,21 +50,38 @@ export default function SearchPage() {
   // Available file types
   const fileTypes = ['video', 'audio', 'image', 'pdf', 'document', 'spreadsheet', 'text'];
 
-  // Available colors for filter
-  const colors = [
-    { name: 'Red', class: 'bg-red-500' },
-    { name: 'Blue', class: 'bg-blue-500' },
-    { name: 'Green', class: 'bg-green-500' },
-    { name: 'Yellow', class: 'bg-yellow-400' },
-    { name: 'Orange', class: 'bg-orange-500' },
-    { name: 'Purple', class: 'bg-purple-600' },
-    { name: 'Pink', class: 'bg-pink-400' },
-    { name: 'Black', class: 'bg-gray-900' },
-    { name: 'White', class: 'bg-white border border-gray-200' },
-    { name: 'Gray', class: 'bg-gray-500' },
-    { name: 'Brown', class: 'bg-amber-800' },
-    { name: 'Teal', class: 'bg-teal-500' },
+  // Available colors for filter (Quick Select)
+  const colorPresets = [
+    { name: 'Red', hex: '#ef4444' },
+    { name: 'Blue', hex: '#3b82f6' },
+    { name: 'Green', hex: '#22c55e' },
+    { name: 'Yellow', hex: '#eab308' },
+    { name: 'Orange', hex: '#f97316' },
+    { name: 'Purple', hex: '#a855f7' },
+    { name: 'Pink', hex: '#ec4899' },
+    { name: 'Black', hex: '#111827' },
+    { name: 'White', hex: '#ffffff' },
+    { name: 'Gray', hex: '#6b7280' },
+    { name: 'Brown', hex: '#78350f' },
+    { name: 'Teal', hex: '#14b8a6' },
   ];
+
+  const [recentColors, setRecentColors] = useState<string[]>([]);
+
+  // Load recently used colors
+  useEffect(() => {
+    const saved = localStorage.getItem('recent_search_colors');
+    if (saved) setRecentColors(JSON.parse(saved));
+  }, []);
+
+  const addToRecentColors = (color: string) => {
+    setRecentColors(prev => {
+      const filtered = prev.filter(c => c !== color);
+      const updated = [color, ...filtered].slice(0, 8);
+      localStorage.setItem('recent_search_colors', JSON.stringify(updated));
+      return updated;
+    });
+  };
 
   // Load all files on mount so filters are available before search
   React.useEffect(() => {
@@ -258,6 +275,11 @@ export default function SearchPage() {
           setSearchStatus('Results from cache');
         } else {
           setSearchStatus('Search complete');
+        }
+
+        // Add to recent colors if used
+        if (filters.color) {
+          addToRecentColors(filters.color);
         }
         // Clear status after 2 seconds
         setTimeout(() => setSearchStatus(''), 2000);
@@ -472,28 +494,108 @@ export default function SearchPage() {
                           </div>
 
                           {/* Color Filter */}
-                          <div>
-                            <label className="text-xs text-blue-100 mb-2 block">Search by Color:</label>
-                            <div className="flex flex-wrap gap-2">
-                              {colors.map((color) => (
+                          <div className="md:col-span-2 mt-4 pt-4 border-t border-white/10">
+                            <div className="flex items-center justify-between mb-3">
+                              <h3 className="text-sm font-semibold text-white">Advanced Color Picker</h3>
+                              {filters.color && (
                                 <button
-                                  key={color.name}
-                                  onClick={() => setFilters(prev => ({ ...prev, color: prev.color === color.name ? undefined : color.name }))}
-                                  className={`w-8 h-8 rounded-full transition-all flex items-center justify-center ${color.class} ${filters.color === color.name ? 'ring-2 ring-white ring-offset-2 ring-offset-blue-600 scale-110 shadow-lg' : 'hover:scale-110'
-                                    }`}
-                                  title={color.name}
+                                  onClick={() => setFilters(prev => ({ ...prev, color: undefined }))}
+                                  className="text-xs text-red-300 hover:text-red-200 flex items-center gap-1"
                                 >
-                                  {filters.color === color.name && (
-                                    <div className={`w-2 h-2 rounded-full ${color.name === 'White' ? 'bg-black' : 'bg-white'}`} />
-                                  )}
+                                  <X className="w-3 h-3" /> Clear Selection
                                 </button>
-                              ))}
+                              )}
                             </div>
-                            {filters.color && (
-                              <p className="text-xs text-blue-100 mt-2 font-medium">
-                                Filtered by: <span className="text-white font-bold">{filters.color}</span>
-                              </p>
-                            )}
+
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                              {/* Native Picker & Presets */}
+                              <div>
+                                <label className="text-xs text-blue-100 mb-2 block font-medium">Quick Presets & Custom Map</label>
+                                <div className="flex flex-wrap gap-2 mb-4">
+                                  {/* Custom Picker Button */}
+                                  <div className="relative w-10 h-10 rounded-xl overflow-hidden shadow-lg hover:scale-105 transition-transform border-2 border-white/20">
+                                    <input
+                                      type="color"
+                                      value={filters.color?.startsWith('#') ? filters.color : '#3b82f6'}
+                                      onChange={(e) => setFilters(prev => ({ ...prev, color: e.target.value }))}
+                                      className="absolute inset-0 w-[200%] h-[200%] -translate-x-1/4 -translate-y-1/4 cursor-pointer"
+                                      title="Custom Hex Color"
+                                    />
+                                    <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                                      <div className="w-1.5 h-1.5 rounded-full bg-white opacity-50" />
+                                    </div>
+                                  </div>
+
+                                  {colorPresets.map((color) => (
+                                    <button
+                                      key={color.name}
+                                      onClick={() => setFilters(prev => ({ ...prev, color: prev.color === color.hex ? undefined : color.hex }))}
+                                      className={`w-10 h-10 rounded-xl transition-all flex items-center justify-center border-2 ${filters.color === color.hex ? 'border-white scale-110 shadow-xl' : 'border-transparent hover:scale-105 opacity-80 hover:opacity-100'
+                                        }`}
+                                      style={{ backgroundColor: color.hex }}
+                                      title={color.name}
+                                    >
+                                      {filters.color === color.hex && (
+                                        <div className={`w-2 h-2 rounded-full ${color.name === 'White' ? 'bg-black' : 'bg-white'}`} />
+                                      )}
+                                    </button>
+                                  ))}
+                                </div>
+
+                                {/* Recent Colors */}
+                                {recentColors.length > 0 && (
+                                  <div>
+                                    <label className="text-xs text-blue-100 mb-2 block opacity-70">Recently Used</label>
+                                    <div className="flex flex-wrap gap-2">
+                                      {recentColors.map((hex, idx) => (
+                                        <button
+                                          key={`recent-${idx}`}
+                                          onClick={() => setFilters(prev => ({ ...prev, color: hex }))}
+                                          className={`w-6 h-6 rounded-lg transition-all border ${filters.color === hex ? 'border-white scale-110' : 'border-white/10 opacity-70 hover:opacity-100'}`}
+                                          style={{ backgroundColor: hex }}
+                                          title={hex}
+                                        />
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Hex Input & Preview */}
+                              <div className="bg-white/5 rounded-xl p-4 border border-white/10 self-start">
+                                <label className="text-xs text-blue-100 mb-2 block">Fine-tune Discovery</label>
+                                <div className="flex items-center gap-3">
+                                  <div
+                                    className="w-12 h-12 rounded-xl border-2 border-white/20 shadow-inner group relative"
+                                    style={{ backgroundColor: filters.color || 'transparent' }}
+                                  >
+                                    {!filters.color && (
+                                      <div className="absolute inset-0 flex items-center justify-center">
+                                        <div className="w-4 h-4 text-white/30"><Filter size={16} /></div>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="flex-1">
+                                    <input
+                                      type="text"
+                                      placeholder="#000000"
+                                      value={filters.color || ''}
+                                      onChange={(e) => setFilters(prev => ({ ...prev, color: e.target.value }))}
+                                      className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-sm font-mono focus:ring-2 focus:ring-blue-400 focus:outline-none placeholder:text-white/30"
+                                    />
+                                    <p className="text-[10px] text-blue-200/60 mt-1 uppercase font-bold tracking-wider">
+                                      {filters.color ? 'Active Filter Hex' : 'No color selected'}
+                                    </p>
+                                  </div>
+                                </div>
+                                {filters.color && (
+                                  <div className="mt-3 flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                                    <span className="text-xs text-green-300 font-medium lowercase">AI will prioritize this hue</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>

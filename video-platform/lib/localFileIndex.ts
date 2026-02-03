@@ -275,8 +275,17 @@ export async function searchIndexedFiles(options: SearchOptions): Promise<Search
     // Filter by color
     if (options.color) {
       if (!file.analyzed || !file.analysisResult || !file.analysisResult.colors) continue;
-      const targetColor = options.color.toLowerCase();
-      const hasColor = file.analysisResult.colors.some(c => c.toLowerCase().includes(targetColor));
+
+      const queryColor = options.color.toLowerCase();
+      // If it's a hex code, map it to a name
+      const targetColor = queryColor.startsWith('#')
+        ? getClosestColorName(queryColor).toLowerCase()
+        : queryColor;
+
+      const hasColor = file.analysisResult.colors.some(c =>
+        c.toLowerCase().includes(targetColor) || targetColor.includes(c.toLowerCase())
+      );
+
       if (!hasColor) continue;
       score += 50; // Boost score if color matches
     }
@@ -530,4 +539,54 @@ export async function batchIndexFiles(
   }
 
   return allIndexed;
+}
+
+/**
+ * Helper to map a hex color to a simple color name that Gemini might use
+ */
+function getClosestColorName(hex: string): string {
+  // Simple color mapping - in a real app this would use delta-e or similar
+  const colorMap: Record<string, string> = {
+    '#ff0000': 'Red',
+    '#00ff00': 'Green',
+    '#0000ff': 'Blue',
+    '#ffff00': 'Yellow',
+    '#ffa500': 'Orange',
+    '#800080': 'Purple',
+    '#ffc0cb': 'Pink',
+    '#000000': 'Black',
+    '#ffffff': 'White',
+    '#808080': 'Gray',
+    '#a52a2a': 'Brown',
+    '#008080': 'Teal',
+    '#00ffff': 'Cyan',
+    '#ff00ff': 'Magenta',
+  };
+
+  // Basic nearest neighbor matching by RGB distance
+  const r2 = parseInt(hex.slice(1, 3), 16);
+  const g2 = parseInt(hex.slice(3, 5), 16);
+  const b2 = parseInt(hex.slice(5, 7), 16);
+
+  let closest = 'Unknown';
+  let minDistance = Infinity;
+
+  for (const [h, name] of Object.entries(colorMap)) {
+    const r1 = parseInt(h.slice(1, 3), 16);
+    const g1 = parseInt(h.slice(3, 5), 16);
+    const b1 = parseInt(h.slice(5, 7), 16);
+
+    const distance = Math.sqrt(
+      Math.pow(r2 - r1, 2) +
+      Math.pow(g2 - g1, 2) +
+      Math.pow(b2 - b1, 2)
+    );
+
+    if (distance < minDistance) {
+      minDistance = distance;
+      closest = name;
+    }
+  }
+
+  return closest;
 }

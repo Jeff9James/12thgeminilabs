@@ -125,7 +125,11 @@ export async function POST(request: NextRequest) {
         const isVideoOrAudio = category === 'video' || category === 'audio';
 
         // Shortened, optimized prompt with explicit JSON format
-        const prompt = `Search for: "${query}"${color ? ` and specifically find content matching the color "${color}"` : ''}
+        const colorContext = color
+          ? ` and specifically find content matching the ${color.startsWith('#') ? `hex color "${color}"` : `color "${color}"`}`
+          : '';
+
+        const prompt = `Search for: "${query}"${colorContext}
 
 Find matching content and return as JSON array.
 

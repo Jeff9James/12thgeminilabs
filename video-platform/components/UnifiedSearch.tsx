@@ -27,20 +27,20 @@ import {
 import { analyzeLocalFile, type AnalysisProgress } from '@/lib/localFileAnalysis';
 import { formatFileSize } from '@/lib/localFileAccess';
 
-// Available colors for filter
+// Available colors for filter (Quick Select)
 const COLOR_PRESETS = [
-  { name: 'Red', class: 'bg-red-500' },
-  { name: 'Blue', class: 'bg-blue-500' },
-  { name: 'Green', class: 'bg-green-500' },
-  { name: 'Yellow', class: 'bg-yellow-400' },
-  { name: 'Orange', class: 'bg-orange-500' },
-  { name: 'Purple', class: 'bg-purple-600' },
-  { name: 'Pink', class: 'bg-pink-400' },
-  { name: 'Black', class: 'bg-gray-900' },
-  { name: 'White', class: 'bg-white border border-gray-200' },
-  { name: 'Gray', class: 'bg-gray-500' },
-  { name: 'Brown', class: 'bg-amber-800' },
-  { name: 'Teal', class: 'bg-teal-500' },
+  { name: 'Red', hex: '#ef4444' },
+  { name: 'Blue', hex: '#3b82f6' },
+  { name: 'Green', hex: '#22c55e' },
+  { name: 'Yellow', hex: '#eab308' },
+  { name: 'Orange', hex: '#f97316' },
+  { name: 'Purple', hex: '#a855f7' },
+  { name: 'Pink', hex: '#ec4899' },
+  { name: 'Black', hex: '#111827' },
+  { name: 'White', hex: '#ffffff' },
+  { name: 'Gray', hex: '#6b7280' },
+  { name: 'Brown', hex: '#78350f' },
+  { name: 'Teal', hex: '#14b8a6' },
 ];
 
 export default function UnifiedSearch() {
@@ -61,10 +61,23 @@ export default function UnifiedSearch() {
     maxResults: 50,
   });
   const [indexStats, setIndexStats] = useState<any>(null);
+  const [recentColors, setRecentColors] = useState<string[]>([]);
 
   useEffect(() => {
     loadIndexStats();
+    // Load recently used colors
+    const saved = localStorage.getItem('recent_search_colors');
+    if (saved) setRecentColors(JSON.parse(saved));
   }, []);
+
+  const addToRecentColors = (color: string) => {
+    setRecentColors(prev => {
+      const filtered = prev.filter(c => c !== color);
+      const updated = [color, ...filtered].slice(0, 8);
+      localStorage.setItem('recent_search_colors', JSON.stringify(updated));
+      return updated;
+    });
+  };
 
   const loadIndexStats = async () => {
     try {
@@ -94,6 +107,11 @@ export default function UnifiedSearch() {
 
         const results = await searchIndexedFiles(options);
         setLocalResults(results);
+
+        // Add to recent colors if used
+        if (filters.color) {
+          addToRecentColors(filters.color);
+        }
       }
 
       // Search cloud files (uploaded files)
@@ -311,30 +329,79 @@ export default function UnifiedSearch() {
                 </select>
               </div>
 
-              <div className="md:col-span-3">
-                <label className="block text-sm font-medium text-white mb-2">Dominant Color</label>
-                <div className="flex flex-wrap gap-2">
+              <div className="md:col-span-3 pt-4 border-t border-white/10">
+                <div className="flex items-center justify-between mb-3">
+                  <label className="block text-sm font-medium text-white">Dominant Color Discovery</label>
+                  {filters.color && (
+                    <button
+                      onClick={() => setFilters({ ...filters, color: undefined })}
+                      className="text-xs text-red-300 hover:text-red-200 flex items-center gap-1"
+                    >
+                      <X className="w-3 h-3" /> Clear Selection
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap gap-3 items-center">
+                  {/* Custom Picker Button */}
+                  <div className="relative w-10 h-10 rounded-xl overflow-hidden shadow-lg hover:scale-105 transition-transform border-2 border-white/20">
+                    <input
+                      type="color"
+                      value={filters.color?.startsWith('#') ? filters.color : '#3b82f6'}
+                      onChange={(e) => setFilters({ ...filters, color: e.target.value })}
+                      className="absolute inset-0 w-[200%] h-[200%] -translate-x-1/4 -translate-y-1/4 cursor-pointer"
+                      title="Custom Hex Color"
+                    />
+                    <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                      <div className="w-1.5 h-1.5 rounded-full bg-white opacity-50" />
+                    </div>
+                  </div>
+
+                  <div className="h-8 w-px bg-white/10 mx-1" />
+
                   {COLOR_PRESETS.map((color) => (
                     <button
                       key={color.name}
-                      onClick={() => setFilters({ ...filters, color: filters.color === color.name ? undefined : color.name })}
-                      className={`w-8 h-8 rounded-full transition-all flex items-center justify-center ${color.class} ${filters.color === color.name ? 'ring-2 ring-white ring-offset-2 ring-offset-blue-600 scale-110 shadow-lg' : 'hover:scale-110'
+                      onClick={() => setFilters({ ...filters, color: filters.color === color.hex ? undefined : color.hex })}
+                      className={`w-8 h-8 rounded-full transition-all flex items-center justify-center border-2 ${filters.color === color.hex ? 'border-white scale-110 shadow-lg' : 'border-transparent hover:scale-110'
                         }`}
+                      style={{ backgroundColor: color.hex }}
                       title={color.name}
                     >
-                      {filters.color === color.name && (
+                      {filters.color === color.hex && (
                         <div className={`w-2 h-2 rounded-full ${color.name === 'White' ? 'bg-black' : 'bg-white'}`} />
                       )}
                     </button>
                   ))}
-                  {filters.color && (
-                    <button
-                      onClick={() => setFilters({ ...filters, color: undefined })}
-                      className="px-3 py-1 bg-white/20 hover:bg-white/30 text-white rounded-lg text-xs font-medium transition-colors"
-                    >
-                      Clear: {filters.color}
-                    </button>
+
+                  {recentColors.length > 0 && (
+                    <>
+                      <div className="h-8 w-px bg-white/10 mx-1" />
+                      <div className="flex gap-1.5">
+                        {recentColors.map((hex, idx) => (
+                          <button
+                            key={`recent-${idx}`}
+                            onClick={() => setFilters({ ...filters, color: hex })}
+                            className={`w-6 h-6 rounded-md transition-all border ${filters.color === hex ? 'border-white scale-110' : 'border-white/5 opacity-60 hover:opacity-100'}`}
+                            style={{ backgroundColor: hex }}
+                            title={`Recent: ${hex}`}
+                          />
+                        ))}
+                      </div>
+                    </>
                   )}
+
+                  <div className="ml-auto flex items-center gap-2">
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="#HEX"
+                        value={filters.color || ''}
+                        onChange={(e) => setFilters({ ...filters, color: e.target.value })}
+                        className="w-24 bg-white/10 border border-white/20 rounded-lg px-2 py-1 text-white text-xs font-mono focus:ring-1 focus:ring-blue-400 focus:outline-none uppercase"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
