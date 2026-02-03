@@ -184,6 +184,16 @@ export async function POST(request: NextRequest) {
           // Return empty results for recitation blocks
           return [];
         }
+        
+        // If 403 error (file no longer accessible), try metadata search as fallback
+        if (videoError.status === 403 || videoError.message?.includes('403') || videoError.message?.includes('Forbidden')) {
+          console.log(`File ${video.id} not accessible (403), falling back to metadata search`);
+          if (video.analysis) {
+            return searchInMetadata(video, query, color);
+          }
+          return [];
+        }
+        
         console.error(`Error searching video ${video.id}: `, videoError);
         return [];
       }

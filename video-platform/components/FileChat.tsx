@@ -464,6 +464,16 @@ export default function FileChat({ fileId, fileCategory, fileName }: FileChatPro
             const data = await response.json();
 
             if (data.error) {
+                // Handle 403 errors with helpful suggestion
+                if (response.status === 403 && data.suggestion) {
+                    const errorMessage: Message = {
+                        role: 'assistant',
+                        content: `⚠️ **File Access Issue**\n\n${data.error}\n\n💡 **Suggestion:** ${data.suggestion}\n\nQuick Mode uses your saved analysis metadata and doesn't require access to the original file.`
+                    };
+                    setMessages(prev => [...prev, errorMessage]);
+                    setIsLoading(false);
+                    return;
+                }
                 throw new Error(data.error);
             }
 

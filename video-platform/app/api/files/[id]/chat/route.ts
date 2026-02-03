@@ -117,17 +117,34 @@ Note: You are chatting based on the file's analysis metadata. If the user needs 
                 }, { status: 404 });
             }
 
-            const response = await chatWithFile(
-                file.geminiFileUri,
-                file.mimeType,
-                category,
-                message,
-                history
-            );
+            try {
+                const response = await chatWithFile(
+                    file.geminiFileUri,
+                    file.mimeType,
+                    category,
+                    message,
+                    history
+                );
 
-            responseText = response.text;
-            timestamps = response.timestamps || [];
-            thoughtSignature = response.thoughtSignature || undefined;
+                responseText = response.text;
+                timestamps = response.timestamps || [];
+                thoughtSignature = response.thoughtSignature || undefined;
+            } catch (chatError: any) {
+                // If 403 error (file no longer accessible), suggest Quick Mode
+                if (chatError.status === 403 || chatError.message?.includes('403') || chatError.message?.includes('Forbidden')) {
+                    if (file.analysis) {
+                        return Response.json({
+                            error: 'This file is no longer accessible in Gemini File API. Please use Quick Mode to chat based on saved analysis metadata.',
+                            suggestion: 'Switch to Quick Mode (⚡) to continue chatting with this file.'
+                        }, { status: 403 });
+                    } else {
+                        return Response.json({
+                            error: 'This file is no longer accessible and has no saved analysis. Please re-upload and analyze the file.',
+                        }, { status: 404 });
+                    }
+                }
+                throw chatError;
+            }
         }
 
         // Save messages to history
