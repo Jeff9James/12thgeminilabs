@@ -6,13 +6,18 @@ The **Quick Mode / Detailed Mode** toggle has been added to the Chat page, match
 
 ## 🎯 What It Does
 
-### ⚡ Quick Mode (Default)
+### 🔍 Detailed Mode (Default)
+- **Processes full files** - AI analyzes actual file content in real-time
+- **More accurate** - Direct access to complete file data
+- **Slower responses** - Takes time to process files
+- **Higher cost** - Uses more AI tokens
+- **Best for:** Complex queries requiring deep analysis, maximum accuracy
+
+### ⚡ Quick Mode
 - **Searches metadata only** - Uses pre-saved analysis from your files
 - **90% cost savings** - Doesn't re-process files with AI
 - **Faster responses** - No file processing delay
 - **Best for:** Follow-up questions, general queries, budget-conscious usage
-
-### 🔍 Detailed Mode
 - **Processes full files** - AI analyzes actual file content in real-time
 - **More accurate** - Direct access to complete file data
 - **Slower responses** - Takes time to process files
@@ -52,7 +57,7 @@ Look for the **"Search Mode"** section in the left sidebar:
 
 ### State Management
 ```typescript
-const [useMetadata, setUseMetadata] = useState(true); // Default to Quick Mode
+const [useMetadata, setUseMetadata] = useState(false); // Default to Detailed Mode
 ```
 
 ### API Call
@@ -133,24 +138,25 @@ if (data.usedMetadata) {
 
 ## 🧪 Testing
 
-### Test Quick Mode:
-1. Upload a file and analyze it (generates metadata)
+### Test Detailed Mode (Default):
+1. Upload a file
 2. Go to Chat page
-3. Ensure **⚡ Quick Mode** is selected (green button)
+3. **🔍 Detailed Mode** should be selected by default (blue button)
 4. Ask: "What's in this file?"
-5. **Expect:** Fast response (~2-5 sec), console shows `✅ Quick Mode`
+5. **Expect:** Response in ~10-20 sec, console shows `🔍 Detailed Mode`
 
-### Test Detailed Mode:
+### Test Quick Mode:
 1. Same file as above
-2. Switch to **🔍 Detailed Mode** (blue button)
-3. Ask: "Explain the details in this file"
-4. **Expect:** Slower response (~10-20 sec), console shows `🔍 Detailed Mode`
+2. Switch to **⚡ Quick Mode** (green button)
+3. Ask: "Summarize this file"
+4. **Expect:** Fast response (~2-5 sec), console shows `✅ Quick Mode`
+5. **Note:** File must be analyzed first for Quick Mode to work
 
 ### Test Mode Persistence:
-1. Select **🔍 Detailed Mode**
+1. Select **⚡ Quick Mode**
 2. Ask a question
 3. Ask a follow-up question
-4. **Expect:** Still in Detailed Mode (blue button active)
+4. **Expect:** Still in Quick Mode (green button active)
 
 ## 🎨 UI Elements
 

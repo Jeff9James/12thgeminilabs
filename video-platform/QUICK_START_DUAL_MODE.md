@@ -5,9 +5,10 @@
 The Quick/Detailed mode toggle is now available on **both** the Search and Chat pages!
 
 **What's New:**
-- ⚡ Quick Mode toggle on Chat page (sidebar + mobile)
+- 🔍 **Detailed Mode is now the default** (maximum accuracy)
+- ⚡ Quick Mode toggle available on Chat page (sidebar + mobile)
 - 🔍 Detailed Mode toggle on Chat page (sidebar + mobile)
-- 90% cost savings with Quick Mode
+- Switch to Quick Mode for 90% cost savings when appropriate
 - Identical to Search page functionality
 
 See full details in [CHAT_QUICK_DETAILED_MODE.md](./CHAT_QUICK_DETAILED_MODE.md)
@@ -43,35 +44,37 @@ Visit: `http://localhost:3000`
 
 ## 💬 Step 3: Try Chat Modes (1 minute)
 
-### Quick Mode (Fast & Cheap):
+### Detailed Mode (Default - Maximum Accuracy):
 1. Click **"Chat with [File]"** tab
-2. Ensure **⚡ Quick** button is green (default)
+2. **🔍 Detailed** button is active by default (blue)
 3. Ask: "What is this file about?"
-4. ✅ Response in ~1-2 seconds!
-5. Check console: `✅ Quick Mode: Using metadata only`
+4. ✅ Response in ~5-10 seconds (most accurate)
+5. Check console: `🔍 Detailed Mode: Using full file`
 
-### Detailed Mode (Accurate):
-1. Click **🔍 Detailed** button (turns blue)
-2. Ask: "Describe specific details"
-3. ✅ Response in ~5-10 seconds (more accurate)
-4. Check console: `🔍 Detailed Mode: Using full file`
+### Quick Mode (Fast & Cheap - Optional):
+1. Click **⚡ Quick** button (turns green)
+2. Ask: "Summarize this file"
+3. ✅ Response in ~1-2 seconds!
+4. Check console: `✅ Quick Mode: Using metadata only`
+5. **Note:** File must be analyzed first for this to work
 
 ---
 
 ## 🔍 Step 4: Try Search Modes (1 minute)
 
-### Quick Mode (Instant):
+### Detailed Mode (Default - Semantic Search):
 1. Go to `/search` page
-2. Ensure **⚡ Quick Mode** is active (green)
-3. Search: "mountains" (or keywords from your file)
-4. ✅ Instant results from metadata!
-5. Check console: `✅ Quick Mode: Searched metadata only`
+2. **🔍 Detailed Mode** is active by default (blue)
+3. Search: "red objects in the scene"
+4. ✅ AI processes all files (~20-30 seconds)
+5. Check console: `🔍 Detailed Mode: AI processed all files`
 
-### Detailed Mode (Semantic):
-1. Click **🔍 Detailed Mode** button (turns blue)
-2. Search: "red objects in the scene"
-3. ✅ AI processes all files (~20-30 seconds)
-4. Check console: `🔍 Detailed Mode: AI processed all files`
+### Quick Mode (Fast - Optional):
+1. Click **⚡ Quick Mode** button (turns green)
+2. Search: "mountains" (or keywords from your file)
+3. ✅ Instant results from metadata!
+4. Check console: `✅ Quick Mode: Searched metadata only`
+5. **Note:** File must be analyzed first for this to work
 
 ---
 
@@ -196,21 +199,24 @@ Filter by `chat` or `search` requests
 
 ## 🎓 Pro Tips
 
-### Tip 1: Analyze First
-Always analyze files before chatting/searching for best results
+### Tip 1: Detailed Mode is Default
+The app now defaults to Detailed Mode for maximum accuracy out of the box
 
-### Tip 2: Start with Quick
-Begin with Quick Mode, switch to Detailed only when needed
+### Tip 2: Switch to Quick When Appropriate
+Switch to Quick Mode for faster responses on follow-up questions or general queries
 
-### Tip 3: Keyboard Shortcuts
+### Tip 3: Analyze Files for Quick Mode
+For Quick Mode to work, files must be analyzed first (to generate metadata)
+
+### Tip 4: Keyboard Shortcuts
 - Tab to cycle between mode buttons
 - Enter/Space to activate
 
-### Tip 4: Monitor Usage
+### Tip 5: Monitor Usage
 Check console logs to verify which mode is being used
 
-### Tip 5: Re-analyze if Needed
-If file content changes, re-run analysis to update metadata
+### Tip 6: Re-analyze if Needed
+If file content changes, re-run analysis to update metadata for Quick Mode
 
 ---
 

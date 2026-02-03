@@ -37,7 +37,7 @@ export default function SearchPage() {
   const [searchStatus, setSearchStatus] = useState<string>('');
 
   // Search mode: true = use metadata only (fast, cheap), false = use full file (detailed, slower)
-  const [useMetadata, setUseMetadata] = useState(true);
+  const [useMetadata, setUseMetadata] = useState(false);
 
   // Filter and sort state
   const [sortBy, setSortBy] = useState<SortOption>('relevance');
