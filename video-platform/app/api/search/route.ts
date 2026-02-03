@@ -5,6 +5,38 @@ import crypto from 'crypto';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
+/**
+ * Compare two hex colors and determine if they're similar
+ * @param color1 First hex color (e.g., "#FF5733")
+ * @param color2 Second hex color (e.g., "#FF6644")
+ * @param tolerance Tolerance level (0-255), default 30
+ * @returns true if colors are similar within tolerance
+ */
+function areColorsSimilar(color1: string, color2: string, tolerance: number = 30): boolean {
+  // Remove # if present
+  const hex1 = color1.replace('#', '');
+  const hex2 = color2.replace('#', '');
+  
+  // Parse hex to RGB
+  const r1 = parseInt(hex1.substring(0, 2), 16);
+  const g1 = parseInt(hex1.substring(2, 4), 16);
+  const b1 = parseInt(hex1.substring(4, 6), 16);
+  
+  const r2 = parseInt(hex2.substring(0, 2), 16);
+  const g2 = parseInt(hex2.substring(2, 4), 16);
+  const b2 = parseInt(hex2.substring(4, 6), 16);
+  
+  // Calculate Euclidean distance between colors
+  const distance = Math.sqrt(
+    Math.pow(r1 - r2, 2) +
+    Math.pow(g1 - g2, 2) +
+    Math.pow(b1 - b2, 2)
+  );
+  
+  // Check if distance is within tolerance (30 is a good default for similar colors)
+  return distance <= tolerance;
+}
+
 // Create a cache key from query and video IDs
 function createCacheKey(query: string, videoIds: string[]): string {
   const content = `${query}:${videoIds.sort().join(',')}`;
@@ -311,13 +343,42 @@ async function searchInMetadata(video: any, query: string, color?: string): Prom
     relevanceScore += matches * 5;
   });
 
-  // Color matching for images
+  // Color matching for images (hex code matching)
   if (color && analysis.colors) {
-    const colorMatches = analysis.colors.some((c: string) => 
-      c.toLowerCase().includes(color.toLowerCase()) || 
-      color.toLowerCase().includes(c.toLowerCase())
-    );
-    if (colorMatches) {
+    let colorMatch = false;
+    
+    // Check if the selected color is a hex code
+    if (color.startsWith('#')) {
+      // Direct hex code matching (case-insensitive)
+      colorMatch = analysis.colors.some((c: string) => 
+        c.toLowerCase() === color.toLowerCase()
+      );
+      
+      // If no exact match, check for similar colors (within a tolerance)
+      if (!colorMatch) {
+        colorMatch = analysis.colors.some((c: string) => {
+          if (c.startsWith('#')) {
+            return areColorsSimilar(color, c, 30); // 30 is tolerance threshold
+          }
+          return false;
+        });
+      }
+    } else {
+      // If not a hex code, fall back to string matching (legacy support)
+      colorMatch = analysis.colors.some((c: string) => 
+        c.toLowerCase().includes(color.toLowerCase()) || 
+        color.toLowerCase().includes(c.toLowerCase())
+      );
+      
+      // Also check colorDescriptions if available
+      if (!colorMatch && analysis.colorDescriptions) {
+        colorMatch = analysis.colorDescriptions.some((desc: string) =>
+          desc.toLowerCase().includes(color.toLowerCase())
+        );
+      }
+    }
+    
+    if (colorMatch) {
       relevanceScore += 30;
       if (!matchedContent) matchedContent = `Contains color: ${color}`;
     }

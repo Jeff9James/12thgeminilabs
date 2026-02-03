@@ -36,7 +36,8 @@ Format as JSON:
 2. List of objects, people, and elements detected
 3. Any text visible in the image (OCR)
 4. Context and setting
-5. Colors, composition, and visual style
+5. Identify the MAIN/DOMINANT colors (top 5-10) with their HEX codes in #RRGGBB format
+6. Visual style and composition
 
 Format as JSON:
 {
@@ -45,9 +46,16 @@ Format as JSON:
   "ocrText": "...",
   "setting": "...",
   "style": "...",
-  "colors": ["..."],
+  "colors": ["#FF5733", "#C70039", "#900C3F", "..."],
+  "colorDescriptions": ["bright red", "dark crimson", "deep purple", "..."],
   "keyPoints": ["..."]
-}`;
+}
+
+IMPORTANT: 
+- For "colors", provide ONLY hex codes in #RRGGBB format (e.g., "#FF5733")
+- List the most dominant/prominent colors first
+- Include 5-10 main colors that are visually significant
+- For "colorDescriptions", provide human-readable names matching the hex codes in the same order`;
 
         case 'audio':
             return `Analyze this audio file and provide:
@@ -482,7 +490,8 @@ export function getDefaultAnalysis(category: FileCategory) {
                 ocrText: '',
                 setting: '',
                 style: '',
-                colors: []
+                colors: [],
+                colorDescriptions: []
             };
         case 'audio':
             return {
