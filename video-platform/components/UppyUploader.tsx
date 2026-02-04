@@ -1,32 +1,28 @@
 'use client';
 
 import React, { useEffect, useState, useMemo } from 'react';
-import Uppy from '@uppy/core';
-import Webcam from '@uppy/webcam';
-import GoogleDrive from '@uppy/google-drive';
-import GooglePhotos from '@uppy/google-photos';
-import Dropbox from '@uppy/dropbox';
-import Instagram from '@uppy/instagram';
-import Facebook from '@uppy/facebook';
-import OneDrive from '@uppy/onedrive';
-import Box from '@uppy/box';
-import Url from '@uppy/url';
-import Zoom from '@uppy/zoom';
-import Unsplash from '@uppy/unsplash';
-import Audio from '@uppy/audio';
-import ScreenCapture from '@uppy/screen-capture';
-import ImageEditor from '@uppy/image-editor';
-import Tus from '@uppy/tus';
+import {
+    Uppy,
+    Webcam,
+    Zoom,
+    Dropbox,
+    OneDrive,
+    Unsplash,
+    Url,
+    Box,
+    Audio,
+    ScreenCapture,
+    ImageEditor,
+    Tus,
+    GoogleDrivePicker,
+    GooglePhotosPicker,
+    Facebook,
+    Instagram,
+} from 'uppy';
 import DashboardModal from '@uppy/react/dashboard-modal';
 
-// CSS imports
-import '@uppy/core/dist/style.min.css';
-import '@uppy/dashboard/dist/style.min.css';
-import '@uppy/webcam/dist/style.min.css';
-import '@uppy/screen-capture/dist/style.min.css';
-import '@uppy/audio/dist/style.min.css';
-import '@uppy/url/dist/style.min.css';
-import '@uppy/image-editor/dist/style.min.css';
+// Use the consolidated Uppy CSS bundle
+import 'uppy/dist/uppy.min.css';
 
 interface UppyUploaderProps {
     open: boolean;
@@ -36,6 +32,11 @@ interface UppyUploaderProps {
 
 const companionUrl = 'https://companion.uppy.io';
 const endpoint = 'https://tusd.tusdemo.net/files/';
+
+// Credentials from the official Uppy GitHub example
+const googlePickerClientId = '458443975467-fiplebcb8bdnplqo8hlfs9pagmseo5nk.apps.googleusercontent.com';
+const googlePickerApiKey = 'AIzaSyC6m6CZEFiTtSkBfNf_-PvtCxmDMiAgfag';
+const googlePickerAppId = '458443975467';
 
 export default function UppyUploader({ open, onClose, onFileSelect }: UppyUploaderProps) {
     const [isMounted, setIsMounted] = useState(false);
@@ -66,8 +67,16 @@ export default function UppyUploader({ open, onClose, onFileSelect }: UppyUpload
             .use(Zoom, { companionUrl })
             .use(Facebook, { companionUrl })
             .use(Instagram, { companionUrl })
-            .use(GoogleDrive, { companionUrl })
-            .use(GooglePhotos, { companionUrl });
+            .use(GoogleDrivePicker, {
+                companionUrl,
+                clientId: googlePickerClientId,
+                apiKey: googlePickerApiKey,
+                appId: googlePickerAppId,
+            })
+            .use(GooglePhotosPicker, {
+                companionUrl,
+                clientId: googlePickerClientId,
+            });
     }, []);
 
     useEffect(() => {
@@ -103,8 +112,8 @@ export default function UppyUploader({ open, onClose, onFileSelect }: UppyUpload
                 'Unsplash',
                 'Box',
                 'ImageEditor',
-                'GoogleDrive',
-                'GooglePhotos',
+                'GoogleDrivePicker',
+                'GooglePhotosPicker',
                 'Facebook',
                 'Instagram',
                 'Zoom',
