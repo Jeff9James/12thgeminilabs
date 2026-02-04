@@ -54,6 +54,8 @@ export default function LiveLesson({ onClose, systemInstruction, contextFiles }:
             const socket = new WebSocket(url);
             socketRef.current = socket;
 
+            socket.binaryType = 'arraybuffer';
+
             socket.onopen = () => {
                 console.log("WebSocket Connection Opened.");
                 setIsConnected(true);
@@ -84,24 +86,36 @@ export default function LiveLesson({ onClose, systemInstruction, contextFiles }:
             };
 
             socket.onmessage = async (event) => {
-                const response = JSON.parse(event.data);
+                try {
+                    let data = event.data;
+                    if (data instanceof ArrayBuffer) {
+                        // Some endpoints might send JSON as binary
+                        data = new TextDecoder().decode(data);
+                    } else if (data instanceof Blob) {
+                        data = await data.text();
+                    }
 
-                if (response.serverContent?.interrupted) {
-                    audioQueueRef.current = [];
-                    setIsSpeaking(false);
-                    return;
-                }
+                    const response = JSON.parse(data);
 
-                if (response.serverContent?.modelTurn?.parts) {
-                    for (const part of response.serverContent.modelTurn.parts) {
-                        if (part.inlineData?.data) {
-                            const binary = atob(part.inlineData.data);
-                            const buffer = new Uint8Array(binary.length);
-                            for (let i = 0; i < binary.length; i++) buffer[i] = binary.charCodeAt(i);
-                            audioQueueRef.current.push(buffer.buffer);
-                            if (!isPlayingRef.current) playNextChunk();
+                    if (response.serverContent?.interrupted) {
+                        audioQueueRef.current = [];
+                        setIsSpeaking(false);
+                        return;
+                    }
+
+                    if (response.serverContent?.modelTurn?.parts) {
+                        for (const part of response.serverContent.modelTurn.parts) {
+                            if (part.inlineData?.data) {
+                                const binary = atob(part.inlineData.data);
+                                const buffer = new Uint8Array(binary.length);
+                                for (let i = 0; i < binary.length; i++) buffer[i] = binary.charCodeAt(i);
+                                audioQueueRef.current.push(buffer.buffer);
+                                if (!isPlayingRef.current) playNextChunk();
+                            }
                         }
                     }
+                } catch (e) {
+                    console.error("Message parsing error:", e, event.data);
                 }
             };
 
