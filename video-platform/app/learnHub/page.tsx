@@ -112,8 +112,10 @@ export default function LearnHubPage() {
   const [selectedMCPTool, setSelectedMCPTool] = useState<MCPTool | null>(null);
   const [mcpToolArgs, setMcpToolArgs] = useState<Record<string, string>>({});
 
-  // Tutor Agent State
+  // Agent State & Capabilities
   const [isAgentMode, setIsAgentMode] = useState(true);
+  const [isTutorEnabled, setIsTutorEnabled] = useState(true);
+  const [isManagementEnabled, setIsManagementEnabled] = useState(true);
   const [pendingActions, setPendingActions] = useState<AgentAction[]>([]);
   const [isApplying, setIsApplying] = useState(false);
 
@@ -426,17 +428,23 @@ export default function LearnHubPage() {
     setIsSearching(true);
     setRawResults([]);
 
-    setSearchStatus(isAgentMode ? 'Consulting AI Tutor...' : 'Preparing lesson...');
+    setSearchStatus(isAgentMode ? 'Consulting AI...' : 'Preparing lesson...');
 
     try {
       if (isAgentMode) {
+        // Determine mode based on enabled capabilities
+        let agentMode: 'learning' | 'management' | 'hybrid' = 'learning';
+        if (isTutorEnabled && isManagementEnabled) agentMode = 'hybrid';
+        else if (isManagementEnabled) agentMode = 'management';
+        else agentMode = 'learning';
+
         const response = await fetch('/api/chat/agent', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             query: query.trim(),
             history: chatHistory.slice(-5), // Send some context
-            mode: 'learning' // Signal learning mode to the agent
+            mode: agentMode
           })
         });
 
@@ -808,10 +816,10 @@ export default function LearnHubPage() {
 
           <div className="border-t border-gray-100 pt-10">
             <div className="p-4 bg-purple-50 rounded-xl border border-purple-100 mb-6 flex-shrink-0">
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <Bot className="w-5 h-5 text-purple-600" />
-                  <span className="font-bold text-gray-900 text-xs uppercase tracking-tight">AI Tutor Mode</span>
+                  <span className="font-bold text-gray-900 text-xs uppercase tracking-tight">AI Agent Mode</span>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
@@ -823,10 +831,48 @@ export default function LearnHubPage() {
                   <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
                 </label>
               </div>
-              <p className="text-[10px] text-purple-700 leading-relaxed font-medium">
-                Pedagogical guidance and scaffolding.
-                <span className="block mt-1 font-bold">Review lesson plans before applying.</span>
-              </p>
+
+              {isAgentMode && (
+                <div className="space-y-4 pt-2 border-t border-purple-100 mt-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-bold text-gray-700 uppercase">AI Tutor Capability</span>
+                      <span className="text-[9px] text-gray-500">Pedagogical guidance</span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer scale-75">
+                      <input
+                        type="checkbox"
+                        className="sr-only peer"
+                        checked={isTutorEnabled}
+                        onChange={(e) => setIsTutorEnabled(e.target.checked)}
+                      />
+                      <div className="w-8 h-4 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-purple-500"></div>
+                    </label>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-bold text-gray-700 uppercase">File Agent Capability</span>
+                      <span className="text-[9px] text-gray-500">Organization & actions</span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer scale-75">
+                      <input
+                        type="checkbox"
+                        className="sr-only peer"
+                        checked={isManagementEnabled}
+                        onChange={(e) => setIsManagementEnabled(e.target.checked)}
+                      />
+                      <div className="w-8 h-4 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-purple-500"></div>
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {!isAgentMode && (
+                <p className="text-[10px] text-gray-500 italic mt-2">
+                  Enable Agent Mode for proactive AI assistance.
+                </p>
+              )}
             </div>
 
             {/* Search Mode Toggle */}

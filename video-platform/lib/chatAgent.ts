@@ -19,7 +19,7 @@ export async function runAgentCycle(
     history: any[] = [],
     contextFiles: any[] = [],
     contextFolders: any[] = [],
-    mode: 'management' | 'learning' = 'management'
+    mode: 'management' | 'learning' | 'hybrid' = 'management'
 ): Promise<AgentResponse> {
     const model = genAI.getGenerativeModel({
         model: 'gemini-3-flash-preview',
@@ -29,16 +29,24 @@ export async function runAgentCycle(
     // Prepare context about current structure
     let systemInstruction = '';
 
-    if (mode === 'learning') {
-        systemInstruction = `You are an AI Tutor and Learning Hub Agent.
+    const fileStateContext = `
+CURRENT FILE SYSTEM STATE:
+Folders: ${JSON.stringify(contextFolders.map(f => ({ id: f.id, name: f.name, parentId: f.parentId })))}
+Files: ${JSON.stringify(contextFiles.map(f => ({ id: f.id, filename: f.filename || f.title, folderId: f.folderId, category: f.category, uploadedAt: f.uploadedAt })))}
+`;
+
+    if (mode === 'learning' || mode === 'hybrid') {
+        const hybridIntro = mode === 'hybrid'
+            ? "You are a Hybrid AI Agent acting as both an AI Tutor and a File Management Specialist."
+            : "You are an AI Tutor and Learning Hub Agent.";
+
+        systemInstruction = `${hybridIntro}
 Your goal is to help the user master subjects using their uploaded study materials.
 You should act as a pedagogical guide, explaining complex concepts, creating study plans, and scaffolding the user's learning process.
 
-CURRENT STUDY MATERIALS (FILE SYSTEM STATE):
-Folders: ${JSON.stringify(contextFolders.map(f => ({ id: f.id, name: f.name, parentId: f.parentId })))}
-Files: ${JSON.stringify(contextFiles.map(f => ({ id: f.id, filename: f.filename || f.title, folderId: f.folderId, category: f.category, uploadedAt: f.uploadedAt })))}
+${fileStateContext}
 
-When the user asks to perform a learning action or organize study materials, use your tools if needed (e.g., to create a "Study Guides" folder).
+When the user asks to perform a learning action or organize study materials, use your tools if needed (e.g., to create a "Study Guides" folder or rename files for better organization).
 You MUST propose actions to the user using your tools if you want to organize their files.
 
 PEDAGOGICAL GUIDELINES:
@@ -47,15 +55,18 @@ PEDAGOGICAL GUIDELINES:
 3. Propose practice questions or quizzes.
 4. If a user asks a complex question, break it down into smaller, learnable parts (scaffolding).
 
-Always explain your pedagogical approach in your response.`;
+${mode === 'hybrid' ? `
+FILE MANAGEMENT CAPABILITIES:
+You can also help the user organize their files and folders, rename them, delete them, and update metadata.
+You can call MULTIPLE tools in a single response to perform complex tasks.
+If you are creating a folder and want to move files into it immediately, use the virtual ID format 'virtual-folder:[NAME]' for the folderId in the move_item tool.
+Always explain both your pedagogical approach and any file management actions you are proposing.` : "Always explain your pedagogical approach in your response."}`;
     } else {
         systemInstruction = `You are a File Management AI Agent. 
 You can help the user organize their files and folders, rename them, delete them, and update metadata.
 You MUST propose actions to the user using your tools.
 
-CURRENT FILE SYSTEM STATE:
-Folders: ${JSON.stringify(contextFolders.map(f => ({ id: f.id, name: f.name, parentId: f.parentId })))}
-Files: ${JSON.stringify(contextFiles.map(f => ({ id: f.id, filename: f.filename || f.title, folderId: f.folderId, category: f.category, uploadedAt: f.uploadedAt })))}
+${fileStateContext}
 
 When the user asks to perform an action, call the corresponding tool.
 You can call MULTIPLE tools in a single response to perform complex tasks.
