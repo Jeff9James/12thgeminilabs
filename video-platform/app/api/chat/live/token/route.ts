@@ -17,11 +17,11 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
             success: true,
             // We'll pass the model name for the Live API
-            model: "gemini-2.5-flash-native-audio-preview-12-2025",
+            model: "gemini-2.0-flash-exp",
             // In a real implementation, you would return a short-lived token here
             // token: ephemeralToken,
             key: process.env.GEMINI_API_KEY,
-            baseUrl: "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BiDiGenerateContent"
+            baseUrl: "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent"
         });
 
     } catch (error: any) {
