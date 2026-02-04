@@ -27,6 +27,7 @@ import {
   CheckCircle2,
   XCircle
 } from 'lucide-react';
+import LiveLesson from '@/components/LiveLesson';
 import {
   connectToMCPServer,
   disconnectFromMCPServer,
@@ -1255,7 +1256,17 @@ export default function LearnHubPage() {
           </div>
         )}
 
-        {/* Results Section */}
+        <AnimatePresence>
+          {isLiveMode && (
+            <LiveLesson
+              onClose={() => setIsLiveMode(false)}
+              systemInstruction="You are an expert tutor for the subjects in these files. Guide the user patiently and reference their uploaded materials."
+              contextFiles={allFiles}
+            />
+          )}
+        </AnimatePresence>
+
+        {/* Hero Section */}
         <div className="max-w-7xl mx-auto px-6 pb-32">
           <AnimatePresence mode="wait">
             {isSearching && (
