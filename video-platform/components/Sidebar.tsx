@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { FileText, Search, Sparkles, Menu, X, MessageCircle, Clock } from 'lucide-react';
+import { FileText, Search, Sparkles, Menu, X, MessageCircle, Clock, GraduationCap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -37,6 +37,12 @@ const navItems: Array<{
       name: 'Analyze',
       href: '/analyze',
       icon: Sparkles,
+    },
+    {
+      name: 'LearnHub',
+      href: '/learnHub',
+      icon: GraduationCap,
+      badge: 'NEW',
     },
   ];
 

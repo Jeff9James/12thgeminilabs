@@ -4,7 +4,7 @@ import { listFiles, listFolders } from '@/lib/kv';
 
 export async function POST(request: NextRequest) {
     try {
-        const { query, history = [] } = await request.json();
+        const { query, history = [], mode = 'management' } = await request.json();
 
         if (!query) {
             return NextResponse.json({ error: 'Query is required' }, { status: 400 });
@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
             listFolders(userId)
         ]);
 
-        const agentResponse = await runAgentCycle(query, history, files, folders);
+        const agentResponse = await runAgentCycle(query, history, files, folders, mode as any);
 
         return NextResponse.json({
             success: true,

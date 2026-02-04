@@ -18,7 +18,8 @@ export async function runAgentCycle(
     query: string,
     history: any[] = [],
     contextFiles: any[] = [],
-    contextFolders: any[] = []
+    contextFolders: any[] = [],
+    mode: 'management' | 'learning' = 'management'
 ): Promise<AgentResponse> {
     const model = genAI.getGenerativeModel({
         model: 'gemini-3-flash-preview',
@@ -26,7 +27,29 @@ export async function runAgentCycle(
     });
 
     // Prepare context about current structure
-    const systemInstruction = `You are a File Management AI Agent. 
+    let systemInstruction = '';
+
+    if (mode === 'learning') {
+        systemInstruction = `You are an AI Tutor and Learning Hub Agent.
+Your goal is to help the user master subjects using their uploaded study materials.
+You should act as a pedagogical guide, explaining complex concepts, creating study plans, and scaffolding the user's learning process.
+
+CURRENT STUDY MATERIALS (FILE SYSTEM STATE):
+Folders: ${JSON.stringify(contextFolders.map(f => ({ id: f.id, name: f.name, parentId: f.parentId })))}
+Files: ${JSON.stringify(contextFiles.map(f => ({ id: f.id, filename: f.filename || f.title, folderId: f.folderId, category: f.category, uploadedAt: f.uploadedAt })))}
+
+When the user asks to perform a learning action or organize study materials, use your tools if needed (e.g., to create a "Study Guides" folder).
+You MUST propose actions to the user using your tools if you want to organize their files.
+
+PEDAGOGICAL GUIDELINES:
+1. Explain concepts simply and use analogies.
+2. Link information across multiple files if relevant.
+3. Propose practice questions or quizzes.
+4. If a user asks a complex question, break it down into smaller, learnable parts (scaffolding).
+
+Always explain your pedagogical approach in your response.`;
+    } else {
+        systemInstruction = `You are a File Management AI Agent. 
 You can help the user organize their files and folders, rename them, delete them, and update metadata.
 You MUST propose actions to the user using your tools.
 
@@ -40,6 +63,7 @@ If you are creating a folder and want to move files into it immediately, use the
 
 The user will review your proposed actions before they are applied. 
 Always explain what you are planning to do.`;
+    }
 
     const contents: Content[] = [
         {
