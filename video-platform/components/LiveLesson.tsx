@@ -33,13 +33,11 @@ export default function LiveLesson({ onClose, systemInstruction, contextFiles }:
         try {
             setStatus('Requesting secure session...');
             const res = await fetch('/api/chat/live/token', { method: 'POST' });
-            const { baseUrl, model } = await res.json();
+            const { baseUrl, model, key } = await res.json();
 
             setStatus('Connecting to Gemini Live...');
-            // In a real implementation with API key or token:
-            // const url = `${baseUrl}?key=${process.env.NEXT_PUBLIC_GEMINI_API_KEY}`;
-            // For now we use the demo URL structure
-            const socket = new WebSocket(baseUrl);
+            const url = `${baseUrl}?key=${key}`;
+            const socket = new WebSocket(url);
             socketRef.current = socket;
 
             socket.onopen = () => {

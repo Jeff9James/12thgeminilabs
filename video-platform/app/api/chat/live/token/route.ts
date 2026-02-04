@@ -20,6 +20,7 @@ export async function POST(request: NextRequest) {
             model: "gemini-2.0-flash-exp",
             // In a real implementation, you would return a short-lived token here
             // token: ephemeralToken,
+            key: process.env.GEMINI_API_KEY,
             baseUrl: "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BiDiGenerateContent"
         });
 
