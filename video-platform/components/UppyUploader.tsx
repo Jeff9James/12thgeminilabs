@@ -92,7 +92,7 @@ export default function UppyUploader({ open, onClose, onFileSelect }: UppyUpload
                 'ImageEditor',
                 'ScreenCapture',
                 'Audio',
-                // RemoteSources handles adding its own plugins to the Dashboard
+                'RemoteSources' // handles adding its own plugins to the Dashboard
             ]}
         />
     );
