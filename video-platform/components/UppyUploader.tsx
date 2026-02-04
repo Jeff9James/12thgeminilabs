@@ -5,23 +5,15 @@ import {
     Uppy,
     Webcam,
     Zoom,
-    Dropbox,
-    OneDrive,
-    Unsplash,
-    Url,
-    Box,
     Audio,
     ScreenCapture,
     ImageEditor,
     Tus,
-    GoogleDrivePicker,
-    GooglePhotosPicker,
-    Facebook,
-    Instagram,
+    RemoteSources,
 } from 'uppy';
 import DashboardModal from '@uppy/react/dashboard-modal';
 
-// Use the consolidated Uppy CSS bundle
+// Use the consolidated Uppy CSS bundle for reliability
 import 'uppy/dist/uppy.min.css';
 
 interface UppyUploaderProps {
@@ -32,11 +24,6 @@ interface UppyUploaderProps {
 
 const companionUrl = 'https://companion.uppy.io';
 const endpoint = 'https://tusd.tusdemo.net/files/';
-
-// Credentials from the official Uppy GitHub example
-const googlePickerClientId = '458443975467-fiplebcb8bdnplqo8hlfs9pagmseo5nk.apps.googleusercontent.com';
-const googlePickerApiKey = 'AIzaSyC6m6CZEFiTtSkBfNf_-PvtCxmDMiAgfag';
-const googlePickerAppId = '458443975467';
 
 export default function UppyUploader({ open, onClose, onFileSelect }: UppyUploaderProps) {
     const [isMounted, setIsMounted] = useState(false);
@@ -59,23 +46,19 @@ export default function UppyUploader({ open, onClose, onFileSelect }: UppyUpload
             .use(Audio)
             .use(ImageEditor, {})
             .use(Tus, { endpoint })
-            .use(Dropbox, { companionUrl })
-            .use(Url, { companionUrl })
-            .use(OneDrive, { companionUrl })
-            .use(Unsplash, { companionUrl })
-            .use(Box, { companionUrl })
-            .use(Zoom, { companionUrl })
-            .use(Facebook, { companionUrl })
-            .use(Instagram, { companionUrl })
-            .use(GoogleDrivePicker, {
+            .use(RemoteSources, {
                 companionUrl,
-                clientId: googlePickerClientId,
-                apiKey: googlePickerApiKey,
-                appId: googlePickerAppId,
-            })
-            .use(GooglePhotosPicker, {
-                companionUrl,
-                clientId: googlePickerClientId,
+                sources: [
+                    'GoogleDrive',
+                    'Dropbox',
+                    'Instagram',
+                    'Facebook',
+                    'OneDrive',
+                    'Box',
+                    'Unsplash',
+                    'Url',
+                    'Zoom',
+                ],
             });
     }, []);
 
@@ -106,19 +89,10 @@ export default function UppyUploader({ open, onClose, onFileSelect }: UppyUpload
             proudlyDisplayPoweredByUppy={false}
             plugins={[
                 'Webcam',
-                'Dropbox',
-                'Url',
-                'OneDrive',
-                'Unsplash',
-                'Box',
                 'ImageEditor',
-                'GoogleDrivePicker',
-                'GooglePhotosPicker',
-                'Facebook',
-                'Instagram',
-                'Zoom',
                 'ScreenCapture',
-                'Audio'
+                'Audio',
+                // RemoteSources handles adding its own plugins to the Dashboard
             ]}
         />
     );
