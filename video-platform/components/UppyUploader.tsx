@@ -4,19 +4,12 @@ import React, { useEffect, useState, useMemo, useRef } from 'react';
 import {
     Uppy,
     Webcam,
-    Zoom,
-    Dropbox,
-    OneDrive,
     Unsplash,
     Url,
-    Box,
     Audio,
     ScreenCapture,
     ImageEditor,
     Tus,
-    GoogleDrive,
-    Facebook,
-    Instagram,
 } from 'uppy';
 import DashboardModal from '@uppy/react/dashboard-modal';
 
@@ -61,15 +54,8 @@ export default function UppyUploader({ open, onClose, onFileSelect }: UppyUpload
             .use(Audio)
             .use(ImageEditor, {})
             .use(Tus, { endpoint })
-            .use(Dropbox, { companionUrl })
             .use(Url, { companionUrl })
-            .use(OneDrive, { companionUrl })
-            .use(Unsplash, { companionUrl })
-            .use(Box, { companionUrl })
-            .use(Zoom, { companionUrl })
-            .use(Facebook, { companionUrl })
-            .use(Instagram, { companionUrl })
-            .use(GoogleDrive, { companionUrl });
+            .use(Unsplash, { companionUrl });
 
         if (typeof window !== 'undefined') {
             (window as any).uppy = u;
