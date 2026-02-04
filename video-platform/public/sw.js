@@ -97,10 +97,12 @@ self.addEventListener('fetch', (event) => {
         }
 
         // Clone and cache the response
-        const responseClone = response.clone();
-        caches.open(RUNTIME_CACHE).then((cache) => {
-          cache.put(request, responseClone);
-        });
+        if (request.method === 'GET') {
+          const responseClone = response.clone();
+          caches.open(RUNTIME_CACHE).then((cache) => {
+            cache.put(request, responseClone);
+          });
+        }
 
         return response;
       });
@@ -111,14 +113,14 @@ self.addEventListener('fetch', (event) => {
 // Handle file sharing
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
-  
+
   // Handle shared files
   if (url.pathname === '/analyze' && event.request.method === 'POST') {
     event.respondWith(
       (async () => {
         const formData = await event.request.formData();
         const file = formData.get('file');
-        
+
         if (file) {
           // Store file info in cache for the analyze page to pick up
           const cache = await caches.open(RUNTIME_CACHE);
@@ -128,7 +130,7 @@ self.addEventListener('fetch', (event) => {
             size: file.size,
           })));
         }
-        
+
         // Redirect to analyze page
         return Response.redirect('/analyze', 303);
       })()
@@ -141,7 +143,7 @@ self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
-  
+
   if (event.data && event.data.type === 'CLAIM_CLIENTS') {
     self.clients.claim();
   }

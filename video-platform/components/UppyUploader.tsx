@@ -9,6 +9,7 @@ import {
     Audio,
     ScreenCapture,
     ImageEditor,
+    XHRUpload,
 } from 'uppy';
 import DashboardModal from '@uppy/react/dashboard-modal';
 
@@ -54,10 +55,9 @@ export default function UppyUploader({ open, onClose, onFileSelect }: UppyUpload
             .use(ImageEditor, {})
             // Unsplash and Url REQUIRE a companionUrl. They cannot run client-only.
             .use(Unsplash, { companionUrl })
-            .use(Url, { companionUrl });
-
-        // Since we removed Tus, we can handle the "upload" event locally
-        // or just let 'complete' fire when the user finishes selecting/editing.
+            .use(Url, { companionUrl })
+            // We need an uploader plugin to satisfy Uppy and trigger 'complete' events.
+            .use(XHRUpload, { endpoint: '/api/upload-dummy', formData: true, bundle: true });
 
         if (typeof window !== 'undefined') {
             (window as any).uppy = u;
@@ -67,16 +67,37 @@ export default function UppyUploader({ open, onClose, onFileSelect }: UppyUpload
     }, []);
 
     useEffect(() => {
-        const handleComplete = (result: any) => {
+        const handleComplete = async (result: any) => {
             if (result.successful && result.successful.length > 0) {
                 const uppyFile = result.successful[0];
 
-                // Convert Blob to File if necessary
                 let fileToReturn: File;
-                if (uppyFile.data instanceof File) {
-                    fileToReturn = uppyFile.data;
+
+                // Check if we have actual file data. Remote files initially only have metadata.
+                const hasData = uppyFile.data instanceof File || uppyFile.data instanceof Blob;
+
+                if (hasData && uppyFile.data.size > 0) {
+                    fileToReturn = uppyFile.data instanceof File
+                        ? uppyFile.data
+                        : new File([uppyFile.data], uppyFile.name || 'upload', { type: uppyFile.type });
                 } else {
-                    fileToReturn = new File([uppyFile.data], uppyFile.name || 'upload', { type: uppyFile.type });
+                    // This is likely a remote file (Url import). 
+                    // To get it to the app's local state, we need to fetch the bytes.
+                    try {
+                        const sourceUrl = uppyFile.uploadURL || uppyFile.remote?.body?.url || uppyFile.preview;
+
+                        if (sourceUrl) {
+                            console.log('[UppyUploader] Fetching remote file data from:', sourceUrl);
+                            const response = await fetch(sourceUrl);
+                            const blob = await response.blob();
+                            fileToReturn = new File([blob], uppyFile.name || 'upload', { type: uppyFile.type });
+                        } else {
+                            fileToReturn = new File([], uppyFile.name || 'upload', { type: uppyFile.type });
+                        }
+                    } catch (err) {
+                        console.error('Failed to fetch remote file data:', err);
+                        fileToReturn = new File([], uppyFile.name || 'upload', { type: uppyFile.type });
+                    }
                 }
 
                 onFileSelectRef.current(fileToReturn);
