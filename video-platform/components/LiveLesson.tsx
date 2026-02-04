@@ -31,12 +31,22 @@ export default function LiveLesson({ onClose, systemInstruction, contextFiles }:
 
     const startSession = async () => {
         try {
+            console.log("Starting Live Session...");
             setStatus('Requesting Microphone access...');
-            await startMic();
+
+            // Request mic explicitly
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            micStreamRef.current = stream;
+            console.log("Microphone access granted.");
 
             setStatus('Requesting secure session...');
             const res = await fetch('/api/chat/live/token', { method: 'POST' });
-            const { baseUrl, model, key } = await res.json();
+            const data = await res.json();
+
+            if (!data.success) throw new Error(data.error || "Failed to get session");
+
+            const { baseUrl, model, key } = data;
+            console.log(`Session received. Model: ${model}`);
 
             setStatus('Connecting to Gemini Live...');
             const url = `${baseUrl}?key=${key}`;
@@ -44,6 +54,7 @@ export default function LiveLesson({ onClose, systemInstruction, contextFiles }:
             socketRef.current = socket;
 
             socket.onopen = () => {
+                console.log("WebSocket Connection Opened.");
                 setIsConnected(true);
                 setStatus('AI Tutor connected. Speak now!');
 
@@ -63,6 +74,9 @@ export default function LiveLesson({ onClose, systemInstruction, contextFiles }:
                         }
                     }
                 }));
+
+                // Start audio processing
+                setupAudioProcessing();
             };
 
             socket.onmessage = async (event) => {
@@ -89,34 +103,37 @@ export default function LiveLesson({ onClose, systemInstruction, contextFiles }:
 
             socket.onerror = (err) => {
                 console.error("WebSocket Error:", err);
-                setError("Connection error. Please try again.");
+                setError("Connection error. Check your API key and Internet.");
             };
 
-            socket.onclose = () => {
+            socket.onclose = (e) => {
+                console.log("WebSocket Closed:", e.code, e.reason);
                 setIsConnected(false);
-                stopMic();
+                if (e.code !== 1000) setError(`Connection closed: ${e.reason || 'Handshake failed'}`);
             };
 
         } catch (err: any) {
+            console.error("Session Error:", err);
             setError(err.message || "Failed to start live lesson");
         }
     };
 
     const stopSession = () => {
         socketRef.current?.close();
-        stopMic();
+        micStreamRef.current?.getTracks().forEach(track => track.stop());
+        processorRef.current?.disconnect();
         if (audioContextRef.current) audioContextRef.current.close();
+        setIsListening(false); // Ensure listening state is reset
     };
 
-    const startMic = async () => {
+    const setupAudioProcessing = async () => {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            micStreamRef.current = stream;
+            if (!micStreamRef.current) return;
 
             const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
             audioContextRef.current = audioCtx;
 
-            const source = audioCtx.createMediaStreamSource(stream);
+            const source = audioCtx.createMediaStreamSource(micStreamRef.current);
             const processor = audioCtx.createScriptProcessor(4096, 1, 1);
             processorRef.current = processor;
 
@@ -147,15 +164,9 @@ export default function LiveLesson({ onClose, systemInstruction, contextFiles }:
             processor.connect(audioCtx.destination);
 
         } catch (err) {
-            console.error("Mic Error:", err);
+            console.error("Audio Setup Error:", err);
             setError("Could not access microphone.");
         }
-    };
-
-    const stopMic = () => {
-        micStreamRef.current?.getTracks().forEach(track => track.stop());
-        processorRef.current?.disconnect();
-        setIsListening(false);
     };
 
     const playNextChunk = async () => {
