@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import {
     Uppy,
     Webcam,
@@ -33,6 +33,15 @@ const endpoint = 'https://tusd.tusdemo.net/files/';
 
 export default function UppyUploader({ open, onClose, onFileSelect }: UppyUploaderProps) {
     const [isMounted, setIsMounted] = useState(false);
+
+    // Store callbacks in a ref to prevent effect re-runs when they change
+    const onFileSelectRef = useRef(onFileSelect);
+    const onCloseRef = useRef(onClose);
+
+    useEffect(() => {
+        onFileSelectRef.current = onFileSelect;
+        onCloseRef.current = onClose;
+    }, [onFileSelect, onClose]);
 
     useEffect(() => {
         setIsMounted(true);
@@ -70,24 +79,33 @@ export default function UppyUploader({ open, onClose, onFileSelect }: UppyUpload
     }, []);
 
     useEffect(() => {
-        uppy.on('complete', (result) => {
+        const handleComplete = (result: any) => {
             if (result.successful && result.successful.length > 0) {
                 const uppyFile = result.successful[0];
                 if (uppyFile.data instanceof File) {
-                    onFileSelect(uppyFile.data);
+                    onFileSelectRef.current(uppyFile.data);
                 } else if (uppyFile.data instanceof Blob) {
                     const file = new File([uppyFile.data], uppyFile.name, { type: uppyFile.type });
-                    onFileSelect(file);
+                    onFileSelectRef.current(file);
                 }
-                onClose();
+                onCloseRef.current();
                 uppy.cancelAll();
             }
-        });
+        };
 
+        uppy.on('complete', handleComplete);
+
+        return () => {
+            uppy.off('complete', handleComplete);
+        };
+    }, [uppy]);
+
+    // Cleanup uppy instance only on true unmount
+    useEffect(() => {
         return () => {
             uppy.destroy();
         };
-    }, [uppy, onFileSelect, onClose]);
+    }, [uppy]);
 
     if (!isMounted) return null;
 
