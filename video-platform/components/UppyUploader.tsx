@@ -14,8 +14,9 @@ import {
     ScreenCapture,
     ImageEditor,
     Tus,
-    GoogleDrivePicker,
-    GooglePhotosPicker,
+    GoogleDrive,
+    Facebook,
+    Instagram,
 } from 'uppy';
 import DashboardModal from '@uppy/react/dashboard-modal';
 
@@ -29,10 +30,6 @@ interface UppyUploaderProps {
 
 const companionUrl = 'https://companion.uppy.io';
 const endpoint = 'https://tusd.tusdemo.net/files/';
-const googlePickerClientId =
-    '458443975467-fiplebcb8bdnplqo8hlfs9pagmseo5nk.apps.googleusercontent.com';
-const googlePickerApiKey = 'AIzaSyC6m6CZEFiTtSkBfNf_-PvtCxmDMiAgfag';
-const googlePickerAppId = '458443975467';
 
 export default function UppyUploader({ open, onClose, onFileSelect }: UppyUploaderProps) {
     const [isMounted, setIsMounted] = useState(false);
@@ -61,18 +58,10 @@ export default function UppyUploader({ open, onClose, onFileSelect }: UppyUpload
             .use(Unsplash, { companionUrl })
             .use(Box, { companionUrl })
             .use(Zoom, { companionUrl })
-            .use(GoogleDrivePicker, {
-                companionUrl,
-                clientId: googlePickerClientId,
-                apiKey: googlePickerApiKey,
-                appId: googlePickerAppId,
-            })
-            .use(GooglePhotosPicker, {
-                companionUrl,
-                clientId: googlePickerClientId,
-            });
+            .use(Facebook, { companionUrl })
+            .use(Instagram, { companionUrl })
+            .use(GoogleDrive, { companionUrl });
 
-        // Expose for easier debugging as seen in the snippet
         if (typeof window !== 'undefined') {
             (window as any).uppy = u;
         }
@@ -96,8 +85,7 @@ export default function UppyUploader({ open, onClose, onFileSelect }: UppyUpload
         });
 
         return () => {
-            // We don't uppy.destroy() here to keep the instance alive for the next open, 
-            // matching useMemo behavior.
+            uppy.destroy();
         };
     }, [uppy, onFileSelect, onClose]);
 
@@ -110,15 +98,6 @@ export default function UppyUploader({ open, onClose, onFileSelect }: UppyUpload
             onRequestClose={onClose}
             closeModalOnClickOutside
             proudlyDisplayPoweredByUppy={false}
-            plugins={[
-                'Webcam',
-                'Dropbox',
-                'Url',
-                'OneDrive',
-                'Unsplash',
-                'Box',
-                'ImageEditor',
-            ]}
         />
     );
 }
