@@ -9,7 +9,6 @@ import {
     Audio,
     ScreenCapture,
     ImageEditor,
-    Tus,
 } from 'uppy';
 import DashboardModal from '@uppy/react/dashboard-modal';
 
@@ -21,8 +20,8 @@ interface UppyUploaderProps {
     onFileSelect: (file: File) => void;
 }
 
-const companionUrl = 'https://companion.uppy.io';
-const endpoint = 'https://tusd.tusdemo.net/files/';
+// These are only used for the plugins that absolutely require a server (Unsplash, Url)
+const companionUrl = '/companion';
 
 export default function UppyUploader({ open, onClose, onFileSelect }: UppyUploaderProps) {
     const [isMounted, setIsMounted] = useState(false);
@@ -44,7 +43,7 @@ export default function UppyUploader({ open, onClose, onFileSelect }: UppyUpload
         const u = new Uppy({
             debug: true,
             id: 'uppy-uploader',
-            autoProceed: false,
+            autoProceed: false, // Wait for user to click upload
             restrictions: {
                 maxNumberOfFiles: 1,
             },
@@ -53,9 +52,12 @@ export default function UppyUploader({ open, onClose, onFileSelect }: UppyUpload
             .use(ScreenCapture)
             .use(Audio)
             .use(ImageEditor, {})
-            .use(Tus, { endpoint })
-            .use(Url, { companionUrl })
-            .use(Unsplash, { companionUrl });
+            // Unsplash and Url REQUIRE a companionUrl. They cannot run client-only.
+            .use(Unsplash, { companionUrl })
+            .use(Url, { companionUrl });
+
+        // Since we removed Tus, we can handle the "upload" event locally
+        // or just let 'complete' fire when the user finishes selecting/editing.
 
         if (typeof window !== 'undefined') {
             (window as any).uppy = u;
@@ -68,12 +70,16 @@ export default function UppyUploader({ open, onClose, onFileSelect }: UppyUpload
         const handleComplete = (result: any) => {
             if (result.successful && result.successful.length > 0) {
                 const uppyFile = result.successful[0];
+
+                // Convert Blob to File if necessary
+                let fileToReturn: File;
                 if (uppyFile.data instanceof File) {
-                    onFileSelectRef.current(uppyFile.data);
-                } else if (uppyFile.data instanceof Blob) {
-                    const file = new File([uppyFile.data], uppyFile.name, { type: uppyFile.type });
-                    onFileSelectRef.current(file);
+                    fileToReturn = uppyFile.data;
+                } else {
+                    fileToReturn = new File([uppyFile.data], uppyFile.name || 'upload', { type: uppyFile.type });
                 }
+
+                onFileSelectRef.current(fileToReturn);
                 onCloseRef.current();
                 uppy.cancelAll();
             }
@@ -86,7 +92,6 @@ export default function UppyUploader({ open, onClose, onFileSelect }: UppyUpload
         };
     }, [uppy]);
 
-    // Cleanup uppy instance only on true unmount
     useEffect(() => {
         return () => {
             uppy.destroy();

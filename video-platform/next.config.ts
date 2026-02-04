@@ -40,6 +40,14 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  async rewrites() {
+    return [
+      {
+        source: '/companion/:path*',
+        destination: 'https://companion.uppy.io/:path*',
+      },
+    ];
+  },
 };
 
 export default nextConfig;
