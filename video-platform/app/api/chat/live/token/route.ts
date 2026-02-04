@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
             success: true,
             // We'll pass the model name for the Live API
-            model: "gemini-3-flash-preview",
+            model: "gemini-2.5-flash-native-audio-preview-12-2025",
             // In a real implementation, you would return a short-lived token here
             // token: ephemeralToken,
             key: process.env.GEMINI_API_KEY,
