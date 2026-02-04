@@ -31,6 +31,9 @@ export default function LiveLesson({ onClose, systemInstruction, contextFiles }:
 
     const startSession = async () => {
         try {
+            setStatus('Requesting Microphone access...');
+            await startMic();
+
             setStatus('Requesting secure session...');
             const res = await fetch('/api/chat/live/token', { method: 'POST' });
             const { baseUrl, model, key } = await res.json();
@@ -43,6 +46,7 @@ export default function LiveLesson({ onClose, systemInstruction, contextFiles }:
             socket.onopen = () => {
                 setIsConnected(true);
                 setStatus('AI Tutor connected. Speak now!');
+
                 const fileContext = contextFiles?.length
                     ? `\n\nCURRENT STUDY MATERIALS:\n${JSON.stringify(contextFiles.map(f => ({ filename: f.filename || f.title, category: f.category })))}`
                     : "";
@@ -59,7 +63,6 @@ export default function LiveLesson({ onClose, systemInstruction, contextFiles }:
                         }
                     }
                 }));
-                startMic();
             };
 
             socket.onmessage = async (event) => {
