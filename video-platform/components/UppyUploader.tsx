@@ -57,7 +57,7 @@ export default function UppyUploader({ open, onClose, onFileSelect }: UppyUpload
             .use(Unsplash, { companionUrl })
             .use(Url, { companionUrl })
             // We need an uploader plugin to satisfy Uppy and trigger 'complete' events.
-            .use(XHRUpload, { endpoint: '/api/upload-dummy', formData: true, bundle: true });
+            .use(XHRUpload, { endpoint: '/api/upload-dummy', formData: true });
 
         if (typeof window !== 'undefined') {
             (window as any).uppy = u;
