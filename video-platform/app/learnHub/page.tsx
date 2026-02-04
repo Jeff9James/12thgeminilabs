@@ -25,7 +25,8 @@ import {
   Wrench,
   Loader2,
   CheckCircle2,
-  XCircle
+  XCircle,
+  Trash2
 } from 'lucide-react';
 import LiveLesson from '@/components/LiveLesson';
 import {
@@ -232,7 +233,33 @@ export default function LearnHubPage() {
     }
   }, [chatHistory, allFiles, mcpConnection]);
 
-  // Load all files on mount so filters are available before search
+  // Known dummy/demo files that should be filtered out
+  const KNOWN_DUMMY_FILES = [
+    'Product_Presentation.mp4',
+    'Market_Report.pdf',
+    'Customer_Feedback.xlsx',
+    'demo-video.mp4',
+    'sample.pdf',
+    'test-file.xlsx'
+  ];
+
+  // Sanitize files by removing dummy/unknown files
+  const sanitizeFiles = (files: any[]): any[] => {
+    return files.filter((f: any) => {
+      const filename = f.filename || f.title || '';
+      // Check if filename matches known dummy patterns
+      const isDummy = KNOWN_DUMMY_FILES.some(dummy =>
+        filename.toLowerCase().includes(dummy.toLowerCase())
+      );
+      // Also filter files without proper IDs or geminiFileUri if they look suspicious
+      const hasValidId = f.id && f.id.length > 10;
+      const hasGeminiUri = f.geminiFileUri && f.geminiFileUri.startsWith('https://');
+      // Keep files that are either real uploads (have ID and URI) or not in dummy list
+      return (hasValidId && hasGeminiUri) || !isDummy;
+    });
+  };
+
+  // Clean up dummy files from localStorage
   React.useEffect(() => {
     const storedFiles = localStorage.getItem('uploadedFiles');
     const storedVideos = localStorage.getItem('uploadedVideos');
@@ -241,7 +268,14 @@ export default function LearnHubPage() {
 
     if (storedFiles) {
       const parsedFiles = JSON.parse(storedFiles);
-      loadedFiles = [...parsedFiles];
+      // Sanitize files before loading
+      const sanitizedFiles = sanitizeFiles(parsedFiles);
+      // Update localStorage if files were removed
+      if (sanitizedFiles.length !== parsedFiles.length) {
+        localStorage.setItem('uploadedFiles', JSON.stringify(sanitizedFiles));
+        console.log(`Cleaned ${parsedFiles.length - sanitizedFiles.length} dummy files from uploadedFiles`);
+      }
+      loadedFiles = [...sanitizedFiles];
     }
 
     if (storedVideos) {
@@ -252,7 +286,14 @@ export default function LearnHubPage() {
         category: v.category || 'video',
         filename: v.filename || v.title || 'Unknown',
       }));
-      loadedFiles = [...loadedFiles, ...convertedVideos];
+      // Sanitize converted videos
+      const sanitizedVideos = sanitizeFiles(convertedVideos);
+      // Update localStorage if files were removed
+      if (sanitizedVideos.length !== convertedVideos.length) {
+        localStorage.setItem('uploadedVideos', JSON.stringify(sanitizedVideos));
+        console.log(`Cleaned ${convertedVideos.length - sanitizedVideos.length} dummy files from uploadedVideos`);
+      }
+      loadedFiles = [...loadedFiles, ...sanitizedVideos];
     }
 
     setAllFiles(loadedFiles);
@@ -663,6 +704,24 @@ export default function LearnHubPage() {
     });
   };
 
+  // Clear all dummy/unknown files from localStorage
+  const clearDummyFiles = () => {
+    if (!confirm('This will remove all demo/dummy files from your local storage. Your uploaded files will be preserved. Continue?')) {
+      return;
+    }
+
+    // Clear all localStorage file data
+    localStorage.removeItem('uploadedFiles');
+    localStorage.removeItem('uploadedVideos');
+
+    // Also clear chat history to prevent references to deleted files
+    localStorage.removeItem('unified_chat_history');
+    localStorage.removeItem('unified_chat_metadata');
+
+    // Reload the page to refresh state
+    window.location.reload();
+  };
+
   const hasActiveFilters =
     filters.excludeFiles.length > 0 ||
     filters.includeFiles.length > 0 ||
@@ -925,6 +984,18 @@ export default function LearnHubPage() {
                   Clear
                 </button>
               )}
+            </div>
+
+            {/* Clear Dummy Files Button */}
+            <div className="mb-6 px-1">
+              <button
+                onClick={clearDummyFiles}
+                className="w-full px-3 py-2 bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 rounded-lg font-bold transition-all flex items-center justify-center gap-2 text-xs"
+                title="Remove demo/dummy files from local storage"
+              >
+                <Trash2 className="w-3 h-3" />
+                Clear Dummy Files
+              </button>
             </div>
 
             <div className="space-y-8">
