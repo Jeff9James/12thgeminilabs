@@ -43,7 +43,7 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
-        source: '/companion/:path*',
+        source: '/uppy-proxy/:path*',
         destination: 'https://companion.uppy.io/:path*',
       },
     ];

@@ -22,7 +22,7 @@ interface UppyUploaderProps {
 }
 
 // These are only used for the plugins that absolutely require a server (Unsplash, Url)
-const companionUrl = '/companion';
+const companionUrl = '/uppy-proxy';
 
 export default function UppyUploader({ open, onClose, onFileSelect }: UppyUploaderProps) {
     const [isMounted, setIsMounted] = useState(false);
@@ -87,8 +87,13 @@ export default function UppyUploader({ open, onClose, onFileSelect }: UppyUpload
                         const sourceUrl = uppyFile.uploadURL || uppyFile.remote?.body?.url || uppyFile.preview;
 
                         if (sourceUrl) {
-                            console.log('[UppyUploader] Fetching remote file data from:', sourceUrl);
-                            const response = await fetch(sourceUrl);
+                            // If it's a remote file from companion, fetch it through our proxy
+                            const proxiedUrl = sourceUrl.includes('companion.uppy.io')
+                                ? sourceUrl.replace('https://companion.uppy.io', '/uppy-proxy')
+                                : sourceUrl;
+
+                            console.log('[UppyUploader] Fetching remote file data from:', proxiedUrl);
+                            const response = await fetch(proxiedUrl);
                             const blob = await response.blob();
                             fileToReturn = new File([blob], uppyFile.name || 'upload', { type: uppyFile.type });
                         } else {

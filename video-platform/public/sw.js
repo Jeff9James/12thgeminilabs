@@ -56,8 +56,8 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Skip API calls (always go to network)
-  if (url.pathname.startsWith('/api/')) {
+  // Skip API and Companion proxy calls (always go to network)
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/uppy-proxy/')) {
     return;
   }
 
