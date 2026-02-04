@@ -5,15 +5,20 @@ import {
     Uppy,
     Webcam,
     Zoom,
+    Dropbox,
+    OneDrive,
+    Unsplash,
+    Url,
+    Box,
     Audio,
     ScreenCapture,
     ImageEditor,
     Tus,
-    RemoteSources,
+    GoogleDrivePicker,
+    GooglePhotosPicker,
 } from 'uppy';
 import DashboardModal from '@uppy/react/dashboard-modal';
 
-// Use the consolidated Uppy CSS bundle for reliability
 import 'uppy/dist/uppy.min.css';
 
 interface UppyUploaderProps {
@@ -24,6 +29,10 @@ interface UppyUploaderProps {
 
 const companionUrl = 'https://companion.uppy.io';
 const endpoint = 'https://tusd.tusdemo.net/files/';
+const googlePickerClientId =
+    '458443975467-fiplebcb8bdnplqo8hlfs9pagmseo5nk.apps.googleusercontent.com';
+const googlePickerApiKey = 'AIzaSyC6m6CZEFiTtSkBfNf_-PvtCxmDMiAgfag';
+const googlePickerAppId = '458443975467';
 
 export default function UppyUploader({ open, onClose, onFileSelect }: UppyUploaderProps) {
     const [isMounted, setIsMounted] = useState(false);
@@ -33,10 +42,10 @@ export default function UppyUploader({ open, onClose, onFileSelect }: UppyUpload
     }, []);
 
     const uppy = useMemo(() => {
-        return new Uppy({
+        const u = new Uppy({
+            debug: true,
             id: 'uppy-uploader',
             autoProceed: false,
-            debug: process.env.NODE_ENV === 'development',
             restrictions: {
                 maxNumberOfFiles: 1,
             },
@@ -46,20 +55,29 @@ export default function UppyUploader({ open, onClose, onFileSelect }: UppyUpload
             .use(Audio)
             .use(ImageEditor, {})
             .use(Tus, { endpoint })
-            .use(RemoteSources, {
+            .use(Dropbox, { companionUrl })
+            .use(Url, { companionUrl })
+            .use(OneDrive, { companionUrl })
+            .use(Unsplash, { companionUrl })
+            .use(Box, { companionUrl })
+            .use(Zoom, { companionUrl })
+            .use(GoogleDrivePicker, {
                 companionUrl,
-                sources: [
-                    'GoogleDrive',
-                    'Dropbox',
-                    'Instagram',
-                    'Facebook',
-                    'OneDrive',
-                    'Box',
-                    'Unsplash',
-                    'Url',
-                    'Zoom',
-                ],
+                clientId: googlePickerClientId,
+                apiKey: googlePickerApiKey,
+                appId: googlePickerAppId,
+            })
+            .use(GooglePhotosPicker, {
+                companionUrl,
+                clientId: googlePickerClientId,
             });
+
+        // Expose for easier debugging as seen in the snippet
+        if (typeof window !== 'undefined') {
+            (window as any).uppy = u;
+        }
+
+        return u;
     }, []);
 
     useEffect(() => {
@@ -76,6 +94,11 @@ export default function UppyUploader({ open, onClose, onFileSelect }: UppyUpload
                 uppy.cancelAll();
             }
         });
+
+        return () => {
+            // We don't uppy.destroy() here to keep the instance alive for the next open, 
+            // matching useMemo behavior.
+        };
     }, [uppy, onFileSelect, onClose]);
 
     if (!isMounted) return null;
@@ -89,10 +112,12 @@ export default function UppyUploader({ open, onClose, onFileSelect }: UppyUpload
             proudlyDisplayPoweredByUppy={false}
             plugins={[
                 'Webcam',
+                'Dropbox',
+                'Url',
+                'OneDrive',
+                'Unsplash',
+                'Box',
                 'ImageEditor',
-                'ScreenCapture',
-                'Audio',
-                'RemoteSources' // handles adding its own plugins to the Dashboard
             ]}
         />
     );
