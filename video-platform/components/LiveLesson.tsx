@@ -50,6 +50,7 @@ export default function LiveLesson({ onClose, systemInstruction, contextFiles }:
 
             setStatus('Connecting to Gemini Live...');
             const url = `${baseUrl}?key=${key}`;
+            console.log("Connecting to URL:", url.split('?')[0] + "?key=HIDDEN");
             const socket = new WebSocket(url);
             socketRef.current = socket;
 
@@ -62,10 +63,13 @@ export default function LiveLesson({ onClose, systemInstruction, contextFiles }:
                     ? `\n\nCURRENT STUDY MATERIALS:\n${JSON.stringify(contextFiles.map(f => ({ filename: f.filename || f.title, category: f.category })))}`
                     : "";
 
+                const modelPath = model.startsWith('models/') ? model : `models/${model}`;
+                console.log("Sending Setup with model:", modelPath);
+
                 // Send initial config
                 socket.send(JSON.stringify({
                     setup: {
-                        model: `models/${model}`,
+                        model: modelPath,
                         generation_config: {
                             response_modalities: ["AUDIO"]
                         },
