@@ -69,10 +69,12 @@ function NavBar() {
 
   const links = [
     { label: "FEATURES", href: "#features" },
-    { label: "SEARCH", href: "#search" },
-    { label: "CHAT", href: "#chat" },
-    { label: "LEARNHUB", href: "#learnhub" },
-    { label: "MORE", href: "#more" },
+    { label: "MY FILES", href: "/files" },
+    { label: "CHAT", href: "/chat" },
+    { label: "HISTORY", href: "/history" },
+    { label: "SEARCH", href: "/search" },
+    { label: "ANALYZE", href: "/analyze" },
+    { label: "LEARNHUB", href: "/learnHub" },
   ];
 
   return (
@@ -193,8 +195,15 @@ function HeroSection() {
         </div>
 
         <a
+          href="/analyze"
+          className="inline-block font-pixel text-xs bg-accent text-darker px-6 py-3 border-2 border-accent-dark pixel-border-accent hover:bg-accent-dark transition-none cursor-pointer mb-4"
+        >
+          GET STARTED
+        </a>
+
+        <a
           href="#features"
-          className="inline-block font-pixel text-xs bg-accent text-darker px-6 py-3 border-2 border-accent-dark pixel-border-accent hover:bg-accent-dark transition-none cursor-pointer"
+          className="inline-block font-pixel text-xs bg-transparent text-accent px-6 py-3 border-2 border-accent pixel-border hover:bg-accent/10 transition-none cursor-pointer"
         >
           EXPLORE FEATURES
         </a>
@@ -209,11 +218,13 @@ function CoreFeaturesSection() {
   return (
     <section id="features" className="py-16 px-4 dither-cross bg-darker">
       <div className="max-w-6xl mx-auto">
-        <SectionHeader
-          icon={<PixelIcon type="star" size={20} color="#e8a525" />}
-          title="CORE FEATURES"
-          subtitle="Everything you need to manage and interact with your files intelligently"
-        />
+        <a href="/files" className="block">
+          <SectionHeader
+            icon={<PixelIcon type="star" size={20} color="#e8a525" />}
+            title="CORE FEATURES"
+            subtitle="Everything you need to manage and interact with your files intelligently"
+          />
+        </a>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <FeatureCard
@@ -268,11 +279,13 @@ function SearchSection() {
   return (
     <section id="search" className="py-16 px-4 dither-light bg-dark">
       <div className="max-w-6xl mx-auto">
-        <SectionHeader
-          icon={<PixelIcon type="search" size={20} color="#e8a525" />}
-          title="SEARCH ENGINE"
-          subtitle="Powerful search capabilities across all your uploaded files"
-        />
+        <a href="/search" className="block">
+          <SectionHeader
+            icon={<PixelIcon type="search" size={20} color="#e8a525" />}
+            title="SEARCH ENGINE"
+            subtitle="Powerful search capabilities across all your uploaded files"
+          />
+        </a>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <FeatureCard
@@ -320,11 +333,13 @@ function ChatSection() {
   return (
     <section id="chat" className="py-16 px-4 dither-cross bg-darker">
       <div className="max-w-6xl mx-auto">
-        <SectionHeader
-          icon={<PixelIcon type="chat" size={20} color="#e8a525" />}
-          title="CHAT PAGE"
-          subtitle="Unified chat experience with AI agents and multi-file support"
-        />
+        <a href="/chat" className="block">
+          <SectionHeader
+            icon={<PixelIcon type="chat" size={20} color="#e8a525" />}
+            title="CHAT PAGE"
+            subtitle="Unified chat experience with AI agents and multi-file support"
+          />
+        </a>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <FeatureCard
@@ -403,11 +418,13 @@ function LearnHubSection() {
   return (
     <section id="learnhub" className="py-16 px-4 dither-cross bg-darker">
       <div className="max-w-6xl mx-auto">
-        <SectionHeader
-          icon={<PixelIcon type="brain" size={20} color="#e8a525" />}
-          title="LEARNHUB"
-          subtitle="Your AI Teacher — learn from your files with voice and intelligence"
-        />
+        <a href="/learnHub" className="block">
+          <SectionHeader
+            icon={<PixelIcon type="brain" size={20} color="#e8a525" />}
+            title="LEARNHUB"
+            subtitle="Your AI Teacher — learn from your files with voice and intelligence"
+          />
+        </a>
 
         {/* LearnHub description box */}
         <div className="border-2 border-accent bg-card dither-accent p-6 mb-6 max-w-3xl mx-auto pixel-border">
@@ -459,13 +476,15 @@ function LearnHubSection() {
 
 function HistorySection() {
   return (
-    <section id="more" className="py-16 px-4 dither-light bg-dark">
+    <section id="history" className="py-16 px-4 dither-light bg-dark">
       <div className="max-w-6xl mx-auto">
-        <SectionHeader
-          icon={<PixelIcon type="history" size={20} color="#e8a525" />}
-          title="HISTORY"
-          subtitle="Complete session history across all pages in one place"
-        />
+        <a href="/history" className="block">
+          <SectionHeader
+            icon={<PixelIcon type="history" size={20} color="#e8a525" />}
+            title="HISTORY"
+            subtitle="Complete session history across all pages in one place"
+          />
+        </a>
 
         <div className="border-2 border-border bg-card dither-accent p-6 max-w-4xl mx-auto pixel-border">
           <div className="flex items-center gap-2 mb-4">
@@ -567,6 +586,15 @@ function FileTypesSection() {
 }
 
 export function Footer() {
+  const footerLinks = [
+    { label: "MY FILES", href: "/files" },
+    { label: "CHAT", href: "/chat" },
+    { label: "HISTORY", href: "/history" },
+    { label: "SEARCH", href: "/search" },
+    { label: "ANALYZE", href: "/analyze" },
+    { label: "LEARNHUB", href: "/learnHub" },
+  ];
+
   return (
     <footer className="py-10 px-4 bg-darker border-t-2 border-border dither-bg">
       <div className="max-w-6xl mx-auto text-center">
@@ -575,8 +603,16 @@ export function Footer() {
           <span className="font-pixel text-[10px] text-accent">Gemini Files</span>
         </div>
 
-        <div className="font-retro text-sm text-cream/30 mb-4">
-          SEARCH CHAT ANALYZE LEARN
+        <div className="flex flex-wrap justify-center gap-4 mb-4">
+          {footerLinks.map((link) => (
+            <a
+              key={link.label}
+              href={link.href}
+              className="font-retro text-sm text-cream/50 hover:text-accent transition-colors"
+            >
+              {link.label}
+            </a>
+          ))}
         </div>
 
         {/* Pixel art divider */}
