@@ -270,6 +270,20 @@ function CoreFeaturesSection() {
             tagColors={["#ef4444", "#f97316", "#e8a525", "#4ade80", "#38bdf8", "#22d3ee", "#fff"]}
           />
         </div>
+
+        {/* Conduit Section */}
+        <div className="mt-12 border-2 border-accent bg-card dither-accent p-6 max-w-3xl mx-auto pixel-border">
+          <div className="flex items-center gap-2 mb-3">
+            <PixelIcon type="brain" size={20} color="#e8a525" />
+            <span className="font-pixel text-[10px] text-accent">CONDUIT INTEGRATION</span>
+          </div>
+          <p className="font-retro text-lg text-cream/70 leading-relaxed mb-4">
+            The <span className="text-accent font-bold">Access Local Files</span> button in the Analyze page is a full-fledged read-only version of <a href="https://github.com/abaveja313/conduit" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">Conduit</a>.
+          </p>
+          <p className="font-retro text-base text-cream/50 leading-relaxed">
+            Conduit is an in-browser AI-powered file system tool. AI agents can operate on your local file system directly in the browser with no native app and no per-file uploads. Conduit combines the File System Access API, direct type-safe tools, and a Rust → WASM core for high-performance file operations. While currently only compatible with Chromium-based browsers, Conduit provides a powerful foundation for AI-assisted file system operations with plans to expand browser support as standards evolve.
+          </p>
+        </div>
       </div>
     </section>
   );
@@ -614,6 +628,13 @@ export function Footer() {
             </a>
           ))}
         </div>
+
+        <a
+          href="/analyze"
+          className="inline-block font-pixel text-xs bg-accent text-darker px-6 py-3 border-2 border-accent-dark pixel-border-accent hover:bg-accent-dark transition-none cursor-pointer mb-6"
+        >
+          GET STARTED
+        </a>
 
         {/* Pixel art divider */}
         <div className="flex justify-center gap-0.5 mb-4" aria-hidden>
