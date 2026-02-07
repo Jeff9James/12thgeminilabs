@@ -2,6 +2,7 @@
 
 import { useState, forwardRef, useImperativeHandle } from 'react';
 import { FileCategory } from '@/lib/fileTypes';
+import { Play } from 'lucide-react';
 
 interface ParsedAnalysis {
   summary?: string;
@@ -59,6 +60,20 @@ interface StreamingAnalysisProps {
   fileId: string;
   category: FileCategory;
   onAnalysisComplete?: (analysis: any) => void;
+}
+
+// Helper function to parse timestamps like "0:05" or "1:23" to seconds
+function parseTimeToSeconds(timeStr: string): number {
+  // Remove brackets if present
+  const cleanTime = timeStr.replace(/[\[\]]/g, '');
+  const parts = cleanTime.split(':');
+
+  if (parts.length === 2) {
+    return parseInt(parts[0]) * 60 + parseInt(parts[1]);
+  } else if (parts.length === 3) {
+    return parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseInt(parts[2]);
+  }
+  return 0;
 }
 
 // Helper function to update lastUsedAt in localStorage
@@ -246,13 +261,27 @@ const StreamingAnalysis = forwardRef<StreamingAnalysisHandle, StreamingAnalysisP
         {category === 'video' && parsedAnalysis.scenes && parsedAnalysis.scenes.length > 0 && (
           <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
             <h3 className="text-xl font-semibold mb-4 text-blue-800">Scene Breakdown</h3>
+            <p className="text-sm text-gray-600 mb-4">Click on timestamps to jump to that moment in the video</p>
             <div className="space-y-3">
               {parsedAnalysis.scenes.map((scene, i) => (
-                <div key={i} className="bg-white border-l-4 border-blue-500 pl-4 py-3 rounded-r shadow-sm">
-                  <div className="flex items-baseline gap-2 mb-1">
-                    <span className="font-mono text-sm text-blue-600 font-semibold">
-                      [{scene.start} - {scene.end}]
-                    </span>
+                <div key={i} className="bg-white border-l-4 border-blue-500 pl-4 py-3 rounded-r shadow-sm hover:bg-blue-50 transition-colors">
+                  <div className="flex items-baseline gap-2 mb-1 flex-wrap">
+                    <button
+                      onClick={() => {
+                        const videoEl = document.getElementById('videoPlayer') as HTMLVideoElement;
+                        if (videoEl) {
+                          const time = parseTimeToSeconds(scene.start);
+                          videoEl.currentTime = time;
+                          videoEl.play().catch(e => console.error('Autoplay prevented:', e));
+                          videoEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                      }}
+                      className="inline-flex items-center gap-1 px-3 py-1 bg-white text-blue-600 font-mono text-sm font-semibold hover:bg-blue-600 hover:text-white rounded-lg transition-colors cursor-pointer border border-blue-200"
+                      title={`Click to jump to ${scene.start}`}
+                    >
+                      <Play className="w-3 h-3" />
+                      {scene.start} - {scene.end}
+                    </button>
                     <span className="font-semibold text-gray-900">{scene.label}</span>
                   </div>
                   <p className="text-sm text-gray-600">{scene.description}</p>
@@ -292,10 +321,25 @@ const StreamingAnalysis = forwardRef<StreamingAnalysisHandle, StreamingAnalysisP
         {category === 'audio' && parsedAnalysis.keyMoments && parsedAnalysis.keyMoments.length > 0 && (
           <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
             <h3 className="text-xl font-semibold mb-3 text-orange-800">Key Moments</h3>
+            <p className="text-sm text-gray-600 mb-3">Click on timestamps to jump to that moment in the audio</p>
             <div className="space-y-2">
               {parsedAnalysis.keyMoments.map((moment, i) => (
-                <div key={i} className="bg-white p-3 rounded-lg flex gap-3">
-                  <span className="font-mono text-sm text-orange-600 font-semibold">[{moment.timestamp}]</span>
+                <div key={i} className="bg-white p-3 rounded-lg flex gap-3 items-start">
+                  <button
+                    onClick={() => {
+                      const audioEl = document.getElementById('audioPlayer') as HTMLAudioElement;
+                      if (audioEl) {
+                        const time = parseTimeToSeconds(moment.timestamp);
+                        audioEl.currentTime = time;
+                        audioEl.play().catch(e => console.error('Autoplay prevented:', e));
+                        audioEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      }
+                    }}
+                    className="font-mono text-sm text-orange-600 font-semibold hover:text-orange-800 hover:underline cursor-pointer bg-orange-50 hover:bg-orange-100 px-2 py-1 rounded transition-colors flex-shrink-0"
+                    title={`Click to jump to ${moment.timestamp}`}
+                  >
+                    [{moment.timestamp}]
+                  </button>
                   <span className="text-gray-700">{moment.description}</span>
                 </div>
               ))}
