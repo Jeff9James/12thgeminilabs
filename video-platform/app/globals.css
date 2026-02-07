@@ -62,3 +62,168 @@ body {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+/* Pixel art theme for Gemini Files landing page */
+@theme {
+  --font-pixel: 'Press Start 2P', monospace;
+  --font-retro: 'VT323', monospace;
+  --font-silk: 'Silkscreen', monospace;
+
+  --color-cream: #f5f0e1;
+  --color-dark: #1a1a2e;
+  --color-darker: #0f0f1a;
+  --color-mid: #2d2d44;
+  --color-accent: #e8a525;
+  --color-accent-dark: #c48a1a;
+  --color-green: #4ade80;
+  --color-green-dark: #22763a;
+  --color-cyan: #22d3ee;
+  --color-cyan-dark: #0e7490;
+  --color-red: #ef4444;
+  --color-orange: #f97316;
+  --color-teal: #14b8a6;
+  --color-sky: #38bdf8;
+  --color-border: #3d3d5c;
+  --color-card: #232338;
+  --color-card-hover: #2a2a42;
+}
+
+/* Dither pattern backgrounds */
+.dither-bg {
+  background-color: #0f0f1a;
+  background-image: url("data:image/svg+xml,%3Csvg width='4' height='4' viewBox='0 0 4 4' xmlns='http://www.w3.org/2000/svg'%3E%3Crect x='0' y='0' width='1' height='1' fill='%231a1a2e' /%3E%3Crect x='2' y='2' width='1' height='1' fill='%231a1a2e' /%3E%3C/svg%3E");
+}
+
+.dither-light {
+  background-image: url("data:image/svg+xml,%3Csvg width='4' height='4' viewBox='0 0 4 4' xmlns='http://www.w3.org/2000/svg'%3E%3Crect x='0' y='0' width='1' height='1' fill='%23e8a525' opacity='0.08' /%3E%3Crect x='2' y='2' width='1' height='1' fill='%23e8a525' opacity='0.08' /%3E%3C/svg%3E");
+}
+
+.dither-accent {
+  background-image: url("data:image/svg+xml,%3Csvg width='6' height='6' viewBox='0 0 6 6' xmlns='http://www.w3.org/2000/svg'%3E%3Crect x='0' y='0' width='1' height='1' fill='%23e8a525' opacity='0.15' /%3E%3Crect x='3' y='3' width='1' height='1' fill='%23e8a525' opacity='0.15' /%3E%3C/svg%3E");
+}
+
+.dither-dense {
+  background-image: url("data:image/svg+xml,%3Csvg width='2' height='2' viewBox='0 0 2 2' xmlns='http://www.w3.org/2000/svg'%3E%3Crect x='0' y='0' width='1' height='1' fill='%23ffffff' opacity='0.03' /%3E%3C/svg%3E");
+}
+
+.dither-cross {
+  background-image: url("data:image/svg+xml,%3Csvg width='8' height='8' viewBox='0 0 8 8' xmlns='http://www.w3.org/2000/svg'%3E%3Crect x='3' y='0' width='1' height='1' fill='%23e8a525' opacity='0.06' /%3E%3Crect x='0' y='3' width='1' height='1' fill='%23e8a525' opacity='0.06' /%3E%3Crect x='3' y='3' width='1' height='1' fill='%23e8a525' opacity='0.1' /%3E%3Crect x='7' y='3' width='1' height='1' fill='%23e8a525' opacity='0.06' /%3E%3Crect x='3' y='7' width='1' height='1' fill='%23e8a525' opacity='0.06' /%3E%3C/svg%3E");
+}
+
+/* Pixel border utility */
+.pixel-border {
+  box-shadow:
+    inset -2px -2px 0px 0px #0f0f1a,
+    inset 2px 2px 0px 0px #3d3d5c;
+}
+
+.pixel-border-accent {
+  box-shadow:
+    inset -2px -2px 0px 0px #c48a1a,
+    inset 2px 2px 0px 0px #f5d98a;
+}
+
+.pixel-border-out {
+  box-shadow:
+    2px 2px 0px 0px #0f0f1a,
+    -2px -2px 0px 0px #3d3d5c;
+}
+
+/* Scanline effect */
+.scanlines::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(transparent,
+      transparent 2px,
+      rgba(0, 0, 0, 0.05) 2px,
+      rgba(0, 0, 0, 0.05) 4px);
+  pointer-events: none;
+}
+
+/* Pixel cursor blink */
+@keyframes blink {
+
+  0%,
+  50% {
+    opacity: 1;
+  }
+
+  51%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.pixel-blink {
+  animation: blink 1s step-end infinite;
+}
+
+/* Pixel bounce */
+@keyframes pixel-float {
+
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+.pixel-float {
+  animation: pixel-float 3s step-end infinite;
+}
+
+@keyframes pixel-float-delay {
+
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+.pixel-float-delay {
+  animation: pixel-float-delay 3s step-end infinite;
+  animation-delay: 1.5s;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0f0f1a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #3d3d5c;
+  border: 2px solid #0f0f1a;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #e8a525;
+}
+
+html {
+  scroll-behavior: smooth;
+  image-rendering: pixelated;
+}
+
+/* Tag pixel style */
+.pixel-tag {
+  image-rendering: pixelated;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px;
+  padding: 4px 8px;
+  border: 2px solid;
+}
