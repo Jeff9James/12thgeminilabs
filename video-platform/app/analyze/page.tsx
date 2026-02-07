@@ -24,9 +24,38 @@ export default function AnalyzePage() {
   const [showUrlModal, setShowUrlModal] = useState(false);
   const [fileUrl, setFileUrl] = useState('');
   const [showUppyModal, setShowUppyModal] = useState(false);
+  const [showDemoFilesDialog, setShowDemoFilesDialog] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+
+  // Demo file URLs
+  const demoFiles = [
+    {
+      type: 'Image',
+      url: 'https://res.cloudinary.com/ddz3nsnq1/image/upload/v1770471275/Screenshot_2026-02-02_214003_whppx7.png',
+      icon: ImageIcon,
+      color: 'green'
+    },
+    {
+      type: 'Audio',
+      url: 'https://res.cloudinary.com/ddz3nsnq1/video/upload/v1770471106/ChatGPT__OpenAI_Sam_Altman_AI_Joe_Rogan_Artificial_Intelligence_Practical_AI-HumansAnd_Raises_480M_Seed_Round_to_Build_AI_for_Human_Collaboration_m006pr.mp3',
+      icon: Music,
+      color: 'purple'
+    },
+    {
+      type: 'Video',
+      url: 'https://res.cloudinary.com/ddz3nsnq1/video/upload/v1770471060/videoplayback_eanr2j.mp4',
+      icon: VideoIcon,
+      color: 'blue'
+    },
+    {
+      type: 'PDF',
+      url: 'https://www.iitjammu.ac.in/events/2021/Disciplined_Entrepreneurship.pdf',
+      icon: FileText,
+      color: 'orange'
+    }
+  ];
 
   const handleFileSelect = async (selectedFile: File, fromUrl: boolean = false) => {
     // Validate file
@@ -439,6 +468,14 @@ export default function AnalyzePage() {
                 <Sparkles className="w-5 h-5" />
                 Advanced Upload (Uppy)
               </button>
+
+              <button
+                onClick={() => setShowDemoFilesDialog(true)}
+                className="px-8 py-3 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors inline-flex items-center justify-center gap-2"
+              >
+                <Sparkles className="w-5 h-5" />
+                Try Demo Files
+              </button>
             </div>
 
             <p className="text-sm text-gray-500 mt-4">
@@ -648,6 +685,105 @@ export default function AnalyzePage() {
                         Import
                       </>
                     )}
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Demo Files Dialog */}
+        <AnimatePresence>
+          {showDemoFilesDialog && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+              onClick={() => setShowDemoFilesDialog(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6"
+              >
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                    <Sparkles className="w-6 h-6 text-emerald-600" />
+                    Try Demo Files
+                  </h2>
+                  <button
+                    onClick={() => setShowDemoFilesDialog(false)}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    <X className="w-5 h-5 text-gray-500" />
+                  </button>
+                </div>
+
+                <p className="text-gray-600 mb-6">
+                  Click on any demo file below to import it directly, or copy the URL to use with the "Import from URL" feature.
+                </p>
+
+                <div className="space-y-3">
+                  {demoFiles.map((demo, index) => {
+                    const Icon = demo.icon;
+                    const colorClasses = {
+                      green: 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100',
+                      purple: 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100',
+                      blue: 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100',
+                      orange: 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100'
+                    };
+
+                    return (
+                      <div
+                        key={index}
+                        className={`border rounded-xl p-4 transition-all ${colorClasses[demo.color as keyof typeof colorClasses]}`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="flex-shrink-0">
+                            <Icon className="w-6 h-6" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-semibold mb-1">{demo.type} Demo</h3>
+                            <p className="text-sm break-all opacity-75 mb-3">
+                              {demo.url}
+                            </p>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => {
+                                  setFileUrl(demo.url);
+                                  setShowDemoFilesDialog(false);
+                                  setShowUrlModal(true);
+                                }}
+                                className="px-4 py-2 bg-white border border-current rounded-lg text-sm font-medium hover:bg-opacity-50 transition-colors"
+                              >
+                                Use This File
+                              </button>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(demo.url);
+                                  alert('URL copied to clipboard!');
+                                }}
+                                className="px-4 py-2 bg-white border border-current rounded-lg text-sm font-medium hover:bg-opacity-50 transition-colors"
+                              >
+                                Copy URL
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-6 pt-6 border-t border-gray-200">
+                  <button
+                    onClick={() => setShowDemoFilesDialog(false)}
+                    className="w-full px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors"
+                  >
+                    Close
                   </button>
                 </div>
               </motion.div>
