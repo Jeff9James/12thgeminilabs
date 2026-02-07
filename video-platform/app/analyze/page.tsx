@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
-import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Upload, Sparkles, Video as VideoIcon, X, FileText, Image as ImageIcon, Music, FileSpreadsheet, Link as LinkIcon } from 'lucide-react';
@@ -10,8 +9,6 @@ import { validateFile, getFileCategory, formatFileSize, FILE_INPUT_ACCEPT, FileC
 import { convertSpreadsheetToCSV } from '@/lib/spreadsheetConverter';
 import { FilePreview } from '@/components/FilePreview';
 import LocalFilePicker from '@/components/LocalFilePicker';
-
-const UppyUploader = dynamic(() => import('@/components/UppyUploader'), { ssr: false });
 
 export default function AnalyzePage() {
   const [file, setFile] = useState<File | null>(null);
@@ -23,7 +20,6 @@ export default function AnalyzePage() {
   const [validationError, setValidationError] = useState<string | null>(null);
   const [showUrlModal, setShowUrlModal] = useState(false);
   const [fileUrl, setFileUrl] = useState('');
-  const [showUppyModal, setShowUppyModal] = useState(false);
   const [showDemoFilesDialog, setShowDemoFilesDialog] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -459,14 +455,6 @@ export default function AnalyzePage() {
               >
                 <LinkIcon className="w-5 h-5" />
                 Import from URL
-              </button>
-
-              <button
-                onClick={() => setShowUppyModal(true)}
-                className="px-8 py-3 bg-purple-600 text-white rounded-xl font-semibold hover:bg-purple-700 transition-colors inline-flex items-center justify-center gap-2"
-              >
-                <Sparkles className="w-5 h-5" />
-                Advanced Upload (Uppy)
               </button>
 
               <button
