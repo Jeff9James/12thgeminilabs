@@ -778,12 +778,6 @@ export default function AnalyzePage() {
             </motion.div>
           )}
         </AnimatePresence>
-
-        <UppyUploader
-          open={showUppyModal}
-          onClose={() => setShowUppyModal(false)}
-          onFileSelect={(file) => handleFileSelect(file, false)}
-        />
       </div>
     </div>
   );
